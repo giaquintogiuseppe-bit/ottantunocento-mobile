@@ -1,0 +1,984 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="81|00">
+<meta name="theme-color" content="#0a1628">
+<title>81|00 Mobile</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+:root{
+  --navy:#0a1628;--navy2:#0f1f3d;--teal:#00b4a6;--gold:#e8b84b;
+  --red:#e84b4b;--green:#4be87a;--text:#e8eaf0;--text2:#8a95a8;
+  --brd:rgba(255,255,255,.08);--card:rgba(255,255,255,.05);--r:14px
+}
+html,body{height:100%;background:var(--navy);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Helvetica Neue',sans-serif;overflow:hidden}
+/* LAYOUT */
+#app{display:flex;flex-direction:column;height:100dvh}
+#hdr{background:var(--navy2);padding:calc(env(safe-area-inset-top)+10px) 16px 10px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--brd);flex-shrink:0}
+#hdr h1{font-size:18px;font-weight:800;color:var(--teal)}
+#hdr-status{display:flex;align-items:center;gap:6px}
+#status-dot{width:8px;height:8px;border-radius:50%;background:var(--text2)}
+#status-txt{font-size:11px;color:var(--text2)}
+#content{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:0 0 80px}
+#nav-bar{position:fixed;bottom:0;left:0;right:0;background:var(--navy2);border-top:1px solid var(--brd);display:flex;padding-bottom:env(safe-area-inset-bottom);z-index:10}
+.nav-btn{flex:1;padding:10px 4px 8px;display:flex;flex-direction:column;align-items:center;gap:3px;cursor:pointer;border:none;background:transparent;color:var(--text2);font-size:9px;font-weight:600;letter-spacing:.5px;text-transform:uppercase;transition:color .2s}
+.nav-btn .ni{font-size:22px}
+.nav-btn.active{color:var(--teal)}
+/* PAGINE */
+.pg{display:none;padding:16px;animation:fi .2s ease}
+.pg.active{display:block}
+@keyframes fi{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+/* CARD */
+.card{background:var(--card);border:1px solid var(--brd);border-radius:var(--r);margin-bottom:10px;overflow:hidden}
+.card-h{display:flex;align-items:center;padding:14px;cursor:pointer;gap:12px}
+.card-body{padding:0 14px 14px;border-top:1px solid var(--brd);display:none}
+.card-body.open{display:block}
+/* KPI */
+.kpi-row{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px}
+.kpi{background:var(--card);border:1px solid var(--brd);border-radius:12px;padding:12px}
+.kpi .lb{font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--text2);margin-bottom:5px;font-weight:700}
+.kpi .vl{font-size:20px;font-weight:800}
+.kpi.tc .vl{color:var(--teal)}.kpi.go .vl{color:var(--gold)}.kpi.rd .vl{color:var(--red)}.kpi.gn .vl{color:var(--green)}
+/* FORM */
+.field{margin-bottom:14px}
+.field label{display:block;font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--text2);font-weight:600;margin-bottom:6px}
+.field input,.field select,.field textarea{width:100%;background:var(--navy2);border:1px solid var(--brd);border-radius:10px;color:var(--text);font-family:-apple-system,sans-serif;font-size:16px;padding:12px 14px;outline:none;-webkit-appearance:none}
+.field input:focus,.field select:focus{border-color:var(--teal)}
+.field select option{background:var(--navy2)}
+/* BOTTONI */
+.btn{width:100%;padding:15px;border:none;border-radius:12px;font-family:-apple-system,sans-serif;font-size:16px;font-weight:700;cursor:pointer;margin-bottom:10px;transition:opacity .15s}
+.btn:active{opacity:.8}
+.btn-teal{background:var(--teal);color:var(--navy)}
+.btn-gold{background:var(--gold);color:var(--navy)}
+.btn-red{background:var(--red);color:#fff}
+.btn-ghost{background:var(--card);border:1px solid var(--brd);color:var(--text)}
+/* CHIP */
+.chips{display:flex;flex-wrap:wrap;gap:7px;margin-top:6px}
+.chip{padding:8px 14px;border-radius:20px;border:1px solid var(--brd);background:transparent;color:var(--text2);font-size:13px;font-weight:600;cursor:pointer}
+.chip.on{background:var(--teal);color:var(--navy);border-color:var(--teal)}
+/* DIPENDENTE ROW */
+.dip-row{display:flex;align-items:center;padding:12px 0;border-bottom:1px solid var(--brd);gap:10px}
+.dip-row:last-child{border-bottom:none}
+.av{width:36px;height:36px;border-radius:50%;background:var(--navy2);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;color:var(--text2);flex-shrink:0}
+.dip-info{flex:1;min-width:0}
+.dip-nome{font-size:14px;font-weight:700}
+.dip-sub{font-size:11px;color:var(--text2);margin-top:1px}
+.dip-saldo{text-align:right;font-size:14px;font-weight:800;font-variant-numeric:tabular-nums;flex-shrink:0}
+/* PRESENZA CARD */
+.pres-card{background:var(--card);border:1px solid var(--brd);border-radius:12px;padding:12px;margin-bottom:8px}
+.pres-card.presente{border-color:rgba(0,180,166,.4);background:rgba(0,180,166,.05)}
+.pres-row{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+.pres-toggle{width:44px;height:26px;border-radius:13px;border:none;cursor:pointer;position:relative;flex-shrink:0;transition:background .2s}
+.pres-toggle.on{background:var(--teal)}
+.pres-toggle.off{background:var(--brd)}
+.pres-toggle::after{content:'';position:absolute;width:20px;height:20px;border-radius:50%;background:#fff;top:3px;transition:left .2s}
+.pres-toggle.on::after{left:21px}
+.pres-toggle.off::after{left:3px}
+.pres-fields{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}
+.ie{background:var(--navy);border:1px solid var(--brd);border-radius:8px;color:var(--text);font-size:14px;padding:8px 10px;width:100%;outline:none;-webkit-appearance:none}
+.ie:focus{border-color:var(--teal)}
+/* SEZIONE LABEL */
+.sec-lbl{font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:var(--text2);font-weight:700;margin:16px 0 8px;padding-left:2px}
+/* FOTO */
+#foto-preview{width:100%;border-radius:10px;margin-bottom:10px;display:none;max-height:200px;object-fit:cover}
+/* TOAST */
+#toast{position:fixed;bottom:calc(env(safe-area-inset-bottom)+80px);left:50%;transform:translateX(-50%) translateY(20px);background:var(--teal);color:var(--navy);padding:10px 20px;border-radius:10px;font-weight:700;font-size:13px;opacity:0;transition:all .25s;z-index:99;pointer-events:none;white-space:nowrap}
+#toast.on{opacity:1;transform:translateX(-50%) translateY(0)}
+/* LOADING */
+#loading{position:fixed;inset:0;background:rgba(10,22,40,.9);display:flex;align-items:center;justify-content:center;z-index:100;flex-direction:column;gap:14px;display:none}
+#loading p{color:var(--text2);font-size:14px}
+.spin{font-size:36px;animation:sp 1s linear infinite}
+@keyframes sp{to{transform:rotate(360deg)}}
+</style>
+</head>
+<body>
+
+<div id="loading"><div class="spin">⚙️</div><p>Caricamento dati...</p></div>
+<div id="toast"></div>
+
+<div id="app">
+<div id="hdr">
+  <div>
+    <h1>81|00</h1>
+    <div style="font-size:10px;color:var(--text2)" id="hdr-date"></div>
+  </div>
+  <div id="hdr-status">
+    <span id="status-dot"></span>
+    <span id="status-txt">Connessione...</span>
+    <button onclick="syncCloud()" style="background:rgba(0,180,166,.15);border:1px solid rgba(0,180,166,.3);color:var(--teal);border-radius:8px;padding:5px 10px;font-size:12px;font-weight:700;cursor:pointer">↻ Sync</button>
+  </div>
+</div>
+
+<div id="content">
+
+  <!-- DASHBOARD -->
+  <div class="pg active" id="pg-dash">
+    <div class="kpi-row" id="dash-kpi"></div>
+    <div class="sec-lbl">Saldi dipendenti</div>
+    <div id="dash-saldi"></div>
+    <div class="sec-lbl">Cantieri attivi</div>
+    <div id="dash-cantieri"></div>
+  </div>
+
+  <!-- PRESENZE -->
+  <div class="pg" id="pg-pres">
+    <div class="field">
+      <label>Data</label>
+      <input type="date" id="pres-data" onchange="loadPres()">
+    </div>
+    <div style="display:flex;gap:8px;margin-bottom:14px">
+      <button class="btn btn-ghost" style="padding:10px;font-size:13px" onclick="presNav(-1)">◀ Ieri</button>
+      <button class="btn btn-ghost" style="padding:10px;font-size:13px" onclick="presNav(1)">Domani ▶</button>
+    </div>
+    <div id="pres-kpi" style="margin-bottom:14px"></div>
+    <div id="pres-list"></div>
+    <button class="btn btn-teal" onclick="salvaPres()">💾 Salva presenze</button>
+  </div>
+
+  <!-- SALDI -->
+  <div class="pg" id="pg-saldi">
+    <div class="kpi-row" id="saldi-kpi"></div>
+    <input type="text" placeholder="🔍 Cerca dipendente..." id="saldi-search" oninput="renderSaldi()"
+      style="width:100%;background:var(--navy2);border:1px solid var(--brd);border-radius:10px;color:var(--text);font-size:16px;padding:12px 14px;outline:none;margin-bottom:14px">
+    <div class="chips" style="margin-bottom:14px" id="saldi-filtri">
+      <button class="chip on" data-f="tutti" onclick="setFiltroSaldi('tutti',this)">Tutti</button>
+      <button class="chip" data-f="pagare" onclick="setFiltroSaldi('pagare',this)">Da pagare</button>
+      <button class="chip" data-f="credito" onclick="setFiltroSaldi('credito',this)">⊕ Crediti</button>
+      <button class="chip" data-f="saldato" onclick="setFiltroSaldi('saldato',this)">✓ Saldati</button>
+    </div>
+    <div id="saldi-list"></div>
+  </div>
+
+  <!-- OPERAZIONI (anticipi, pagamenti, spese) -->
+  <div class="pg" id="pg-ops">
+    <div class="chips" style="margin-bottom:16px" id="ops-tabs">
+      <button class="chip on" onclick="setOpsTab('anticipo',this)">💸 Anticipo</button>
+      <button class="chip" onclick="setOpsTab('pagamento',this)">💰 Pagamento</button>
+      <button class="chip" onclick="setOpsTab('spesa',this)">🧾 Spesa</button>
+    </div>
+
+    <!-- ANTICIPO -->
+    <div id="ops-anticipo">
+      <div class="field"><label>Dipendente</label><select id="ant-dip"><option value="">Seleziona...</option></select></div>
+      <div class="field"><label>Importo (€)</label><input type="number" id="ant-imp" inputmode="decimal" step="0.01" placeholder="0.00"></div>
+      <div class="field"><label>Data</label><input type="date" id="ant-data"></div>
+      <div class="field"><label>Metodo</label>
+        <select id="ant-met"><option>Contanti</option><option>Bonifico</option><option>Carta aziendale</option></select>
+      </div>
+      <div class="field"><label>Note</label><input type="text" id="ant-note" placeholder="Opzionale"></div>
+      <button class="btn btn-gold" onclick="salvaAnticipo()">💸 Registra anticipo</button>
+    </div>
+
+    <!-- PAGAMENTO -->
+    <div id="ops-pagamento" style="display:none">
+      <div class="field"><label>Dipendente</label><select id="pag-dip"><option value="">Seleziona...</option></select></div>
+      <div id="pag-saldo-info" style="background:var(--card);border:1px solid var(--brd);border-radius:10px;padding:12px;margin-bottom:14px;display:none">
+        <div style="font-size:11px;color:var(--text2);margin-bottom:4px">SALDO ATTUALE</div>
+        <div id="pag-saldo-val" style="font-size:22px;font-weight:800;color:var(--gold)"></div>
+      </div>
+      <div class="field"><label>Importo pagato (€)</label><input type="number" id="pag-imp" inputmode="decimal" step="0.01" placeholder="0.00"></div>
+      <div class="field"><label>Data pagamento</label><input type="date" id="pag-data"></div>
+      <div class="field"><label>Note</label><input type="text" id="pag-note" placeholder="es. Fine settimana 1-7 giu"></div>
+      <div id="pag-danno-hint" style="display:none;font-size:12px;color:var(--text2);margin-bottom:14px;display:flex;align-items:center;gap:6px" onclick="goTo('danni',document.querySelector('[onclick*=danni]'))">
+        <span style="color:var(--red)">⚠️</span> <span id="pag-danno-hint-txt"></span> <span style="color:var(--teal);text-decoration:underline">gestisci →</span>
+      </div>
+      <button class="btn btn-teal" onclick="salvaPagamento()">💰 Registra pagamento</button>
+    </div>
+
+    <!-- SPESA -->
+    <div id="ops-spesa" style="display:none">
+      <img id="foto-preview" alt="Foto scontrino">
+      <div style="display:flex;gap:8px;margin-bottom:14px">
+        <button class="btn btn-ghost" style="flex:1;padding:12px;font-size:13px" onclick="document.getElementById('foto-input').click()">📷 Foto</button>
+        <input type="file" id="foto-input" accept="image/*" capture="environment" style="display:none" onchange="onFoto(event)">
+      </div>
+      <div class="field"><label>Importo (€)</label><input type="number" id="sp-imp" inputmode="decimal" step="0.01" placeholder="0.00"></div>
+      <div class="field"><label>Fornitore</label><input type="text" id="sp-forn" placeholder="es. Brico Caserta"></div>
+      <div class="field"><label>Data</label><input type="date" id="sp-data"></div>
+      <div class="field"><label>Categoria</label>
+        <select id="sp-cat">
+          <option>Materiali di consumo</option><option>Attrezzatura</option><option>Noleggio</option>
+          <option>Carburante</option><option>Trasferta / Vitto</option><option>Servizi esterni</option><option>Altro</option>
+        </select>
+      </div>
+      <div class="field"><label>Cantiere</label><select id="sp-cant"><option value="">— Nessuno —</option></select></div>
+      <div class="field"><label>Note</label><input type="text" id="sp-note" placeholder="Opzionale"></div>
+      <button class="btn btn-teal" onclick="salvaSpesa()">🧾 Registra spesa</button>
+    </div>
+  </div>
+
+  <!-- CANTIERI -->
+  <div class="pg" id="pg-cant">
+    <div class="kpi-row" id="cant-kpi"></div>
+    <div id="cant-list"></div>
+  </div>
+
+  <!-- DANNI -->
+  <div class="pg" id="pg-danni">
+    <div class="kpi-row" id="danni-kpi"></div>
+
+    <div class="card" style="border-color:rgba(232,75,75,.25);padding:16px;margin-bottom:16px">
+      <div style="font-weight:700;font-size:14px;color:var(--red);margin-bottom:12px">+ Registra nuovo danno</div>
+      <div class="field"><label>Dipendente</label><select id="dn-dip"><option value="">Seleziona...</option></select></div>
+      <div class="field"><label>Importo totale (€)</label><input type="number" id="dn-imp" inputmode="decimal" step="0.01" placeholder="0.00"></div>
+      <div class="field"><label>Data evento</label><input type="date" id="dn-data"></div>
+      <div class="field"><label>Descrizione</label><input type="text" id="dn-desc" placeholder="es. Specchietto Doblò FS504WE"></div>
+      <div class="field"><label>Mezzo / attrezzatura (opzionale)</label><input type="text" id="dn-mezzo" placeholder="es. FS504WE"></div>
+      <button class="btn btn-red" onclick="salvaDanno()">⚠️ Registra danno</button>
+    </div>
+
+    <div class="sec-lbl">Danni attivi</div>
+    <div id="dn-list"></div>
+
+    <div class="sec-lbl" id="dn-chiusi-lbl" style="display:none">✓ Danni saldati</div>
+    <div id="dn-chiusi-list"></div>
+  </div>
+
+</div><!-- /content -->
+
+<!-- NAV BAR -->
+<div id="nav-bar">
+  <button class="nav-btn active" onclick="goTo('dash',this)"><span class="ni">⬛</span>Home</button>
+  <button class="nav-btn" onclick="goTo('pres',this)"><span class="ni">📅</span>Presenze</button>
+  <button class="nav-btn" onclick="goTo('saldi',this)"><span class="ni">💶</span>Saldi</button>
+  <button class="nav-btn" onclick="goTo('ops',this)"><span class="ni">💸</span>Ops</button>
+  <button class="nav-btn" onclick="goTo('danni',this)"><span class="ni">⚠️</span>Danni</button>
+  <button class="nav-btn" onclick="goTo('cant',this)"><span class="ni">🏗️</span>Cant.</button>
+</div>
+</div><!-- /app -->
+
+<script>
+// ── CONFIG SUPABASE ───────────────────────────────────────────────────────
+const SB_URL = 'https://xqbhujcnjvwbwzpwjujf.supabase.co';
+const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhxYmh1amNuanZ3Ynd6cHdqdWpmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE3MzM4ODUsImV4cCI6MjA5NzMwOTg4NX0.VstO3aII143jpPXjgKg0t3du-yc5rS9xs2hYko_2DRs';
+
+// ── DB LOCALE ─────────────────────────────────────────────────────────────
+let DB = {personale:[],presenze:{},cantieri:[],carburante:[],anticipi:[],pagamenti:[],saldi:[],addebiti:[],speseCantiere:[],documenti:[],carteDkv:[],scontrini:[]};
+let _fotoBase64 = null;
+let _filtroSaldi = 'tutti';
+let _opsTab = 'anticipo';
+let _presDati = {}; // stato presenze giornata corrente in editing
+
+// ── SUPABASE FETCH ────────────────────────────────────────────────────────
+async function sbGet(){
+  const res = await fetch(`${SB_URL}/rest/v1/gestionale_dati?id=eq.unico&select=dati,aggiornato_il`, {
+    headers:{'apikey':SB_KEY,'Authorization':`Bearer ${SB_KEY}`}
+  });
+  if(!res.ok) throw new Error('HTTP '+res.status);
+  const rows = await res.json();
+  return rows[0];
+}
+
+async function sbSet(data){
+  const res = await fetch(`${SB_URL}/rest/v1/gestionale_dati?id=eq.unico`, {
+    method:'PATCH',
+    headers:{'apikey':SB_KEY,'Authorization':`Bearer ${SB_KEY}`,'Content-Type':'application/json','Prefer':'return=minimal'},
+    body: JSON.stringify({dati:data, aggiornato_il: new Date().toISOString()})
+  });
+  if(!res.ok) throw new Error('HTTP '+res.status);
+}
+
+// ── STATO CONNESSIONE ─────────────────────────────────────────────────────
+function setStatus(ok, txt){
+  const dot = document.getElementById('status-dot');
+  const label = document.getElementById('status-txt');
+  if(ok === null)       dot.style.background = '#e8b84b'; // giallo = in corso
+  else if(ok === true)  dot.style.background = '#4be87a'; // verde = ok
+  else                  dot.style.background = '#e84b4b'; // rosso = errore
+  if(label) label.textContent = txt;
+}
+
+// ── CARICA DAL CLOUD ──────────────────────────────────────────────────────
+async function loadCloud(){
+  document.getElementById('loading').style.display='flex';
+  try{
+    const row = await sbGet();
+    if(row && row.dati && Object.keys(row.dati).length){
+      Object.assign(DB, row.dati);
+      ['pagamenti','documenti','carteDkv','scontrini','addebiti','speseCantiere','cantieri','mezziDB','risorse','personaleHR'].forEach(k=>{if(!DB[k])DB[k]=[];});
+      ricalcolaSaldi();
+      setStatus(true,'Connesso ✓');
+    } else {
+      setStatus(true,'Cloud vuoto');
+    }
+    renderAll();
+    populateSelects(); // garantisce che le select anticipi/pagamenti siano popolate anche se loadCloud è chiamata più volte
+  } catch(err){
+    setStatus(false,'Offline');
+  } finally {
+    document.getElementById('loading').style.display='none';
+  }
+}
+
+// ── SALVA SUL CLOUD ───────────────────────────────────────────────────────
+// Merge selettivo: rilegge il remoto e preserva i campi di competenza del
+// Planning (cantieri, mezziDB, risorse, personaleHR), scrivendo solo i
+// campi di competenza del Gestionale. Evita che un salvataggio dal mobile
+// cancelli cantieri creati nel frattempo dal Planning con una copia locale
+// non aggiornata.
+const CAMPI_GESTIONALE = ['personale','presenze','carburante','anticipi','pagamenti','saldi','addebiti','speseCantiere','documenti','carteDkv','scontrini'];
+
+let _saveTimer = null;
+async function salvaCloud(silenzioso){
+  try{
+    setStatus(null,'Salvataggio...');
+    const row = await sbGet();
+    const remoto = (row && row.dati) ? row.dati : {};
+
+    const merged = { ...remoto };
+    CAMPI_GESTIONALE.forEach(k => { merged[k] = DB[k]; });
+
+    if(remoto.cantieri) DB.cantieri = remoto.cantieri;
+    if(remoto.mezziDB) DB.mezziDB = remoto.mezziDB;
+    if(remoto.risorse) DB.risorse = remoto.risorse;
+    if(remoto.personaleHR) DB.personaleHR = remoto.personaleHR;
+
+    await sbSet(merged);
+    setStatus(true,'Sincronizzato ✓');
+    if(!silenzioso) toast('Salvato ✓');
+  } catch(err){
+    setStatus(false,'Errore sync — riprova');
+    if(!silenzioso) toast('⚠ Errore: '+err.message);
+    console.error('salvaCloud error:', err);
+  }
+}
+
+async function syncCloud(){
+  document.getElementById('loading').style.display='flex';
+  try{ await loadCloud(); toast('Dati aggiornati ✓'); }
+  catch(e){ toast('Errore connessione'); }
+  finally{ document.getElementById('loading').style.display='none'; }
+}
+
+// ── CALCOLO SALDI ─────────────────────────────────────────────────────────
+function ricalcolaSaldi(){
+  DB.saldi = DB.personale.map(p=>{
+    let mat=0;
+    Object.values(DB.presenze||{}).forEach(g=>{if(g[p.id]) mat+=g[p.id].totale||0;});
+    const ant=(DB.anticipi||[]).filter(a=>a.dipId===p.id&&a.metodo!=='Anticipo da pagamento').reduce((a,x)=>a+x.importo,0);
+    const pag=(DB.pagamenti||[]).filter(pg=>pg.dipId===p.id).reduce((a,x)=>a+parseFloat(x.pagato||0),0);
+    // I danni sono un conto separato — mai sottratti dal saldo
+    const addeb=residuoDanniDip(p.id);
+    const saldo=mat-ant-pag;
+    return {dipId:p.id,nome:p.nome,maturato:mat,anticipi:ant,pagamenti:pag,addebiti:addeb,saldo};
+  });
+}
+
+function residuoDanniDip(dipId){
+  return (DB.addebiti||[]).filter(a=>a.dipId===dipId&&!a.chiuso).reduce((tot,a)=>{
+    const sc=(a.scalature||[]).reduce((s,x)=>s+x.importo,0);
+    return tot+Math.max(0,a.importo-sc);
+  },0);
+}
+
+// ── RENDER TUTTO ──────────────────────────────────────────────────────────
+function renderAll(){
+  renderDash();
+  renderSaldi();
+  renderCantieri();
+  populateSelects();
+  const di=document.getElementById('pres-data');
+  if(!di.value) di.value=today();
+  loadPres();
+}
+
+// ── DASHBOARD ─────────────────────────────────────────────────────────────
+function renderDash(){
+  const totMat=DB.saldi.reduce((a,s)=>a+s.maturato,0);
+  const totDeb=DB.saldi.filter(s=>s.saldo>0.01).reduce((a,s)=>a+s.saldo,0);
+  const totCred=DB.saldi.filter(s=>s.saldo<-0.01).reduce((a,s)=>a+Math.abs(s.saldo),0);
+  const oggi=today();
+  const presOggi=Object.keys((DB.presenze[oggi])||{}).length;
+
+  document.getElementById('dash-kpi').innerHTML=`
+    <div class="kpi tc"><div class="lb">Maturato tot.</div><div class="vl">${fm(totMat)}</div></div>
+    <div class="kpi go"><div class="lb">Da pagare</div><div class="vl">${fm(totDeb)}</div></div>
+    ${totCred>0?`<div class="kpi gn"><div class="lb">⊕ Crediti</div><div class="vl">${fm(totCred)}</div></div>`:''}
+    <div class="kpi tc"><div class="lb">Presenti oggi</div><div class="vl">${presOggi}</div></div>`;
+
+  // ultimi 5 saldi
+  const top=[...DB.saldi].sort((a,b)=>Math.abs(b.saldo)-Math.abs(a.saldo)).slice(0,5);
+  document.getElementById('dash-saldi').innerHTML=top.map(s=>dipRow(s)).join('');
+
+  // cantieri
+  document.getElementById('dash-cantieri').innerHTML=DB.cantieri.filter(c=>!c.archiviato).slice(0,4).map(c=>`
+    <div class="card" style="padding:12px">
+      <div style="font-weight:700;font-size:14px">${c.nome}</div>
+      <div style="font-size:11px;color:var(--text2);margin-top:2px">${periodoCantiere(c)}</div>
+    </div>`).join('')||'<div style="color:var(--text2);font-size:13px">Nessun cantiere attivo</div>';
+}
+
+function dipRow(s){
+  const cls=s.saldo<-0.01?'gn':s.saldo>0.01?'go':'tc';
+  const lbl=s.saldo<-0.01?'⊕ '+fm(Math.abs(s.saldo)):fm(Math.max(0,s.saldo));
+  const init=s.nome.split(' ').map(x=>x[0]).join('').slice(0,2).toUpperCase();
+  return `<div class="dip-row">
+    <div class="av">${init}</div>
+    <div class="dip-info"><div class="dip-nome">${s.nome}</div><div class="dip-sub">mat. ${fm(s.maturato)}</div></div>
+    <div class="dip-saldo" style="color:var(--${cls==='gn'?'green':cls==='go'?'gold':'teal'})">${lbl}</div>
+  </div>`;
+}
+
+// ── PRESENZE ──────────────────────────────────────────────────────────────
+function loadPres(){
+  const d=document.getElementById('pres-data').value;
+  if(!d) return;
+  const giornata=DB.presenze[d]||{};
+  _presDati={};
+
+  const presOggi=Object.keys(giornata).length;
+  const totOggi=Object.values(giornata).reduce((a,p)=>a+(p.totale||0),0);
+  document.getElementById('pres-kpi').innerHTML=`
+    <div class="kpi-row">
+      <div class="kpi tc"><div class="lb">Presenti</div><div class="vl">${presOggi}</div></div>
+      <div class="kpi go"><div class="lb">Maturato</div><div class="vl">${fm(totOggi)}</div></div>
+    </div>`;
+
+  document.getElementById('pres-list').innerHTML=DB.personale.map(p=>{
+    const pr=giornata[p.id];
+    const presente=!!pr;
+    _presDati[p.id]={presente, cantiere:pr?.cantiere||'', base:pr?.base||0, straord:pr?.straord||0, totale:pr?.totale||0};
+    const init=p.nome.split(' ').map(x=>x[0]).join('').slice(0,2).toUpperCase();
+    return `<div class="pres-card ${presente?'presente':''}" id="pc-${p.id}">
+      <div class="pres-row">
+        <div class="av" style="${presente?'background:rgba(0,180,166,.2);color:var(--teal)':''}">${init}</div>
+        <div style="flex:1;font-size:14px;font-weight:700">${p.nome}</div>
+        <button class="pres-toggle ${presente?'on':'off'}" id="tog-${p.id}" onclick="togglePres('${p.id}')"></button>
+      </div>
+      <div id="pf-${p.id}" style="${presente?'':'display:none'}">
+        <div class="pres-fields">
+          <div>
+            <label style="font-size:10px;color:var(--text2);display:block;margin-bottom:4px">Cantiere</label>
+            <select class="ie" id="pc-cant-${p.id}" onchange="updatePD('${p.id}','cantiere',this.value)">
+              <option value="">—</option>
+              ${(DB.cantieri||[]).filter(c=>!c.archiviato).map(c=>`<option value="${c.nome}" ${pr?.cantiere===c.nome?'selected':''}>${c.nome}</option>`).join('')}
+            </select>
+          </div>
+          <div>
+            <label style="font-size:10px;color:var(--text2);display:block;margin-bottom:4px">Base (€)</label>
+            <input class="ie" type="number" inputmode="decimal" id="pc-base-${p.id}" value="${pr?.base||''}" placeholder="0" onchange="updatePD('${p.id}','base',+this.value)">
+          </div>
+          <div>
+            <label style="font-size:10px;color:var(--text2);display:block;margin-bottom:4px">Straord. (€)</label>
+            <input class="ie" type="number" inputmode="decimal" id="pc-str-${p.id}" value="${pr?.straord||''}" placeholder="0" onchange="updatePD('${p.id}','straord',+this.value)">
+          </div>
+          <div>
+            <label style="font-size:10px;color:var(--text2);display:block;margin-bottom:4px">Totale</label>
+            <div id="pc-tot-${p.id}" style="font-size:16px;font-weight:800;color:var(--teal);padding:8px 0">${fm(pr?.totale||0)}</div>
+          </div>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function togglePres(pid){
+  const pd=_presDati[pid];
+  pd.presente=!pd.presente;
+  const card=document.getElementById('pc-'+pid);
+  const tog=document.getElementById('tog-'+pid);
+  const fields=document.getElementById('pf-'+pid);
+  card.classList.toggle('presente',pd.presente);
+  tog.classList.toggle('on',pd.presente);
+  tog.classList.toggle('off',!pd.presente);
+  if(fields) fields.style.display=pd.presente?'block':'none';
+}
+
+function updatePD(pid,field,val){
+  const pd=_presDati[pid];
+  pd[field]=val;
+  if(field==='base'||field==='straord'){
+    pd.totale=(pd.base||0)+(pd.straord||0);
+    const totEl=document.getElementById('pc-tot-'+pid);
+    if(totEl) totEl.textContent=fm(pd.totale);
+  }
+}
+
+async function salvaPres(){
+  const d=document.getElementById('pres-data').value;
+  if(!d){toast('Seleziona una data');return;}
+  if(!DB.presenze) DB.presenze={};
+  DB.presenze[d]={};
+  DB.personale.forEach(p=>{
+    const pd=_presDati[p.id];
+    if(pd&&pd.presente){
+      DB.presenze[d][p.id]={
+        cantiere:pd.cantiere||'',
+        base:pd.base||0,
+        straord:pd.straord||0,
+        totale:pd.totale||0,
+        note:''
+      };
+    }
+  });
+  if(Object.keys(DB.presenze[d]).length===0) delete DB.presenze[d];
+  ricalcolaSaldi();
+  toast('Presenze salvate ✓');
+  loadPres();
+  await salvaCloud(false);
+}
+
+function presNav(delta){
+  const di=document.getElementById('pres-data');
+  if(!di.value) di.value=today();
+  const d=new Date(di.value);
+  d.setDate(d.getDate()+delta);
+  di.value=d.toISOString().slice(0,10);
+  loadPres();
+}
+
+// ── SALDI ─────────────────────────────────────────────────────────────────
+function renderSaldi(){
+  const q=document.getElementById('saldi-search').value.toLowerCase();
+  let lista=[...DB.saldi];
+  if(_filtroSaldi==='pagare')  lista=lista.filter(s=>s.saldo>0.01);
+  if(_filtroSaldi==='credito') lista=lista.filter(s=>s.saldo<-0.01);
+  if(_filtroSaldi==='saldato') lista=lista.filter(s=>Math.abs(s.saldo)<=0.01);
+  if(q) lista=lista.filter(s=>s.nome.toLowerCase().includes(q));
+  lista.sort((a,b)=>Math.abs(b.saldo)-Math.abs(a.saldo));
+
+  const totDeb=DB.saldi.filter(s=>s.saldo>0.01).reduce((a,s)=>a+s.saldo,0);
+  const totCred=DB.saldi.filter(s=>s.saldo<-0.01).reduce((a,s)=>a+Math.abs(s.saldo),0);
+  document.getElementById('saldi-kpi').innerHTML=`
+    <div class="kpi go"><div class="lb">Da pagare</div><div class="vl">${fm(totDeb)}</div></div>
+    ${totCred>0?`<div class="kpi gn"><div class="lb">⊕ Crediti</div><div class="vl">${fm(totCred)}</div></div>`:`<div class="kpi tc"><div class="lb">Dipendenti</div><div class="vl">${DB.saldi.length}</div></div>`}`;
+
+  document.getElementById('saldi-list').innerHTML=lista.map(s=>{
+    const init=s.nome.split(' ').map(x=>x[0]).join('').slice(0,2).toUpperCase();
+    const cr=s.saldo<-0.01, go=s.saldo>0.01;
+    const colore=cr?'var(--green)':go?'var(--gold)':'var(--teal)';
+    const saldoTxt=cr?'⊕ '+fm(Math.abs(s.saldo)):fm(Math.max(0,s.saldo));
+    const ants=(DB.anticipi||[]).filter(a=>a.dipId===s.dipId&&a.metodo!=='Anticipo da pagamento');
+    const pags=(DB.pagamenti||[]).filter(p=>p.dipId===s.dipId);
+    const detA=ants.map(a=>`<div class="dip-row"><div class="dip-info"><div class="dip-nome" style="font-size:13px">📅 ${fd(a.data)} — Anticipo</div><div class="dip-sub">${a.metodo}</div></div><div class="dip-saldo" style="color:var(--red);font-size:13px">−${fm(a.importo)}</div></div>`).join('');
+    const detP=pags.map(p=>`<div class="dip-row"><div class="dip-info"><div class="dip-nome" style="font-size:13px">💰 ${fd(p.data)} — Pagamento</div><div class="dip-sub">${p.note||''}</div></div><div class="dip-saldo" style="color:var(--red);font-size:13px">−${fm(p.pagato)}</div></div>`).join('');
+    return `<div class="card" style="${cr?'border-color:rgba(75,232,122,.3)':''}">
+      <div class="card-h" onclick="toggleCard('sd-${s.dipId}')">
+        <div class="av" style="${cr?'background:rgba(75,232,122,.15);color:var(--green)':go?'background:rgba(232,184,75,.15);color:var(--gold)':''}">${init}</div>
+        <div class="dip-info"><div class="dip-nome">${s.nome}</div><div class="dip-sub">mat. ${fm(s.maturato)}</div></div>
+        <div style="text-align:right">
+          <div style="font-size:16px;font-weight:800;color:${colore}">${saldoTxt}</div>
+          <div style="font-size:10px;color:var(--text2)">${cr?'CREDITO':go?'DA PAGARE':'SALDATO'}</div>
+        </div>
+        <span style="color:var(--text2);font-size:14px;margin-left:6px">▾</span>
+      </div>
+      <div class="card-body" id="sd-${s.dipId}">
+        <div class="dip-row"><div class="dip-info"><div class="dip-nome" style="font-size:13px">Maturato totale</div></div><div class="dip-saldo" style="font-size:13px">${fm(s.maturato)}</div></div>
+        ${detA}${detP}
+        <div class="dip-row" style="border-top:2px solid var(--brd);padding-top:10px;margin-top:4px">
+          <div class="dip-info"><div class="dip-nome">RESIDUO</div></div>
+          <div class="dip-saldo" style="color:${colore};font-size:16px">${saldoTxt}</div>
+        </div>
+      </div>
+    </div>`;
+  }).join('')||'<div style="color:var(--text2);text-align:center;padding:30px;font-size:14px">Nessun risultato</div>';
+}
+
+function setFiltroSaldi(f,el){
+  _filtroSaldi=f;
+  document.querySelectorAll('#saldi-filtri .chip').forEach(c=>c.classList.remove('on'));
+  el.classList.add('on');
+  renderSaldi();
+}
+
+// ── OPERAZIONI ────────────────────────────────────────────────────────────
+function setOpsTab(tab,el){
+  _opsTab=tab;
+  document.querySelectorAll('#ops-tabs .chip').forEach(c=>c.classList.remove('on'));
+  el.classList.add('on');
+  ['anticipo','pagamento','spesa'].forEach(t=>{
+    document.getElementById('ops-'+t).style.display=t===tab?'block':'none';
+  });
+}
+
+function populateSelects(){
+  const opts=DB.personale.map(p=>`<option value="${p.id}">${p.nome}</option>`).join('');
+  ['ant-dip','pag-dip','dn-dip'].forEach(id=>{
+    const el=document.getElementById(id);
+    if(el) el.innerHTML='<option value="">Seleziona...</option>'+opts;
+  });
+  const cantOpts=DB.cantieri.filter(c=>!c.archiviato).map(c=>`<option value="${c.nome}">${c.nome}</option>`).join('');
+  const sc=document.getElementById('sp-cant');
+  if(sc) sc.innerHTML='<option value="">— Nessuno —</option>'+cantOpts;
+}
+
+// Quando selezioni dipendente per pagamento, mostra il saldo attuale
+document.addEventListener('DOMContentLoaded',()=>{
+  document.getElementById('pag-dip')?.addEventListener('change',function(){
+    const dipId=this.value;
+    const sal=DB.saldi.find(s=>s.dipId===dipId);
+    const box=document.getElementById('pag-saldo-info');
+    const val=document.getElementById('pag-saldo-val');
+    if(sal&&dipId){
+      box.style.display='block';
+      val.textContent=sal.saldo<-0.01?'⊕ Credito '+fm(Math.abs(sal.saldo)):fm(Math.max(0,sal.saldo));
+      val.style.color=sal.saldo<-0.01?'var(--green)':'var(--gold)';
+      document.getElementById('pag-imp').value=sal.saldo>0.01?sal.saldo.toFixed(2):'';
+    } else { box.style.display='none'; }
+
+    // hint informativo se ha un danno attivo — non interferisce col pagamento
+    const hint=document.getElementById('pag-danno-hint');
+    const hintTxt=document.getElementById('pag-danno-hint-txt');
+    const residuoDanno=dipId?residuoDanniDip(dipId):0;
+    if(residuoDanno>0.01){
+      hint.style.display='flex';
+      hintTxt.textContent=`Ha un danno da recuperare: ${fm(residuoDanno)}`;
+    } else {
+      hint.style.display='none';
+    }
+  });
+});
+
+async function salvaAnticipo(){
+  // Aggiorna la select per sicurezza prima di leggere il valore
+  populateSelects();
+  const dipId=document.getElementById('ant-dip').value;
+  const p=DB.personale.find(x=>x.id===dipId);
+  const imp=parseFloat(document.getElementById('ant-imp').value||0);
+  if(!dipId||!p){
+    // Se la select è vuota, potrebbe essere un problema di dati non caricati
+    if(DB.personale.length===0){ toast('⚠ Nessun dipendente in anagrafica — carica i dati prima'); }
+    else { toast('Seleziona il dipendente'); }
+    return;
+  }
+  if(!imp||imp<=0){toast('Inserisci un importo valido');return;}
+  if(!DB.anticipi) DB.anticipi=[];
+  DB.anticipi.push({id:uid(),data:document.getElementById('ant-data').value||today(),dipId,dipNome:p.nome,importo:imp,metodo:document.getElementById('ant-met').value,note:document.getElementById('ant-note').value});
+  ricalcolaSaldi();
+  document.getElementById('ant-imp').value='';
+  document.getElementById('ant-note').value='';
+  renderSaldi();
+  await salvaCloud(false);
+  toast(`Anticipo di ${fm(imp)} registrato per ${p.nome} ✓`);
+}
+
+async function salvaPagamento(){
+  const dipId=document.getElementById('pag-dip').value;
+  const p=DB.personale.find(x=>x.id===dipId);
+  const imp=parseFloat(document.getElementById('pag-imp').value||0);
+
+  if(!dipId||!p){toast('Seleziona dipendente');return;}
+  if(!imp||imp<=0){toast('Inserisci importo');return;}
+
+  const sal=DB.saldi.find(s=>s.dipId===dipId);
+  const eccesso=sal?Math.max(0,imp-sal.saldo):0;
+
+  DB.pagamenti.push({
+    id:uid(), data:document.getElementById('pag-data').value||today(), dipId, dipNome:p.nome,
+    maturato:sal?.maturato||0, anticipiDati:sal?.anticipi||0, pagato:imp, eccesso,
+    note:document.getElementById('pag-note').value,
+    periodoDa:'', periodoAl:''
+  });
+
+  if(eccesso>0.01){
+    DB.anticipi.push({id:uid(),data:today(),dipId,dipNome:p.nome,importo:eccesso,metodo:'Anticipo da pagamento',note:`Anticipo futuro da pagamento (eccesso ${fm(eccesso)})`});
+  }
+
+  ricalcolaSaldi();
+  document.getElementById('pag-imp').value='';
+  document.getElementById('pag-note').value='';
+  document.getElementById('pag-saldo-info').style.display='none';
+  document.getElementById('pag-danno-hint').style.display='none';
+  renderSaldi();
+  toast(`Pagamento ${fm(imp)} a ${p.nome} ✓`);
+  await salvaCloud(false);
+}
+
+// ============================================================
+// DANNI — sistema indipendente, mai legato al saldo
+// ============================================================
+async function salvaDanno(){
+  const dipId=document.getElementById('dn-dip').value;
+  const p=DB.personale.find(x=>x.id===dipId);
+  const imp=parseFloat(document.getElementById('dn-imp').value||0);
+  if(!dipId||!p){toast('Seleziona dipendente');return;}
+  if(!imp||imp<=0){toast('Inserisci importo');return;}
+
+  if(!DB.addebiti) DB.addebiti=[];
+  DB.addebiti.push({
+    id:uid(), dipId, dipNome:p.nome, importo:imp,
+    data:document.getElementById('dn-data').value||today(),
+    descrizione:document.getElementById('dn-desc').value||'Danno non specificato',
+    mezzo:document.getElementById('dn-mezzo').value||'',
+    scalature:[], chiuso:false
+  });
+
+  ricalcolaSaldi();
+  document.getElementById('dn-imp').value='';
+  document.getElementById('dn-desc').value='';
+  document.getElementById('dn-mezzo').value='';
+  document.getElementById('dn-dip').value='';
+  renderDanni();
+  toast(`Danno ${fm(imp)} registrato per ${p.nome} ✓`);
+  await salvaCloud(false);
+}
+
+function renderDanni(){
+  if(!DB.addebiti) DB.addebiti=[];
+
+  const sel=document.getElementById('dn-dip');
+  if(sel) sel.innerHTML='<option value="">Seleziona...</option>'+DB.personale.map(p=>`<option value="${p.id}">${p.nome}</option>`).join('');
+  const di=document.getElementById('dn-data');
+  if(di && !di.value) di.value=today();
+
+  const attivi=DB.addebiti.filter(a=>!a.chiuso);
+  const chiusi=DB.addebiti.filter(a=>a.chiuso);
+
+  const totResiduo=attivi.reduce((tot,a)=>{
+    const sc=(a.scalature||[]).reduce((s,x)=>s+x.importo,0);
+    return tot+Math.max(0,a.importo-sc);
+  },0);
+  document.getElementById('danni-kpi').innerHTML=`
+    <div class="kpi rd"><div class="lb">Attivi</div><div class="vl">${attivi.length}</div></div>
+    <div class="kpi rd"><div class="lb">Da recuperare</div><div class="vl">${fm(totResiduo)}</div></div>`;
+
+  const list=document.getElementById('dn-list');
+  list.innerHTML = attivi.length
+    ? attivi.map(a=>dannoCard(a,false)).join('')
+    : '<div style="color:var(--text2);font-size:13px;text-align:center;padding:16px">Nessun danno attivo</div>';
+
+  const chiusiLbl=document.getElementById('dn-chiusi-lbl');
+  const chiusiList=document.getElementById('dn-chiusi-list');
+  if(chiusi.length){
+    chiusiLbl.style.display='block';
+    chiusiList.innerHTML=chiusi.map(a=>dannoCard(a,true)).join('');
+  } else {
+    chiusiLbl.style.display='none';
+    chiusiList.innerHTML='';
+  }
+}
+
+function dannoCard(a, chiuso){
+  const scalato=(a.scalature||[]).reduce((s,x)=>s+x.importo,0);
+  const residuo=Math.max(0,a.importo-scalato);
+  const pct=Math.min(100,Math.round((scalato/a.importo)*100));
+  return `<div class="card" style="border-color:${chiuso?'rgba(75,232,122,.3)':'rgba(232,75,75,.25)'};padding:12px;cursor:pointer" onclick="apriScalaDanno('${a.id}')">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:4px">
+      <div style="font-weight:700;font-size:14px">${a.dipNome}</div>
+      <span style="font-size:9px;font-weight:700;padding:3px 7px;border-radius:5px;background:${chiuso?'rgba(75,232,122,.15)':'rgba(232,75,75,.15)'};color:${chiuso?'var(--green)':'var(--red)'}">${chiuso?'✓ SALDATO':'ATTIVO'}</span>
+    </div>
+    <div style="font-size:11px;color:var(--text2);margin-bottom:8px">${a.descrizione}${a.mezzo?' — '+a.mezzo:''}</div>
+    <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px">
+      <span style="color:var(--text2)">Danno totale</span><span>${fm(a.importo)}</span>
+    </div>
+    <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:8px">
+      <span style="color:var(--text2)">Già scalato</span><span style="color:var(--red)">${fm(scalato)}</span>
+    </div>
+    <div style="background:var(--navy);border-radius:6px;height:6px;overflow:hidden;margin-bottom:8px">
+      <div style="background:${chiuso?'var(--green)':'var(--red)'};height:100%;width:${pct}%"></div>
+    </div>
+    <div style="display:flex;justify-content:space-between;font-size:14px;font-weight:800">
+      <span>${chiuso?'Completato':'Residuo'}</span><span style="color:${chiuso?'var(--green)':'var(--red)'}">${chiuso?'✓':fm(residuo)}</span>
+    </div>
+  </div>`;
+}
+
+function eliminaDanno(id){
+  if(!confirm('Eliminare questo danno? Le quote già scalate non verranno restituite automaticamente.')) return;
+  DB.addebiti=(DB.addebiti||[]).filter(a=>a.id!==id);
+  document.getElementById('storico-overlay')?.remove();
+  renderDanni();
+  salvaCloud(false);
+  toast('Danno eliminato ✓');
+}
+
+// Overlay per scalare una quota o consultare lo storico
+function apriScalaDanno(id){
+  const a=(DB.addebiti||[]).find(x=>x.id===id);
+  if(!a) return;
+  const scalature=[...(a.scalature||[])].sort((x,y)=>x.data.localeCompare(y.data));
+  const totScalato=scalature.reduce((s,x)=>s+x.importo,0);
+  const residuo=Math.max(0,a.importo-totScalato);
+
+  let overlay=document.getElementById('storico-overlay');
+  if(!overlay){
+    overlay=document.createElement('div');
+    overlay.id='storico-overlay';
+    overlay.style.cssText='position:fixed;inset:0;background:rgba(10,22,40,.92);z-index:200;display:flex;align-items:flex-end;justify-content:center';
+    document.body.appendChild(overlay);
+  }
+
+  const righeStorico = scalature.length
+    ? scalature.map((s,i)=>`<div class="dip-row"><div class="dip-info"><div class="dip-nome" style="font-size:13px">Quota #${i+1}</div><div class="dip-sub">${fd(s.data)}</div></div><div class="dip-saldo" style="color:var(--red);font-size:14px">−${fm(s.importo)}</div></div>`).join('')
+    : '<div style="text-align:center;color:var(--text2);font-size:13px;padding:16px">Nessuna quota scalata ancora</div>';
+
+  overlay.innerHTML = `
+    <div style="background:var(--navy2);border-radius:18px 18px 0 0;width:100%;max-width:480px;padding:20px;padding-bottom:calc(env(safe-area-inset-bottom)+20px);max-height:85vh;overflow-y:auto">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+        <div style="font-size:16px;font-weight:800;color:var(--teal)">⚠️ ${a.dipNome}</div>
+        <button onclick="document.getElementById('storico-overlay').remove()" style="background:var(--card);border:1px solid var(--brd);color:var(--text);width:30px;height:30px;border-radius:8px;font-size:16px">✕</button>
+      </div>
+      <div class="card" style="padding:14px;margin-bottom:16px">
+        <div style="font-size:13px;font-weight:700;margin-bottom:2px">${a.descrizione}${a.mezzo?' — '+a.mezzo:''}</div>
+        <div style="font-size:11px;color:var(--text2);margin-bottom:12px">Evento del ${fd(a.data)}</div>
+        <div class="dip-row"><div class="dip-info"><div class="dip-nome" style="font-size:13px">Danno totale</div></div><div class="dip-saldo" style="font-size:13px">${fm(a.importo)}</div></div>
+        <div class="dip-row"><div class="dip-info"><div class="dip-nome" style="font-size:13px">Totale scalato</div></div><div class="dip-saldo" style="color:var(--red);font-size:13px">${fm(totScalato)}</div></div>
+        <div class="dip-row" style="border-top:2px solid var(--brd);padding-top:10px;margin-top:4px">
+          <div class="dip-info"><div class="dip-nome">${a.chiuso?'✓ SALDATO':'RESIDUO'}</div></div>
+          <div class="dip-saldo" style="color:${a.chiuso?'var(--green)':'var(--gold)'};font-size:16px">${a.chiuso?'✓':fm(residuo)}</div>
+        </div>
+      </div>
+      ${!a.chiuso?`
+      <div class="sec-lbl" style="margin-top:0">Scala una quota ora</div>
+      <div class="field"><input type="number" id="scala-imp-input" inputmode="decimal" step="0.01" placeholder="0.00"></div>
+      <div class="field"><label>Data</label><input type="date" id="scala-data-input" value="${today()}"></div>
+      <button class="btn btn-red" onclick="confermaScalaDanno('${a.id}')">💸 Scala quota</button>
+      `:''}
+      <div class="sec-lbl">Storico scalature</div>
+      ${righeStorico}
+      <button class="btn btn-ghost" style="margin-top:10px" onclick="eliminaDanno('${a.id}')">🗑️ Elimina questo danno</button>
+    </div>`;
+}
+
+async function confermaScalaDanno(id){
+  const a=(DB.addebiti||[]).find(x=>x.id===id);
+  if(!a) return;
+  const importo=parseFloat(document.getElementById('scala-imp-input')?.value||0);
+  if(!importo||importo<=0){toast('Inserisci un importo valido');return;}
+
+  const scalatoFin=(a.scalature||[]).reduce((s,x)=>s+x.importo,0);
+  const residuo=Math.max(0,a.importo-scalatoFin);
+  const quotaReale=Math.min(importo,residuo);
+
+  if(!a.scalature) a.scalature=[];
+  a.scalature.push({id:uid(), importo:quotaReale, data:document.getElementById('scala-data-input')?.value||today()});
+  const totScalato=a.scalature.reduce((s,x)=>s+x.importo,0);
+  if(totScalato >= a.importo - 0.01) a.chiuso=true;
+
+  document.getElementById('storico-overlay')?.remove();
+  renderDanni();
+  toast(a.chiuso?`Danno di ${a.dipNome} completamente saldato ✓`:`Scalati ${fm(quotaReale)} ✓`);
+  await salvaCloud(false);
+}
+
+function onFoto(ev){
+  const f=ev.target.files[0]; if(!f) return;
+  const r=new FileReader();
+  r.onload=e=>{
+    _fotoBase64=e.target.result;
+    const prev=document.getElementById('foto-preview');
+    prev.src=_fotoBase64; prev.style.display='block';
+  };
+  r.readAsDataURL(f);
+}
+
+async function salvaSpesa(){
+  const imp=parseFloat(document.getElementById('sp-imp').value||0);
+  if(!imp||imp<=0){toast('Inserisci importo');return;}
+  const cantiere=document.getElementById('sp-cant').value;
+  const spesa={id:uid(),data:document.getElementById('sp-data').value||today(),importo:imp,fornitore:document.getElementById('sp-forn').value,categoria:document.getElementById('sp-cat').value,cantiere,note:document.getElementById('sp-note').value,foto:_fotoBase64,fonte:'mobile'};
+  if(!DB.scontrini) DB.scontrini=[];
+  DB.scontrini.push(spesa);
+  if(cantiere){
+    if(!DB.speseCantiere) DB.speseCantiere=[];
+    DB.speseCantiere.push({id:uid(),cantiere,data:spesa.data,importo:imp,categoria:spesa.categoria,fornitore:spesa.fornitore,descrizione:spesa.note});
+  }
+  document.getElementById('sp-imp').value='';
+  document.getElementById('sp-forn').value='';
+  document.getElementById('sp-note').value='';
+  document.getElementById('foto-preview').style.display='none';
+  _fotoBase64=null;
+  await salvaCloud(false);
+}
+
+// ── CANTIERI ──────────────────────────────────────────────────────────────
+function renderCantieri(){
+  const attivi = (DB.cantieri||[]).filter(c=>!c.archiviato);
+  const archiviati = (DB.cantieri||[]).filter(c=>c.archiviato);
+  const kpi = attivi.reduce((a,c)=>a+parseFloat(c.ricavo||c.costo||0),0);
+  document.getElementById('cant-kpi').innerHTML=`
+    <div class="kpi tc"><div class="lb">Commesse attive</div><div class="vl">${attivi.length}${archiviati.length?`<span style="font-size:11px;color:var(--text2);font-weight:400"> +${archiviati.length}🗄</span>`:''}</div></div>
+    <div class="kpi go"><div class="lb">Ricavo previsto</div><div class="vl">${fm(kpi)}</div></div>`;
+
+  const cardCantiere = (c, grigio=false) => {
+    const costoPers=costoPersonale(c.nome);
+    const speseDir=(DB.speseCantiere||[]).filter(s=>s.cantiere===c.nome).reduce((a,s)=>a+s.importo,0);
+    const ricavo=parseFloat(c.ricavo||c.costo||0);
+    const margine=ricavo-costoPers-speseDir;
+    return `<div class="card"${grigio?' style="opacity:.6"':''}>
+      <div class="card-h" onclick="toggleCard('cc-${c.id}')">
+        <div style="flex:1"><div style="font-weight:700;font-size:15px">${c.nome}${grigio?` <span style="font-size:10px;color:var(--text2)">🗄</span>`:''}</div><div style="font-size:11px;color:var(--text2)">${periodoCantiere(c)}</div></div>
+        <div style="text-align:right">
+          <div style="font-size:14px;font-weight:800;color:${margine>=0?'var(--green)':'var(--red)'}">${fm(margine)}</div>
+          <div style="font-size:10px;color:var(--text2)">margine</div>
+        </div>
+        <span style="color:var(--text2);font-size:14px;margin-left:6px">▾</span>
+      </div>
+      <div class="card-body" id="cc-${c.id}">
+        <div class="dip-row"><div class="dip-info"><div class="dip-nome" style="font-size:13px">Ricavo previsto</div></div><div class="dip-saldo" style="color:var(--teal);font-size:13px">${fm(ricavo)}</div></div>
+        <div class="dip-row"><div class="dip-info"><div class="dip-nome" style="font-size:13px">Costo personale</div></div><div class="dip-saldo" style="color:var(--red);font-size:13px">−${fm(costoPers)}</div></div>
+        ${speseDir>0?`<div class="dip-row"><div class="dip-info"><div class="dip-nome" style="font-size:13px">Spese dirette</div></div><div class="dip-saldo" style="color:var(--red);font-size:13px">−${fm(speseDir)}</div></div>`:''}
+        <div class="dip-row" style="border-top:2px solid var(--brd);padding-top:10px;margin-top:4px">
+          <div class="dip-info"><div class="dip-nome">MARGINE</div></div>
+          <div class="dip-saldo" style="color:${margine>=0?'var(--green)':'var(--red)'};font-size:16px">${fm(margine)}</div>
+        </div>
+        ${c.note?`<div style="font-size:12px;color:var(--text2);margin-top:8px;padding-top:8px;border-top:1px solid var(--brd)">${c.note}</div>`:''}
+      </div>
+    </div>`;
+  };
+
+  let html = attivi.map(c=>cardCantiere(c,false)).join('');
+  if(!html) html = '<div style="color:var(--text2);text-align:center;padding:30px;font-size:14px">Nessun cantiere attivo</div>';
+  if(archiviati.length){
+    html += `<div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--text2);padding:14px 4px 6px">🗄 Archivio</div>`;
+    html += archiviati.map(c=>cardCantiere(c,true)).join('');
+  }
+  document.getElementById('cant-list').innerHTML = html;
+}
+
+function costoPersonale(nome){
+  let tot=0;
+  Object.values(DB.presenze||{}).forEach(g=>{Object.values(g).forEach(p=>{if(p.cantiere===nome)tot+=p.totale||0;});});
+  return tot;
+}
+
+// ── UTILS ─────────────────────────────────────────────────────────────────
+function goTo(pg,el){
+  document.querySelectorAll('.pg').forEach(p=>p.classList.remove('active'));
+  document.getElementById('pg-'+pg).classList.add('active');
+  document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
+  if(el) el.classList.add('active');
+  document.getElementById('content').scrollTo(0,0);
+  if(pg==='saldi') renderSaldi();
+  if(pg==='cant') renderCantieri();
+  if(pg==='dash') renderDash();
+  if(pg==='danni') renderDanni();
+}
+
+function toggleCard(id){
+  const el=document.getElementById(id);
+  if(el) el.classList.toggle('open');
+}
+
+function uid(){return Math.random().toString(36).slice(2)+Date.now().toString(36);}
+function today(){return new Date().toISOString().slice(0,10);}
+// Compatibilità: cantieri Gestionale hanno "periodo" testuale, quelli creati
+// nel Planning hanno periodoInizio/periodoFine in formato data ISO.
+function periodoCantiere(c){
+  if(c.periodo) return c.periodo;
+  if(c.periodoInizio){
+    const f = s => { const [y,m,d]=s.split('-'); return `${d}/${m}/${y}`; };
+    return (c.periodoFine && c.periodoFine!==c.periodoInizio) ? `${f(c.periodoInizio)} – ${f(c.periodoFine)}` : f(c.periodoInizio);
+  }
+  return '—';
+}
+function fm(n){return parseFloat(n||0).toLocaleString('it-IT',{style:'currency',currency:'EUR'});}
+function fd(s){if(!s)return '—';const[y,m,d]=s.split('-');return`${d}/${m}/${y}`;}
+function toast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('on');setTimeout(()=>t.classList.remove('on'),2200);}
+
+// ── INIT ──────────────────────────────────────────────────────────────────
+document.getElementById('hdr-date').textContent=new Date().toLocaleDateString('it-IT',{weekday:'long',day:'numeric',month:'long'});
+document.getElementById('pres-data').value=today();
+document.getElementById('ant-data').value=today();
+document.getElementById('pag-data').value=today();
+document.getElementById('sp-data').value=today();
+
+// Carica dal cloud all'avvio
+loadCloud();
+</script>
+</body>
+</html>
