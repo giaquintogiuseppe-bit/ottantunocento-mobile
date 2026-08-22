@@ -1772,9 +1772,10 @@ function renderCantieri(){
   const conclusi  = cantieri.filter(c=>!archIds.has(c.id) && c.tipo!=='lungo_periodo' && ((c.stato||'').toLowerCase().includes('conclus')||(c.stato||'').toLowerCase().includes('perso')));
   const archiviati= cantieri.filter(c=>archIds.has(c.id));
 
+  const cpMap = costoPersonaleMap();   // una passata sulle presenze, riusata ovunque sotto
   const totRicavo = attivi.reduce((a,c)=>a+getBudget(c.id,c.nome),0);
   const totCosti  = attivi.reduce((a,c)=>{
-    const cp=costoPersonale(c.nome);
+    const cp=costoPersonale(c.nome,cpMap);
     const sd=(DB.speseCantiere||[]).filter(s=>(s.cantiere||'').toLowerCase()===c.nome.toLowerCase()).reduce((x,s)=>x+parseFloat(s.importo||0),0);
     return a+cp+sd;
   },0);
@@ -1796,7 +1797,7 @@ function renderCantieri(){
 
   const cardCantiere = (c, archiviato=false) => {
     const nLC = c.nome.toLowerCase();
-    const cp = costoPersonale(c.nome);
+    const cp = costoPersonale(c.nome,cpMap);
     const sd = (DB.speseCantiere||[]).filter(s=>(s.cantiere||'').toLowerCase()===nLC).reduce((a,s)=>a+parseFloat(s.importo||0),0);
     const carb = (DB.carburante||[]).filter(f=>(f.cantiere||'').toLowerCase()===nLC).reduce((a,f)=>a+parseFloat(f.totale||0),0)
                + carburanteRiconciliato(c.nome);
@@ -2075,17 +2076,28 @@ function renderDett(){
   document.getElementById('dett-body').innerHTML=body||'<div style="color:var(--text2);text-align:center;padding:20px">Nessuna attività nel periodo</div>';
 }
 
-function costoPersonale(nome){
-  const nLC=(nome||'').toLowerCase().trim();
-  let tot=0;
-  Object.keys(DB.presenze||{}).forEach(d=>{
-    Object.keys(DB.presenze[d]||{}).forEach(dipId=>{
+// Costo personale per cantiere: UNA sola passata sulle presenze, raggruppata per
+// nome cantiere normalizzato. Prima si riscorrevano TUTTE le presenze per OGNI
+// cantiere (O(cantieri × presenze)); ora è O(presenze) + lookup O(1) per cantiere.
+function costoPersonaleMap(){
+  const map={};
+  const P=DB.presenze||{};
+  for(const d in P){
+    for(const dipId in P[d]){
       getTurniRaw(d,dipId).forEach(t=>{
-        if((t.cantiere||'').toLowerCase().trim()===nLC) tot+=parseFloat(t.importo||0);
+        const k=(t.cantiere||'').toLowerCase().trim();
+        if(!k) return;
+        map[k]=(map[k]||0)+parseFloat(t.importo||0);
       });
-    });
-  });
-  return tot;
+    }
+  }
+  return map;
+}
+// map opzionale: se passata, lookup immediato; senza, la costruisce al volo
+// (retrocompatibile per eventuali chiamate isolate).
+function costoPersonale(nome, map){
+  const k=(nome||'').toLowerCase().trim();
+  return (map||costoPersonaleMap())[k]||0;
 }
 
 // ── BOTTOM SHEET riutilizzabile (sostituisce confirm/prompt nativi) ───────
