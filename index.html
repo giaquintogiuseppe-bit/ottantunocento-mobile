@@ -96,6 +96,21 @@ html,body{height:100%;background:var(--navy);color:var(--text);font-family:'Inte
 #loading p{color:var(--text2);font-size:14px}
 .spin{font-size:36px;animation:sp 1s linear infinite}
 @keyframes sp{to{transform:rotate(360deg)}}
+/* BOTTOM SHEET (sostituisce confirm/prompt nativi) */
+button{touch-action:manipulation}
+.sheet-wrap{position:fixed;inset:0;background:rgba(10,22,40,.65);z-index:300;display:flex;align-items:flex-end;justify-content:center;opacity:0;transition:opacity .2s}
+.sheet-wrap.on{opacity:1}
+.sheet{background:var(--navy2);border:1px solid var(--brd);border-radius:18px 18px 0 0;width:100%;max-width:480px;padding:20px;padding-bottom:calc(env(safe-area-inset-bottom)+16px);transform:translateY(24px);transition:transform .22s;max-height:85vh;overflow-y:auto}
+.sheet-wrap.on .sheet{transform:translateY(0)}
+.sheet-title{font-size:16px;font-weight:800;color:var(--teal);margin-bottom:6px}
+.sheet-msg{font-size:14px;color:var(--text);margin-bottom:16px;line-height:1.45}
+.sheet .btn{margin-bottom:8px}
+.sheet .btn:last-child{margin-bottom:0}
+/* AZIONI RAPIDE HOME */
+.quick-actions{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:16px}
+.qa{display:flex;flex-direction:column;align-items:center;gap:5px;padding:14px 6px;background:var(--card);border:1px solid var(--brd);border-radius:12px;color:var(--text);font-size:12px;font-weight:700;cursor:pointer;min-height:66px}
+.qa .qi{font-size:22px;line-height:1}
+.qa:active{background:var(--navy2)}
 </style>
 <!-- ═══════════════════════════════════════════════════════════════════════
      81|00 — Modulo di LOGIN unico per le app (da incollare nell'<head>,
@@ -314,6 +329,11 @@ html,body{height:100%;background:var(--navy);color:var(--text);font-family:'Inte
 
   <!-- DASHBOARD -->
   <div class="pg active" id="pg-dash">
+    <div class="quick-actions">
+      <button class="qa" onclick="qaPresenzeOggi()"><span class="qi">📅</span>Presenze oggi</button>
+      <button class="qa" onclick="qaSpesa()"><span class="qi">📷</span>Registra spesa</button>
+      <button class="qa" onclick="qaSaldi()"><span class="qi">💶</span>Chi pagare</button>
+    </div>
     <div class="kpi-row" id="dash-kpi"></div>
     <div class="sec-lbl">Saldi dipendenti</div>
     <div id="dash-saldi"></div>
@@ -978,7 +998,7 @@ async function salvaIncassoMob(){
 }
 
 async function elimIncassoMob(id){
-  if(!confirm('Eliminare questo incasso?')) return;
+  if(!(await sheetConfirm('Eliminare questo incasso?',{ok:'Elimina',danger:true}))) return;
   DB.incassi=(DB.incassi||[]).filter(x=>x.id!==id);
   await salvaCloud(true);
   renderIncassiMob();
@@ -1220,12 +1240,12 @@ function loadPres(){
   }).join('');
 }
 
-function togglePres(pid){
+async function togglePres(pid){
   const d=document.getElementById('pres-data').value;
   if(!d){toast('Seleziona una data');return;}
   if(!DB.presenze[d]) DB.presenze[d]={};
   if(DB.presenze[d][pid]){
-    if(!confirm('Rimuovere dalla giornata?')) return;
+    if(!(await sheetConfirm('Rimuovere dalla giornata?',{ok:'Rimuovi',danger:true}))) return;
     delete DB.presenze[d][pid];
     if(Object.keys(DB.presenze[d]).length===0) delete DB.presenze[d];
   } else {
@@ -1247,12 +1267,12 @@ function aggiungiTurnoM(pid){
   loadPres();
 }
 
-function rimuoviTurnoM(pid,ti){
+async function rimuoviTurnoM(pid,ti){
   const d=document.getElementById('pres-data').value;
   if(!d||!DB.presenze[d]||!DB.presenze[d][pid]) return;
   const pr=DB.presenze[d][pid];
   if(!pr.turni||pr.turni.length<=1){
-    if(!confirm('Rimuovere l\'unico turno elimina il dipendente dalla giornata?')) return;
+    if(!(await sheetConfirm('Rimuovere l\'unico turno elimina il dipendente dalla giornata?',{ok:'Rimuovi',danger:true}))) return;
     delete DB.presenze[d][pid];
     if(Object.keys(DB.presenze[d]).length===0) delete DB.presenze[d];
     ricalcolaSaldi(); loadPres(); return;
@@ -1423,7 +1443,7 @@ function renderSaldi(){
 async function saldaOraMob(dipId){
   const s=DB.saldi.find(x=>x.dipId===dipId);
   if(!s||s.saldo<=0.009) return;
-  if(!confirm(`Registrare ${fm(s.saldo)} a ${s.nome} in data odierna?`)) return;
+  if(!(await sheetConfirm(`Registrare <b>${fm(s.saldo)}</b> a ${s.nome} in data odierna?`,{ok:'Registra pagamento'}))) return;
   if(!DB.pagamenti) DB.pagamenti=[];
   DB.pagamenti.push({id:uid(),data:today(),dipId:s.dipId,dipNome:s.nome,
     pagato:s.saldo,periodoDa:'',periodoAl:today(),note:'Saldo a pareggio'});
@@ -1630,8 +1650,8 @@ function dannoCard(a, chiuso){
   </div>`;
 }
 
-function eliminaDanno(id){
-  if(!confirm('Eliminare questo danno? Le quote già scalate non verranno restituite automaticamente.')) return;
+async function eliminaDanno(id){
+  if(!(await sheetConfirm('Eliminare questo danno?<br><span style="color:var(--text2)">Le quote già scalate non verranno restituite automaticamente.</span>',{ok:'Elimina danno',danger:true}))) return;
   DB.addebiti=(DB.addebiti||[]).filter(a=>a.id!==id);
   document.getElementById('storico-overlay')?.remove();
   renderDanni();
@@ -1918,16 +1938,17 @@ async function addMSpesaDaCantiere(){
 }
 
 async function eliminaMSpesa(id){
-  if(!confirm('Eliminare questa spesa?')) return;
+  if(!(await sheetConfirm('Eliminare questa spesa?',{ok:'Elimina',danger:true}))) return;
   DB.speseCantiere=(DB.speseCantiere||[]).filter(x=>x.id!==id);
   await salvaCloud(true);
   renderDett();
   toast('Spesa eliminata');
 }
 
-function archiviaCantiere(id){
+async function archiviaCantiere(id){
   const c=(DB.cantieri||[]).find(x=>x.id===id);
-  if(!c||!confirm('Archiviare "'+c.nome+'"?')) return;
+  if(!c) return;
+  if(!(await sheetConfirm('Archiviare "'+c.nome+'"?',{ok:'Archivia'}))) return;
   if(!DB._cantieriArchiviati) DB._cantieriArchiviati=[];
   if(!DB._cantieriArchiviati.includes(id)) DB._cantieriArchiviati.push(id);
   salvaCloud(false); renderCantieri(); toast('Archiviato ✓');
@@ -1938,16 +1959,18 @@ function ripristinaCantiere(id){
   salvaCloud(false); renderCantieri(); toast('Ripristinato ✓');
 }
 
-function cambiaStatoCantiere(id){
+async function cambiaStatoCantiere(id){
   const c=(DB.cantieri||[]).find(x=>x.id===id);
   if(!c) return;
   const stati=['da confermare','in corso','concluso','perso'];
-  const emoji=['📋','🔨','✅','❌'];
   const nomi=['Da confermare','In corso','Concluso','Perso/Rifiutato'];
-  const scelta=prompt('Nuovo stato per "'+c.nome+'":\n'+stati.map((s,i)=>emoji[i]+' '+nomi[i]+' ('+(i+1)+')').join('\n')+'\n\nScrivi il numero (1-4):');
-  if(!scelta) return;
-  const idx=parseInt(scelta)-1;
-  if(isNaN(idx)||idx<0||idx>3){toast('Scelta non valida');return;}
+  const idx=await sheetChoice('Stato di "'+c.nome+'"',[
+    {label:'Da confermare',emoji:'📋'},
+    {label:'In corso',emoji:'🔨'},
+    {label:'Concluso',emoji:'✅'},
+    {label:'Perso / Rifiutato',emoji:'❌',danger:true}
+  ]);
+  if(idx===null) return;
   c.stato=stati[idx];
   salvaCloud(false); renderCantieri(); toast('Stato aggiornato: '+nomi[idx]);
 }
@@ -2063,6 +2086,64 @@ function costoPersonale(nome){
     });
   });
   return tot;
+}
+
+// ── BOTTOM SHEET riutilizzabile (sostituisce confirm/prompt nativi) ───────
+function _sheetClose(){ const s=document.getElementById('ui-sheet'); if(s){ s.classList.remove('on'); setTimeout(()=>s.remove(),200); } }
+// Conferma in tema: risolve true (conferma) / false (annulla o tap sullo sfondo)
+function sheetConfirm(message, opts){
+  const o=opts||{};
+  const ok=o.ok||'Conferma', cancel=o.cancel||'Annulla', danger=!!o.danger, title=o.title||'';
+  return new Promise(resolve=>{
+    _sheetClose();
+    const w=document.createElement('div'); w.id='ui-sheet'; w.className='sheet-wrap';
+    w.innerHTML=`<div class="sheet">
+      ${title?`<div class="sheet-title">${title}</div>`:''}
+      <div class="sheet-msg">${message}</div>
+      <button class="btn ${danger?'btn-red':'btn-teal'}" id="sheet-ok">${ok}</button>
+      <button class="btn btn-ghost" id="sheet-cancel">${cancel}</button>
+    </div>`;
+    document.body.appendChild(w);
+    requestAnimationFrame(()=>w.classList.add('on'));
+    const done=v=>{ _sheetClose(); resolve(v); };
+    w.querySelector('#sheet-ok').onclick=()=>done(true);
+    w.querySelector('#sheet-cancel').onclick=()=>done(false);
+    w.addEventListener('click',e=>{ if(e.target===w) done(false); });
+  });
+}
+// Scelta a bottoni grandi: risolve l'indice scelto, o null se annullato
+function sheetChoice(title, options){
+  return new Promise(resolve=>{
+    _sheetClose();
+    const w=document.createElement('div'); w.id='ui-sheet'; w.className='sheet-wrap';
+    w.innerHTML=`<div class="sheet">
+      <div class="sheet-title">${title}</div>
+      ${options.map((o,i)=>`<button class="btn ${o.danger?'btn-red':'btn-ghost'}" data-i="${i}" style="text-align:left">${o.emoji?o.emoji+'  ':''}${o.label}</button>`).join('')}
+      <button class="btn btn-ghost" id="sheet-cancel" style="opacity:.6">Annulla</button>
+    </div>`;
+    document.body.appendChild(w);
+    requestAnimationFrame(()=>w.classList.add('on'));
+    const done=v=>{ _sheetClose(); resolve(v); };
+    w.querySelectorAll('[data-i]').forEach(b=>b.onclick=()=>done(parseInt(b.dataset.i)));
+    w.querySelector('#sheet-cancel').onclick=()=>done(null);
+    w.addEventListener('click',e=>{ if(e.target===w) done(null); });
+  });
+}
+
+// ── AZIONI RAPIDE HOME ────────────────────────────────────────────────────
+const _navBtn=i=>document.querySelectorAll('.nav-btn')[i];
+function qaPresenzeOggi(){
+  const d=document.getElementById('pres-data'); if(d) d.value=today();
+  goTo('pres',_navBtn(1)); loadPres();
+}
+function qaSpesa(){
+  goTo('ops',_navBtn(3));
+  const chip=document.querySelector('#ops-tabs .chip:nth-child(3)');
+  if(chip) setOpsTab('spesa',chip);
+}
+function qaSaldi(){
+  goTo('saldi',_navBtn(2));
+  setFiltroSaldi('pagare',document.querySelector('#saldi-filtri .chip[data-f="pagare"]'));
 }
 
 // ── UTILS ─────────────────────────────────────────────────────────────────
