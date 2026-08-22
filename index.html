@@ -490,6 +490,9 @@ button{touch-action:manipulation}
       </div>
     </div>
 
+    <!-- Preventivo collegato / crea -->
+    <div id="dett-prev-box" style="margin-bottom:14px"></div>
+
     <!-- KPI costi -->
     <div class="kpi-row" id="dett-kpi"></div>
 
@@ -2098,6 +2101,31 @@ function apriDettCantiere(id){
   goTo('dett', null);
 }
 
+// Crea un preventivo BOZZA per il cantiere aperto nel dettaglio e lo collega
+async function creaPreventivoDaDett(){
+  const c=(DB.cantieri||[]).find(x=>x.nome===_dettNomeMobile);
+  if(!c){ toast('Cantiere non trovato'); return; }
+  if(c.preventivoRef){ toast('Preventivo già collegato: '+c.preventivoRef); return; }
+  if(typeof diarioCreaPreventivo!=='function'){ toast('Funzione non disponibile'); return; }
+  document.getElementById('loading').style.display='flex';
+  try{
+    const numero=await diarioCreaPreventivo(c.id, c.nome, c.committente||'');
+    // Persisti preventivoRef sul cantiere (write atomico che include i cantieri, con lock)
+    let ok=false;
+    for(let t=1;t<=3;t++){
+      const row=await sbGet(); const D=(row&&row.dati)?row.dati:{};
+      const cc=(D.cantieri||[]).find(x=>x.id===c.id);
+      if(cc) cc.preventivoRef=numero;
+      ok=await sbSet(D,(row&&row.versione!=null)?row.versione:null);
+      if(ok){ Object.assign(DB,D); try{const r=await sbGet(); if(r&&r.versione!=null)_mobUltimaVersione=r.versione;}catch(_){} break; }
+    }
+    c.preventivoRef=numero;
+    document.getElementById('loading').style.display='none';
+    renderDett(); renderCantieri();
+    toast(`✓ ${numero} creato in Preventivi`);
+  }catch(e){ document.getElementById('loading').style.display='none'; toast('⚠ Preventivo non creato: '+e.message); }
+}
+
 function renderDett(){
   const nome=_dettNomeMobile; if(!nome) return;
   // Aggiorna budget display
@@ -2105,6 +2133,18 @@ function renderDett(){
   const ric=c?getBudget(c.id,nome):0;
   const bv=document.getElementById('m-budget-val');
   if(bv) bv.textContent=ric>0?fm(ric):'Non impostato';
+  // Preventivo collegato / pulsante crea
+  const pb=document.getElementById('dett-prev-box');
+  if(pb){
+    if(c && c.preventivoRef){
+      pb.innerHTML=`<div style="background:rgba(122,160,255,.08);border:1px solid rgba(122,160,255,.3);border-radius:12px;padding:12px 14px;display:flex;align-items:center;justify-content:space-between;gap:8px">
+        <div><div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#7aa0ff">🧾 Preventivo collegato</div>
+        <div style="font-size:15px;font-weight:800;margin-top:2px">${c.preventivoRef}</div></div>
+        <span style="font-size:11px;color:var(--text2);text-align:right">completa<br>in Preventivi</span></div>`;
+    } else if(c){
+      pb.innerHTML=`<button onclick="creaPreventivoDaDett()" style="width:100%;background:rgba(122,160,255,.08);border:1.5px dashed rgba(122,160,255,.5);border-radius:12px;padding:12px;color:#7aa0ff;font-size:14px;font-weight:700;cursor:pointer">🧾 Crea preventivo (bozza)</button>`;
+    } else pb.innerHTML='';
+  }
   const nLC=nome.toLowerCase().trim();
   const match=s=>(s||'').toLowerCase().trim()===nLC;
   const da=document.getElementById('dett-da')?.value||'';
