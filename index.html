@@ -2,12 +2,14 @@
 <html lang="it">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="81|00">
 <meta name="theme-color" content="#0a1628">
 <title>81|00 Mobile</title>
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
@@ -806,10 +808,11 @@ window.addEventListener('focus', mobControllaAlRientro);
 window.addEventListener('pageshow', (e)=>{ if(e.persisted) mobControllaAlRientro(); });
 
 // ============================================================
-// AUTO-VERSIONE DEL CODICE (mobile index.html) - qui NON c'e' service worker:
-// il codice vecchio viene solo dalla cache HTTP/PWA. Al rientro confronto il
-// Last-Modified della pagina in esecuzione con quello online; se online e' piu'
-// recente e non sto scrivendo in un campo, ricarico UNA volta con cache pulita.
+// AUTO-VERSIONE DEL CODICE (mobile index.html) - cintura aggiuntiva al SW:
+// il service worker è network-first sulla pagina (serve già la versione online
+// più fresca quando c'è rete), ma qui confermo confrontando il Last-Modified
+// della pagina in esecuzione con quello online; se online e' piu' recente e non
+// sto scrivendo in un campo, ricarico UNA volta con cache pulita.
 // ============================================================
 let _mobVerInCorso=false, _mobVerUltimo=0;
 async function _mobControllaVersione(){
@@ -2106,6 +2109,19 @@ document.getElementById('sp-data').value=today();
 
 // Carica dal cloud all'avvio
 loadCloud().then(()=>caricaRifornimentiCloud().then(()=>{ if(typeof renderCant==='function' && document.getElementById('pg-cant')?.classList.contains('active')) renderCant(); }));
+
+// ── PWA: registra il service worker ───────────────────────────────────────
+// sw.js è NETWORK-FIRST sulla pagina: quando c'è rete serve sempre la versione
+// online più fresca (nessuna "PWA vecchia in cache"), e la cache fa da fallback
+// solo quando sei offline in cantiere. Le chiamate a Supabase non vengono mai
+// cachate (dati vivi). Il controllo _mobControllaVersione resta come cintura
+// aggiuntiva. Registrazione tollerante agli errori: se fallisce, l'app funziona
+// comunque (solo senza offline).
+if('serviceWorker' in navigator){
+  window.addEventListener('load', function(){
+    navigator.serviceWorker.register('sw.js').catch(function(e){ console.warn('SW non registrato:', e); });
+  });
+}
 </script>
 </body>
 </html>
