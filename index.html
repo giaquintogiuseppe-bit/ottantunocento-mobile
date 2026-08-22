@@ -2443,14 +2443,19 @@ async function diarioSalvaAgenda(){
 }
 
 // ── Crea un preventivo BOZZA nell'app Preventivi, agganciato al cantiere ──
-async function diarioCreaPreventivo(cantId, nome, committente){
+async function diarioCreaPreventivo(cantId, nome, committente, righe){
   const anno=new Date().getFullYear(); let nn=1;
   try{
     const r=await fetch(`${SB_URL}/rest/v1/preventivi?select=numero&numero=like.PREV-${anno}-*&order=numero.desc&limit=1`,{headers:{apikey:SB_KEY,Authorization:`Bearer ${SB_KEY}`}});
     if(r.ok){ const rows=await r.json(); const m=rows&&rows[0]&&rows[0].numero&&rows[0].numero.match(/(\d+)\s*$/); if(m) nn=parseInt(m[1])+1; }
   }catch(_){}
   const numero=`PREV-${anno}-${String(nn).padStart(3,'0')}`;
-  const body={ numero, data:today(), cliente_nome:committente||'', oggetto:`${nome} — da completare (creato dal Diario)`, stato:'bozza', modalita:'dettagliata', righe:[], elenco_materiali:[], imponibile:0, iva_perc:22, iva_importo:0, totale:0, cantiere_ref:cantId, cantiere_id:cantId };
+  // Righe dettate → calcolo imponibile, IVA 22%, totale
+  const R=(Array.isArray(righe)?righe:[]).filter(r=>r&&(String(r.descrizione||'').trim()||r.prezzo)).map(r=>({qta:Number(r.qta)||1,prezzo:Number(r.prezzo)||0,descrizione:String(r.descrizione||'').trim()}));
+  const imponibile=Math.round(R.reduce((s,r)=>s+r.qta*r.prezzo,0)*100)/100;
+  const iva_importo=Math.round(imponibile*22)/100;
+  const totale=Math.round((imponibile+iva_importo)*100)/100;
+  const body={ numero, data:today(), cliente_nome:committente||'', oggetto:`${nome}${R.length?'':' — da completare'} (creato dal Diario)`, stato:'bozza', modalita:'dettagliata', righe:R, elenco_materiali:[], imponibile, iva_perc:22, iva_importo, totale, cantiere_ref:cantId, cantiere_id:cantId };
   const res=await fetch(`${SB_URL}/rest/v1/preventivi`,{method:'POST',headers:{apikey:SB_KEY,Authorization:`Bearer ${SB_KEY}`,'Content-Type':'application/json',Prefer:'return=minimal'},body:JSON.stringify(body)});
   if(!res.ok){ let tx=''; try{tx=await res.text();}catch(_){} throw new Error(res.status+(tx?' '+tx.slice(0,80):'')); }
   return numero;
@@ -2494,7 +2499,9 @@ function diarioNorm(a,i){
     const raw=Array.isArray(a.squadra)?a.squadra:[]; o.squadra=raw.map(n=>({raw:n,m:diarioMatchDip(n)}));
     const c=diarioMatchCant(a.cantiere); o.cantMatch=c; o.cantRaw=a.cantiere||'';
     o.cantMode=c?'exist':((a.nuovo_cantiere||o.cantRaw)?'new':'exist');
-    o.cantNewName=c?'':(o.cantRaw||''); o.cantNewComm=a.committente||''; o.creaPreventivo=!!a.crea_preventivo; o.mezzo=a.mezzo||''; }
+    o.cantNewName=c?'':(o.cantRaw||''); o.cantNewComm=a.committente||''; o.mezzo=a.mezzo||'';
+    o.righe=(Array.isArray(a.righe)?a.righe:[]).map(r=>({descrizione:r.descrizione||'',qta:(r.qta!=null&&r.qta!=='')?(Number(r.qta)||1):1,prezzo:Number(r.prezzo)||0}));
+    o.creaPreventivo=!!a.crea_preventivo || o.righe.length>0; }
   if(a.tipo==='promemoria'){ o.titolo=a.titolo||o.testo; o.ora=a.ora||''; o.data=a.data||''; }
   return o;
 }
@@ -2584,7 +2591,13 @@ function diarioCard(a){
       <div class="dia-f"><label>Alle</label><input value="${a.oraF}" onchange="diarioSet(${a._i},'oraF',this.value)"></div>
       ${diarioCantBlock(a)}
       <div class="dia-f full"><label>Squadra</label><div class="dia-chips">${chips}</div></div>
-      <div class="dia-f full"><label>Mezzo</label><input value="${_de(a.mezzo)}" placeholder="— nessuno —" onchange="diarioSet(${a._i},'mezzo',this.value)"></div>`;
+      <div class="dia-f full"><label>Mezzo</label><input value="${_de(a.mezzo)}" placeholder="— nessuno —" onchange="diarioSet(${a._i},'mezzo',this.value)"></div>
+      ${(a.righe&&a.righe.length)?`<div class="dia-f full"><label>Righe preventivo (${a.righe.length})</label>
+        <div style="background:var(--navy);border:1px solid var(--brd);border-radius:9px;padding:8px 10px;font-size:12.5px">
+          ${a.righe.map(r=>`<div style="display:flex;justify-content:space-between;gap:8px;padding:3px 0"><span>${_de(r.descrizione)}${r.qta>1?' · '+r.qta+'×'+fm(r.prezzo):''}</span><span style="font-family:monospace;color:var(--gold)">${fm((r.qta||1)*(r.prezzo||0))}</span></div>`).join('')}
+          <div style="display:flex;justify-content:space-between;border-top:1px solid var(--brd);margin-top:4px;padding-top:5px;font-weight:800"><span>Imponibile</span><span style="font-family:monospace">${fm(a.righe.reduce((s,r)=>s+(r.qta||1)*(r.prezzo||0),0))}</span></div>
+          <div style="font-size:11px;color:var(--text2);margin-top:3px">+ IVA 22% · dettaglio poi modificabile in Preventivi</div>
+        </div></div>`:''}`;
   } else if(a.tipo==='promemoria'){
     title=`${_de(a.titolo)||'Promemoria'} <small>${a.data?_de(a.data):'senza data'}${a.ora?' · '+a.ora:''}</small>`;
     body=`<div class="dia-f"><label>Giorno</label><input type="date" value="${a.data}" onchange="diarioSet(${a._i},'data',this.value)"></div>
@@ -2640,9 +2653,11 @@ function diarioApply(a,D){
     if(a.cantMode==='new'){ cant={id:a.__cantId||uid(),nome:a.cantNewName||'Nuovo cantiere',committente:a.cantNewComm||'',stato:'da confermare',periodoInizio:a.data,periodoFine:a.data,interventi:[],fonte:'diario'}; if(a.__prevNumero)cant.preventivoRef=a.__prevNumero; else if(a.creaPreventivo)cant._preventivoDaFare=true; D.cantieri.push(cant); }
     else { const id=a.cantMatch&&a.cantMatch.id; cant=D.cantieri.find(c=>c.id===id)||D.cantieri.find(c=>(c.nome||'').toLowerCase()===((a.cantMatch&&a.cantMatch.nome)||'').toLowerCase()); }
     if(cant){ cant.interventi=cant.interventi||[];
-      cant.interventi.push({id:uid(),data:a.data,squadra:a.squadra.filter(s=>s.m).map(s=>s.m.nome),oraInizio:a.oraI,oraFine:a.oraF,luogo:cant.nome,mezzi:a.mezzo?[a.mezzo]:[]});
-      if(!cant.periodoInizio||a.data<cant.periodoInizio)cant.periodoInizio=a.data;
-      if(!cant.periodoFine||a.data>cant.periodoFine)cant.periodoFine=a.data; }
+      const squad=a.squadra.filter(s=>s.m).map(s=>s.m.nome);
+      if(squad.length){ // intervento nel Planning solo se c'è davvero una squadra (non per i preventivi puri)
+        cant.interventi.push({id:uid(),data:a.data,squadra:squad,oraInizio:a.oraI,oraFine:a.oraF,luogo:cant.nome,mezzi:a.mezzo?[a.mezzo]:[]});
+        if(!cant.periodoInizio||a.data<cant.periodoInizio)cant.periodoInizio=a.data;
+        if(!cant.periodoFine||a.data>cant.periodoFine)cant.periodoFine=a.data; } }
   }
 }
 
@@ -2676,7 +2691,7 @@ async function diarioConferma(){
       if(a.tipo==='lavoro' && a.cantMode==='new'){
         a.__cantId = a.__cantId || uid();
         if(a.creaPreventivo){
-          try{ a.__prevNumero = await diarioCreaPreventivo(a.__cantId, a.cantNewName||'Nuovo cantiere', a.cantNewComm); }
+          try{ a.__prevNumero = await diarioCreaPreventivo(a.__cantId, a.cantNewName||'Nuovo cantiere', a.cantNewComm, a.righe); }
           catch(e){ a.__prevNumero=null; toast('⚠ Preventivo non creato: '+e.message); }
         }
       }
