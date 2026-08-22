@@ -563,10 +563,100 @@ button{touch-action:manipulation}
     </div>
     <div id="inc-list-m"></div>
   </div>
+  <!-- ═══════════ DIARIO DI BORDO ═══════════ -->
+  <style>
+  #pg-diario .dia-lead{font-size:13px;color:var(--text2);line-height:1.5;margin-bottom:14px}
+  #pg-diario .dia-lead b{color:var(--text)}
+  .dia-qg{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:16px}
+  .dia-qb{display:flex;flex-direction:column;align-items:center;gap:6px;padding:12px 4px;background:var(--card);border:1px solid var(--brd);border-radius:12px;color:var(--text);cursor:pointer;font-size:20px;line-height:1}
+  .dia-qb span{font-size:10.5px;font-weight:700;text-align:center;line-height:1.15;color:var(--text)}
+  .dia-qb:active{background:var(--navy2)}
+  #diario-txt{width:100%;min-height:150px;resize:vertical;background:var(--navy2);border:1px solid var(--brd);border-radius:12px;color:var(--text);font-family:inherit;font-size:16px;line-height:1.5;padding:13px;outline:none}
+  #diario-txt:focus{border-color:var(--teal)}
+  .dia-sec-h{display:flex;align-items:center;gap:8px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--text2);margin:16px 0 8px 2px}
+  .dia-sec-h .n{background:var(--navy2);color:var(--text);border-radius:999px;padding:1px 8px;font-size:11px}
+  .dia-act{background:var(--card);border:1px solid var(--brd);border-radius:13px;padding:12px;margin-bottom:9px;transition:opacity .2s}
+  .dia-act.off{opacity:.4}
+  .dia-ah{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+  .dia-ico{width:34px;height:34px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:17px;flex-shrink:0}
+  .dia-ttl{flex:1;font-size:14px;font-weight:700;line-height:1.25}
+  .dia-ttl small{display:block;font-weight:500;color:var(--text2);font-size:12px;margin-top:1px}
+  .dia-tgl{width:44px;height:26px;border-radius:999px;border:none;cursor:pointer;position:relative;flex-shrink:0;background:var(--brd);transition:.2s}
+  .dia-tgl.on{background:var(--teal)}
+  .dia-tgl::after{content:'';position:absolute;width:20px;height:20px;border-radius:50%;background:#fff;top:3px;left:3px;transition:.2s}
+  .dia-tgl.on::after{left:21px}
+  .dia-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .dia-f{display:flex;flex-direction:column;gap:4px}
+  .dia-f.full{grid-column:1/-1}
+  .dia-f label{font-size:10.5px;text-transform:uppercase;letter-spacing:.5px;color:var(--text2);font-weight:700;padding-left:2px}
+  .dia-f input,.dia-f select{background:var(--navy);border:1px solid var(--brd);border-radius:9px;color:var(--text);font-family:inherit;font-size:13.5px;padding:9px 10px;outline:none;width:100%;-webkit-appearance:none}
+  .dia-f input:focus,.dia-f select:focus{border-color:var(--teal)}
+  .dia-f.eur input{font-family:monospace;color:var(--gold)}
+  select.dia-ok{border-color:rgba(75,232,122,.45)}
+  select.dia-warn{border-color:rgba(232,184,75,.55);background:rgba(232,184,75,.06)}
+  .dia-badge{font-size:10.5px;font-weight:700;padding-left:2px}
+  .dia-badge.ok{color:var(--green)}
+  .dia-badge.warn{color:var(--gold)}
+  .dia-seg{display:flex;gap:6px}
+  .dia-segb{flex:1;padding:8px;border-radius:9px;border:1px solid var(--brd);background:var(--navy);color:var(--text2);font-size:12.5px;font-weight:700;cursor:pointer;font-family:inherit}
+  .dia-segb.on{background:rgba(0,180,166,.14);border-color:var(--teal);color:var(--teal)}
+  .dia-chips{display:flex;flex-wrap:wrap;gap:6px}
+  .dia-pchip{font-size:12px;font-weight:600;padding:5px 10px;border-radius:999px;border:1px solid var(--brd);background:var(--navy)}
+  .dia-pchip.ok{color:var(--green);border-color:rgba(75,232,122,.35)}
+  .dia-pchip.warn{color:var(--gold);border-color:rgba(232,184,75,.45);background:rgba(232,184,75,.06)}
+  .dia-chk{display:flex;align-items:flex-start;gap:8px;font-size:12.5px;color:var(--text2);line-height:1.35;cursor:pointer;padding:3px 1px}
+  .dia-chk input{margin-top:1px;accent-color:var(--teal);width:16px;height:16px;flex-shrink:0}
+  .dia-chk b{color:var(--gold)}
+  .dia-recap .ri{display:flex;align-items:center;gap:10px;padding:11px 0;border-bottom:1px solid var(--brd);font-size:13px}
+  .dia-recap .ri:last-child{border-bottom:none}
+  .dia-recap .ri .to{margin-left:auto;font-size:11px;color:var(--text2);font-weight:600;background:var(--navy);border:1px solid var(--brd);padding:3px 9px;border-radius:999px;white-space:nowrap}
+  </style>
+  <div class="pg" id="pg-diario">
+    <!-- INPUT -->
+    <div id="dia-input">
+      <div class="dia-lead">Racconta la giornata (o cosa c'è da fare) — a voce o scritta. Tocca un tasto rapido per un modello, oppure scrivi libero. Poi <b>Elabora</b>.</div>
+      <div class="sec-lbl">Inserimenti rapidi</div>
+      <div class="dia-qg" id="dia-quick">
+        <button class="dia-qb" data-t="planning">🗓️<span>Pianifica lavoro</span></button>
+        <button class="dia-qb" data-t="appunt">⏰<span>Appuntamento</span></button>
+        <button class="dia-qb" data-t="presenze">📅<span>Presenze</span></button>
+        <button class="dia-qb" data-t="spesa">🧾<span>Spesa</span></button>
+        <button class="dia-qb" data-t="anticipo">💸<span>Anticipo</span></button>
+        <button class="dia-qb" data-t="incasso">📥<span>Incasso</span></button>
+      </div>
+      <div class="sec-lbl">Testo libero</div>
+      <textarea id="diario-txt" spellcheck="false" placeholder="Es: Oggi Renato e Pietro a Capua dalle 8 alle 17, 120 a testa. Anticipato 50 a Renato. Domani squadra a Gaeta per montaggio."></textarea>
+      <button class="btn btn-teal" id="diario-go" style="margin-top:12px" onclick="diarioElabora()">✨ Elabora</button>
+      <div style="font-size:11.5px;color:var(--text2);text-align:center;margin-top:10px;line-height:1.5">Legge il testo con Claude e propone le azioni. <b>Non salva nulla</b> finché non confermi.</div>
+    </div>
+
+    <!-- PREVIEW -->
+    <div id="dia-preview" style="display:none">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">
+        <button onclick="diarioShow('input')" style="background:var(--card);border:1px solid var(--brd);color:var(--text);width:34px;height:34px;border-radius:9px;font-size:16px;cursor:pointer">←</button>
+        <div style="font-size:16px;font-weight:800">Cosa ho capito</div>
+      </div>
+      <div id="dia-summary" style="font-size:13px;color:var(--text2);margin:2px 0 14px 44px"></div>
+      <div id="dia-sections"></div>
+      <button class="btn btn-teal" id="dia-confirm" style="margin-top:6px" onclick="diarioConferma()">Conferma e salva</button>
+      <button class="btn btn-ghost" onclick="diarioShow('input')">Annulla</button>
+    </div>
+
+    <!-- DONE -->
+    <div id="dia-done" style="display:none;text-align:center;padding:20px 4px">
+      <div style="width:64px;height:64px;border-radius:50%;background:rgba(75,232,122,.14);border:1px solid rgba(75,232,122,.4);display:flex;align-items:center;justify-content:center;font-size:30px;margin:6px auto 14px">✓</div>
+      <div style="font-size:20px;font-weight:800;margin-bottom:6px">Salvato!</div>
+      <div id="dia-done-count" style="font-size:13.5px;color:var(--text2);margin-bottom:18px"></div>
+      <div class="dia-recap" id="dia-recap" style="text-align:left;background:var(--card);border:1px solid var(--brd);border-radius:13px;padding:4px 14px;margin-bottom:18px"></div>
+      <button class="btn btn-teal" onclick="diarioReset()">📓 Scrivi un'altra cosa</button>
+      <button class="btn btn-ghost" onclick="goTo('dash',document.querySelector('.nav-btn'))">Torna alla Home</button>
+    </div>
+  </div>
 </div><!-- /content -->
 
 <div id="nav-bar">
   <button class="nav-btn active" onclick="goTo('dash',this)"><span class="ni">⬛</span>Home</button>
+  <button class="nav-btn" onclick="goTo('diario',this)"><span class="ni">📓</span>Diario</button>
   <button class="nav-btn" onclick="goTo('pres',this)"><span class="ni">📅</span>Presenze</button>
   <button class="nav-btn" onclick="goTo('saldi',this)"><span class="ni">💶</span>Saldi</button>
   <button class="nav-btn" onclick="goTo('ops',this)"><span class="ni">💸</span>Ops</button>
@@ -581,7 +671,7 @@ const SB_URL = 'https://xqbhujcnjvwbwzpwjujf.supabase.co';
 const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhxYmh1amNuanZ3Ynd6cHdqdWpmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE3MzM4ODUsImV4cCI6MjA5NzMwOTg4NX0.VstO3aII143jpPXjgKg0t3du-yc5rS9xs2hYko_2DRs';
 
 // ── DB LOCALE ─────────────────────────────────────────────────────────────
-let DB = {personale:[],presenze:{},cantieri:[],carburante:[],anticipi:[],pagamenti:[],saldi:[],addebiti:[],speseCantiere:[],documenti:[],carteDkv:[],scontrini:[],budgetCantieri:[],incassi:[]};
+let DB = {personale:[],presenze:{},cantieri:[],carburante:[],anticipi:[],pagamenti:[],saldi:[],addebiti:[],speseCantiere:[],documenti:[],carteDkv:[],scontrini:[],budgetCantieri:[],incassi:[],promemoria:[]};
 
 // Lettura ricavo dal Gestionale (non dal Planning)
 function getBudget(cantiereId, cantiereName){
@@ -2170,6 +2260,7 @@ function goTo(pg,el){
   if(pg==='dash') renderDash();
   if(pg==='danni') renderDanni();
   if(pg==='ops') populateSelects();
+  if(pg==='diario') diarioInit();
 }
 
 function toggleCard(id){
@@ -2202,6 +2293,319 @@ document.getElementById('sp-data').value=today();
 
 // Carica dal cloud all'avvio
 loadCloud().then(()=>caricaRifornimentiCloud().then(()=>{ if(typeof renderCant==='function' && document.getElementById('pg-cant')?.classList.contains('active')) renderCant(); }));
+
+// ═══════════════════════ DIARIO DI BORDO ═══════════════════════
+// Motore: Edge Function diario-parse (Claude). L'anteprima aggancia i nomi
+// all'anagrafica e i cantieri; il salvataggio è ATOMICO sull'intero blob
+// (read → applica → PATCH con lock di versione + retry), come fa il Planning,
+// così può creare anche interventi/cantieri senza perdere dati altrui.
+const DIARIO_FN = SB_URL + '/functions/v1/diario-parse';
+let DIARIO_AZIONI = [];
+const _de = s => String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+const DIARIO_TPL = {
+  planning:"Domani [chi] a [dove] dalle 8 alle 17 per [lavoro].",
+  appunt:"Appuntamento con [chi] [giorno] alle [ora] per [motivo].",
+  presenze:"Oggi [chi] a [cantiere] dalle 8 alle 17, [€] a testa.",
+  spesa:"Comprato [cosa] da [fornitore], [€] per [cantiere].",
+  anticipo:"Anticipato [€] a [chi] in contanti.",
+  incasso:"Incassati [€] da [cliente], acconto."
+};
+const DIARIO_META = {
+  lavoro:{ic:'🗓️',bg:'rgba(122,160,255,.16)',lbl:'Lavori in programma',dest:'Planning'},
+  promemoria:{ic:'⏰',bg:'rgba(232,184,75,.16)',lbl:'Promemoria & appuntamenti',dest:'Agenda'},
+  turno:{ic:'📅',bg:'rgba(0,180,166,.16)',lbl:'Turni & presenze',dest:'Presenze'},
+  anticipo:{ic:'💸',bg:'rgba(232,184,75,.16)',lbl:'Anticipi',dest:'Saldi'},
+  pagamento:{ic:'💰',bg:'rgba(0,180,166,.16)',lbl:'Pagamenti',dest:'Saldi'},
+  spesa:{ic:'🧾',bg:'rgba(232,184,75,.16)',lbl:'Spese',dest:'Spese'},
+  danno:{ic:'⚠️',bg:'rgba(232,75,75,.16)',lbl:'Danni',dest:'Danni'},
+  incasso:{ic:'📥',bg:'rgba(75,232,122,.16)',lbl:'Incassi',dest:'Incassi'}
+};
+const DIARIO_CATEG = ['Materiali di consumo','Attrezzatura','Noleggio','Carburante','Trasferta / Vitto','Servizi esterni','Altro'];
+const DIARIO_ORDER = ['lavoro','promemoria','turno','anticipo','pagamento','spesa','danno','incasso'];
+
+// ── Matching sull'anagrafica reale ──
+function diarioMatchDip(nome){
+  if(!nome) return null;
+  const n=nome.toLowerCase().trim();
+  return (DB.personale||[]).find(p=>(p.nome||'').toLowerCase()===n)
+      || (DB.personale||[]).find(p=>(p.nome||'').toLowerCase().split(' ')[0]===n.split(' ')[0])
+      || (DB.personale||[]).find(p=>{const pn=(p.nome||'').toLowerCase();return pn.includes(n)||n.includes(pn.split(' ')[0]);})
+      || null;
+}
+function diarioActiveCant(){
+  const arch=new Set(DB._cantieriArchiviati||[]);
+  return (DB.cantieri||[]).filter(c=>!arch.has(c.id));
+}
+function diarioMatchCant(nome){
+  if(!nome) return null;
+  const n=nome.toLowerCase().trim();
+  const list=diarioActiveCant();
+  return list.find(c=>(c.nome||'').toLowerCase()===n)
+      || list.find(c=>{const cn=(c.nome||'').toLowerCase();return cn.includes(n)||n.includes(cn);})
+      || null;
+}
+
+// ── Navigazione sotto-viste del Diario ──
+function diarioShow(v){
+  ['input','preview','done'].forEach(x=>{const el=document.getElementById('dia-'+x);if(el)el.style.display=x===v?'block':'none';});
+  document.getElementById('content').scrollTo(0,0);
+}
+function diarioReset(){ DIARIO_AZIONI=[]; const t=document.getElementById('diario-txt'); if(t)t.value=''; diarioShow('input'); }
+function diarioInit(){ if(!DIARIO_AZIONI.length){ diarioShow('input'); } }
+
+// ── Chiamata al motore ──
+async function diarioElabora(){
+  const txt=(document.getElementById('diario-txt').value||'').trim();
+  if(!txt){ toast('Scrivi cosa è successo'); return; }
+  const btn=document.getElementById('diario-go'); btn.disabled=true; btn.textContent='Sto leggendo…';
+  document.getElementById('loading').style.display='flex';
+  try{
+    const res=await fetch(DIARIO_FN,{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({ testo:txt, oggi:today(),
+        personale:(DB.personale||[]).map(p=>p.nome),
+        cantieri:diarioActiveCant().map(c=>c.nome) })});
+    const j=await res.json().catch(()=>({}));
+    if(!res.ok) throw new Error(j.error||('errore '+res.status));
+    DIARIO_AZIONI=(j.azioni||[]).map((a,i)=>diarioNorm(a,i));
+    diarioRenderPreview();
+    diarioShow('preview');
+    if(!DIARIO_AZIONI.length) toast('Non ho riconosciuto azioni — prova a essere più esplicito');
+  }catch(e){ toast('⚠ '+e.message); }
+  finally{ document.getElementById('loading').style.display='none'; btn.disabled=false; btn.textContent='✨ Elabora'; }
+}
+
+// ── Normalizza l'azione grezza del motore in oggetto interno ──
+function diarioNorm(a,i){
+  const o={_i:i,on:true,tipo:a.tipo,testo:a.testo_originale||'',note:a.note||''};
+  o.data=a.data||today();
+  o.importo=(a.importo!=null&&a.importo!=='')?a.importo:'';
+  if(['turno','anticipo','pagamento','danno'].includes(a.tipo)){
+    const m=diarioMatchDip(a.dipendente); o.dipRaw=a.dipendente||''; o.dipId=m?m.id:'';
+  }
+  if(a.tipo==='turno'){ const c=diarioMatchCant(a.cantiere); o.cantMatch=c; o.cantRaw=a.cantiere||''; o.oraI=a.ora_inizio||'08:00'; o.oraF=a.ora_fine||'18:00'; }
+  if(a.tipo==='anticipo'){ o.metodo=a.metodo||'Contanti'; }
+  if(a.tipo==='spesa'){ o.fornitore=a.fornitore||''; o.categoria=DIARIO_CATEG.includes(a.categoria)?a.categoria:'Materiali di consumo'; const c=diarioMatchCant(a.cantiere); o.cantMatch=c; o.cantRaw=a.cantiere||''; }
+  if(a.tipo==='danno'){ o.mezzo=a.mezzo||''; o.descrizione=a.descrizione||o.testo; }
+  if(a.tipo==='incasso'){ const c=diarioMatchCant(a.cantiere); o.cantMatch=c; o.cantRaw=a.cantiere||''; o.committente=a.committente||(c?c.committente:'')||''; o.metodo=a.metodo||'Bonifico'; o.causale=a.causale||''; }
+  if(a.tipo==='lavoro'){ o.oraI=a.ora_inizio||'08:00'; o.oraF=a.ora_fine||'18:00';
+    const raw=Array.isArray(a.squadra)?a.squadra:[]; o.squadra=raw.map(n=>({raw:n,m:diarioMatchDip(n)}));
+    const c=diarioMatchCant(a.cantiere); o.cantMatch=c; o.cantRaw=a.cantiere||'';
+    o.cantMode=c?'exist':((a.nuovo_cantiere||o.cantRaw)?'new':'exist');
+    o.cantNewName=c?'':(o.cantRaw||''); o.cantNewComm=a.committente||''; o.creaPreventivo=!!a.crea_preventivo; o.mezzo=a.mezzo||''; }
+  if(a.tipo==='promemoria'){ o.titolo=a.titolo||o.testo; o.ora=a.ora||''; o.data=a.data||''; }
+  return o;
+}
+
+// ── Handlers anteprima ──
+window.diarioToggle=i=>{DIARIO_AZIONI[i].on=!DIARIO_AZIONI[i].on;const el=document.getElementById('dia-act-'+i);if(el)el.classList.toggle('off',!DIARIO_AZIONI[i].on);diarioUpdCount();};
+window.diarioSet=(i,f,v)=>{DIARIO_AZIONI[i][f]=v;};
+window.diarioSetDip=(i,v)=>{DIARIO_AZIONI[i].dipId=v;diarioRenderPreview();};
+window.diarioSetCant=(i,v)=>{DIARIO_AZIONI[i].cantMatch=diarioActiveCant().find(c=>c.id===v)||null;DIARIO_AZIONI[i].cantRaw=DIARIO_AZIONI[i].cantMatch?DIARIO_AZIONI[i].cantMatch.nome:'';diarioRenderPreview();};
+window.diarioSetCantMode=(i,m)=>{DIARIO_AZIONI[i].cantMode=m;diarioRenderPreview();};
+window.diarioSetBool=(i,f,v)=>{DIARIO_AZIONI[i][f]=v;};
+
+function diarioDipSelect(a){
+  const opts=['<option value="">— scegli —</option>'].concat((DB.personale||[]).map(p=>`<option value="${p.id}"${a.dipId===p.id?' selected':''}>${_de(p.nome)}</option>`)).join('');
+  return `<div class="dia-f full"><label>Dipendente</label>
+    <select class="${a.dipId?'dia-ok':'dia-warn'}" onchange="diarioSetDip(${a._i},this.value)">${opts}</select>
+    ${a.dipId?'<span class="dia-badge ok">✓ anagrafica</span>':`<span class="dia-badge warn">⚠ "${_de(a.dipRaw)}" da scegliere</span>`}</div>`;
+}
+function diarioCantSelect(a,label){
+  const opts=['<option value="">— nessuno —</option>'].concat(diarioActiveCant().map(c=>`<option value="${c.id}"${a.cantMatch&&a.cantMatch.id===c.id?' selected':''}>${_de(c.nome)}</option>`)).join('');
+  return `<div class="dia-f full"><label>${label||'Cantiere'}</label>
+    <select class="${a.cantMatch?'dia-ok':'dia-warn'}" onchange="diarioSetCant(${a._i},this.value)">${opts}</select>
+    ${a.cantMatch?`<span class="dia-badge ok">✓ ${_de(a.cantMatch.nome)}</span>`:(a.cantRaw?`<span class="dia-badge warn">⚠ "${_de(a.cantRaw)}" non trovato</span>`:'')}</div>`;
+}
+function diarioCantBlock(a){
+  const isNew=a.cantMode==='new';
+  const opts=['<option value="">— scegli —</option>'].concat(diarioActiveCant().map(c=>`<option value="${c.id}"${a.cantMatch&&a.cantMatch.id===c.id?' selected':''}>${_de(c.nome)}</option>`)).join('');
+  return `<div class="dia-f full"><label>Cantiere</label>
+    <div class="dia-seg">
+      <button class="dia-segb${!isNew?' on':''}" onclick="diarioSetCantMode(${a._i},'exist')">Esistente</button>
+      <button class="dia-segb${isNew?' on':''}" onclick="diarioSetCantMode(${a._i},'new')">➕ Nuovo</button>
+    </div>
+    ${!isNew
+      ? `<select class="${a.cantMatch?'dia-ok':'dia-warn'}" style="margin-top:8px" onchange="diarioSetCant(${a._i},this.value)">${opts}</select>${a.cantMatch?`<span class="dia-badge ok">✓ lavorazione su ${_de(a.cantMatch.nome)}</span>`:'<span class="dia-badge warn">⚠ scegli il cantiere</span>'}`
+      : `<div style="margin-top:8px;display:grid;gap:8px">
+          <input placeholder="Nome nuovo cantiere" value="${_de(a.cantNewName)}" onchange="diarioSet(${a._i},'cantNewName',this.value)">
+          <input placeholder="Committente / cliente" value="${_de(a.cantNewComm)}" onchange="diarioSet(${a._i},'cantNewComm',this.value)">
+          <label class="dia-chk"><input type="checkbox" ${a.creaPreventivo?'checked':''} onchange="diarioSetBool(${a._i},'creaPreventivo',this.checked)"> <span>🧾 Segna che serve un <b>preventivo</b> da fare in Preventivi</span></label>
+        </div>`}
+  </div>`;
+}
+
+function diarioCard(a){
+  const m=DIARIO_META[a.tipo]; let title='',body='';
+  if(a.tipo==='turno'){
+    title=`${a.dipId?_de((DB.personale.find(p=>p.id===a.dipId)||{}).nome):_de(a.dipRaw)} <small>${a.oraI}–${a.oraF}${a.cantMatch?' · '+_de(a.cantMatch.nome):''}</small>`;
+    body=diarioDipSelect(a)+diarioCantSelect(a)+`
+      <div class="dia-f"><label>Dalle</label><input value="${a.oraI}" onchange="diarioSet(${a._i},'oraI',this.value)"></div>
+      <div class="dia-f"><label>Alle</label><input value="${a.oraF}" onchange="diarioSet(${a._i},'oraF',this.value)"></div>
+      <div class="dia-f eur full"><label>Paga (€)</label><input inputmode="decimal" value="${a.importo}" placeholder="0" onchange="diarioSet(${a._i},'importo',this.value)"></div>
+      <div class="dia-f full"><label>Giorno</label><input type="date" value="${a.data}" onchange="diarioSet(${a._i},'data',this.value)"></div>`;
+  } else if(a.tipo==='anticipo'||a.tipo==='pagamento'){
+    const who=a.dipId?(DB.personale.find(p=>p.id===a.dipId)||{}).nome:a.dipRaw;
+    title=`${_de(who)} <small>${a.tipo==='anticipo'?'anticipo':'pagamento'}${a.importo?' · €'+a.importo:''}</small>`;
+    body=diarioDipSelect(a)+`
+      <div class="dia-f eur"><label>Importo (€)</label><input inputmode="decimal" value="${a.importo}" onchange="diarioSet(${a._i},'importo',this.value)"></div>
+      <div class="dia-f"><label>Giorno</label><input type="date" value="${a.data}" onchange="diarioSet(${a._i},'data',this.value)"></div>
+      ${a.tipo==='anticipo'?`<div class="dia-f full"><label>Metodo</label><select onchange="diarioSet(${a._i},'metodo',this.value)">${['Contanti','Bonifico','Carta aziendale'].map(x=>`<option${x===a.metodo?' selected':''}>${x}</option>`).join('')}</select></div>`:''}
+      <div class="dia-f full"><label>Note</label><input value="${_de(a.note)}" placeholder="opzionale" onchange="diarioSet(${a._i},'note',this.value)"></div>`;
+  } else if(a.tipo==='spesa'){
+    title=`${_de(a.fornitore)||'Spesa'} <small>${_de(a.categoria)}${a.cantMatch?' · '+_de(a.cantMatch.nome):''}</small>`;
+    body=`<div class="dia-f eur"><label>Importo (€)</label><input inputmode="decimal" value="${a.importo}" onchange="diarioSet(${a._i},'importo',this.value)"></div>
+      <div class="dia-f"><label>Fornitore</label><input value="${_de(a.fornitore)}" placeholder="—" onchange="diarioSet(${a._i},'fornitore',this.value)"></div>
+      <div class="dia-f full"><label>Categoria</label><select onchange="diarioSet(${a._i},'categoria',this.value)">${DIARIO_CATEG.map(c=>`<option${c===a.categoria?' selected':''}>${c}</option>`).join('')}</select></div>
+      ${diarioCantSelect(a,'Cantiere su cui pesa')}
+      <div class="dia-f full"><label>Giorno</label><input type="date" value="${a.data}" onchange="diarioSet(${a._i},'data',this.value)"></div>`;
+  } else if(a.tipo==='danno'){
+    const who=a.dipId?(DB.personale.find(p=>p.id===a.dipId)||{}).nome:a.dipRaw;
+    title=`${_de(who)} <small>${_de(a.mezzo)||'danno'}</small>`;
+    body=diarioDipSelect(a)+`
+      <div class="dia-f eur"><label>Importo (€)</label><input inputmode="decimal" value="${a.importo}" onchange="diarioSet(${a._i},'importo',this.value)"></div>
+      <div class="dia-f"><label>Mezzo</label><input value="${_de(a.mezzo)}" placeholder="—" onchange="diarioSet(${a._i},'mezzo',this.value)"></div>
+      <div class="dia-f full"><label>Descrizione</label><input value="${_de(a.descrizione)}" onchange="diarioSet(${a._i},'descrizione',this.value)"></div>`;
+  } else if(a.tipo==='incasso'){
+    title=`${_de(a.committente)||'Incasso'} <small>${_de(a.causale)||''}${a.cantMatch?' · '+_de(a.cantMatch.nome):''}</small>`;
+    body=diarioCantSelect(a,'Cantiere / cliente')+`
+      <div class="dia-f eur"><label>Importo (€)</label><input inputmode="decimal" value="${a.importo}" onchange="diarioSet(${a._i},'importo',this.value)"></div>
+      <div class="dia-f"><label>Metodo</label><select onchange="diarioSet(${a._i},'metodo',this.value)">${['Bonifico','Contanti','Assegno','RID/SEPA','Altro'].map(x=>`<option${x===a.metodo?' selected':''}>${x}</option>`).join('')}</select></div>
+      <div class="dia-f full"><label>Causale</label><input value="${_de(a.causale)}" placeholder="es. Acconto" onchange="diarioSet(${a._i},'causale',this.value)"></div>
+      <div class="dia-f full"><label>Committente</label><input value="${_de(a.committente)}" onchange="diarioSet(${a._i},'committente',this.value)"></div>`;
+  } else if(a.tipo==='lavoro'){
+    const nSq=a.squadra.length;
+    title=`${_de(a.data)} <small>${a.oraI}–${a.oraF} · ${nSq} in squadra${a.cantMatch?' · '+_de(a.cantMatch.nome):''}</small>`;
+    const chips=a.squadra.map(s=>s.m?`<span class="dia-pchip ok">✓ ${_de(s.m.nome)}</span>`:`<span class="dia-pchip warn">⚠ ${_de(s.raw)}</span>`).join('')||'<span class="dia-pchip warn">⚠ nessuno</span>';
+    body=`<div class="dia-f full"><label>Giorno</label><input type="date" value="${a.data}" onchange="diarioSet(${a._i},'data',this.value)"></div>
+      <div class="dia-f"><label>Dalle</label><input value="${a.oraI}" onchange="diarioSet(${a._i},'oraI',this.value)"></div>
+      <div class="dia-f"><label>Alle</label><input value="${a.oraF}" onchange="diarioSet(${a._i},'oraF',this.value)"></div>
+      ${diarioCantBlock(a)}
+      <div class="dia-f full"><label>Squadra</label><div class="dia-chips">${chips}</div></div>
+      <div class="dia-f full"><label>Mezzo</label><input value="${_de(a.mezzo)}" placeholder="— nessuno —" onchange="diarioSet(${a._i},'mezzo',this.value)"></div>`;
+  } else if(a.tipo==='promemoria'){
+    title=`${_de(a.titolo)||'Promemoria'} <small>${a.data?_de(a.data):'senza data'}${a.ora?' · '+a.ora:''}</small>`;
+    body=`<div class="dia-f"><label>Giorno</label><input type="date" value="${a.data}" onchange="diarioSet(${a._i},'data',this.value)"></div>
+      <div class="dia-f"><label>Ora</label><input type="time" value="${a.ora}" onchange="diarioSet(${a._i},'ora',this.value)"></div>
+      <div class="dia-f full"><label>Promemoria</label><input value="${_de(a.titolo)}" onchange="diarioSet(${a._i},'titolo',this.value)"></div>
+      <div class="dia-f full"><label>Note</label><input value="${_de(a.note)}" placeholder="opzionale" onchange="diarioSet(${a._i},'note',this.value)"></div>`;
+  }
+  return `<div class="dia-act${a.on?'':' off'}" id="dia-act-${a._i}">
+    <div class="dia-ah"><div class="dia-ico" style="background:${m.bg}">${m.ic}</div>
+      <div class="dia-ttl">${title}</div>
+      <button class="dia-tgl${a.on?' on':''}" onclick="diarioToggle(${a._i})"></button></div>
+    <div class="dia-grid">${body}</div></div>`;
+}
+
+function diarioRenderPreview(){
+  let html='';
+  DIARIO_ORDER.forEach(t=>{
+    const list=DIARIO_AZIONI.filter(a=>a.tipo===t);
+    if(!list.length) return;
+    html+=`<div class="dia-sec-h">${DIARIO_META[t].ic} ${DIARIO_META[t].lbl} <span class="n">${list.length}</span></div>`+list.map(diarioCard).join('');
+  });
+  document.getElementById('dia-sections').innerHTML=html||'<div style="color:var(--text2);text-align:center;padding:30px;font-size:14px">Nessuna azione riconosciuta.</div>';
+  const cats=new Set(DIARIO_AZIONI.map(a=>a.tipo)).size;
+  document.getElementById('dia-summary').innerHTML=DIARIO_AZIONI.length?`Ho trovato <b style="color:var(--teal)">${DIARIO_AZIONI.length} ${DIARIO_AZIONI.length===1?'azione':'azioni'}</b> in ${cats} ${cats===1?'categoria':'categorie'}. Controlla e conferma.`:'Nessuna azione.';
+  diarioUpdCount();
+}
+function diarioUpdCount(){
+  const on=DIARIO_AZIONI.filter(a=>a.on).length;
+  const b=document.getElementById('dia-confirm');
+  if(b){ b.textContent=on?`Conferma e salva (${on})`:'Niente da salvare'; b.disabled=on===0; b.style.opacity=on?'1':'.5'; }
+}
+
+// ── Applica una singola azione al blob remoto D (mutazione) ──
+function diarioApply(a,D){
+  const dip=a.dipId?(D.personale||[]).find(p=>p.id===a.dipId):null;
+  const imp=parseFloat(a.importo||0)||0;
+  const cantName=a.cantMatch?a.cantMatch.nome:(a.cantRaw||'');
+  if(a.tipo==='turno'){ if(!dip)return;
+    D.presenze=D.presenze||{}; D.presenze[a.data]=D.presenze[a.data]||{};
+    const pr=D.presenze[a.data][dip.id]=D.presenze[a.data][dip.id]||{turni:[],totale:0};
+    if(!pr.turni)pr.turni=[];
+    pr.turni.push({id:uid(),cantiere:cantName,oraI:a.oraI,oraF:a.oraF,importo:imp,notturno:false});
+    pr.totale=pr.turni.reduce((s,t)=>s+parseFloat(t.importo||0),0);
+  } else if(a.tipo==='anticipo'){ if(!dip)return; (D.anticipi=D.anticipi||[]).push({id:uid(),data:a.data,dipId:dip.id,dipNome:dip.nome,importo:imp,metodo:a.metodo||'Contanti',note:a.note||'Da Diario'});
+  } else if(a.tipo==='pagamento'){ if(!dip)return; (D.pagamenti=D.pagamenti||[]).push({id:uid(),data:a.data,dipId:dip.id,dipNome:dip.nome,pagato:imp,note:a.note||'Da Diario',periodoDa:'',periodoAl:a.data});
+  } else if(a.tipo==='spesa'){ (D.scontrini=D.scontrini||[]).push({id:uid(),data:a.data,importo:imp,fornitore:a.fornitore||'',categoria:a.categoria||'Materiali di consumo',cantiere:cantName,note:a.note||'',foto:null,fonte:'diario'});
+    if(cantName)(D.speseCantiere=D.speseCantiere||[]).push({id:uid(),cantiere:cantName,data:a.data,importo:imp,categoria:a.categoria||'',fornitore:a.fornitore||'',descrizione:a.note||a.testo||''});
+  } else if(a.tipo==='danno'){ if(!dip)return; (D.addebiti=D.addebiti||[]).push({id:uid(),dipId:dip.id,dipNome:dip.nome,importo:imp,data:a.data,descrizione:a.descrizione||'Danno',mezzo:a.mezzo||'',scalature:[],chiuso:false});
+  } else if(a.tipo==='incasso'){ const c=a.cantMatch; (D.incassi=D.incassi||[]).push({id:uid(),cantiereId:c?c.id:'',cantiereName:c?c.nome:(a.cantRaw||''),committente:a.committente||'',data:a.data,importo:imp,metodo:a.metodo||'Bonifico',fattura:'',note:a.causale||a.note||''});
+  } else if(a.tipo==='promemoria'){ (D.promemoria=D.promemoria||[]).push({id:uid(),data:a.data||'',ora:a.ora||'',titolo:a.titolo||a.testo||'Promemoria',note:a.note||'',fatto:false,creato:today()});
+  } else if(a.tipo==='lavoro'){
+    D.cantieri=D.cantieri||[]; let cant=null;
+    if(a.cantMode==='new'){ cant={id:uid(),nome:a.cantNewName||'Nuovo cantiere',committente:a.cantNewComm||'',stato:'da confermare',periodoInizio:a.data,periodoFine:a.data,interventi:[],fonte:'diario'}; if(a.creaPreventivo)cant._preventivoDaFare=true; D.cantieri.push(cant); }
+    else { const id=a.cantMatch&&a.cantMatch.id; cant=D.cantieri.find(c=>c.id===id)||D.cantieri.find(c=>(c.nome||'').toLowerCase()===((a.cantMatch&&a.cantMatch.nome)||'').toLowerCase()); }
+    if(cant){ cant.interventi=cant.interventi||[];
+      cant.interventi.push({id:uid(),data:a.data,squadra:a.squadra.filter(s=>s.m).map(s=>s.m.nome),oraInizio:a.oraI,oraFine:a.oraF,luogo:cant.nome,mezzi:a.mezzo?[a.mezzo]:[]});
+      if(!cant.periodoInizio||a.data<cant.periodoInizio)cant.periodoInizio=a.data;
+      if(!cant.periodoFine||a.data>cant.periodoFine)cant.periodoFine=a.data; }
+  }
+}
+
+// ── Salvataggio atomico dell'intero blob con lock di versione + retry ──
+async function diarioSalvaTutto(list){
+  setStatus(null,'Salvataggio…');
+  for(let t=1;t<=4;t++){
+    const row=await sbGet();
+    const D=(row&&row.dati)?row.dati:{};
+    D.presenze=D.presenze||{};
+    ['personale','cantieri','anticipi','pagamenti','scontrini','speseCantiere','addebiti','incassi','promemoria'].forEach(k=>{ if(!D[k])D[k]=[]; });
+    list.forEach(a=>diarioApply(a,D));
+    const ok=await sbSet(D,(row&&row.versione!=null)?row.versione:null);
+    if(ok){ Object.assign(DB,D); try{const r=await sbGet(); if(r&&r.versione!=null)_mobUltimaVersione=r.versione;}catch(_){}
+      ricalcolaSaldi(); renderAll(); setStatus(true,'Sincronizzato ✓'); return true; }
+    setStatus(null,'Dati cambiati — riprovo…');
+  }
+  setStatus(false,'Conflitto — riprova'); return false;
+}
+
+async function diarioConferma(){
+  const list=DIARIO_AZIONI.filter(a=>a.on);
+  if(!list.length){ toast('Niente da salvare'); return; }
+  if(list.some(a=>['turno','anticipo','pagamento','danno'].includes(a.tipo)&&!a.dipId)){ toast('⚠ Scegli il dipendente nelle voci in giallo'); return; }
+  if(list.some(a=>a.tipo==='lavoro'&&a.cantMode==='exist'&&!(a.cantMatch&&a.cantMatch.id))){ toast('⚠ Scegli il cantiere per il lavoro (o metti Nuovo)'); return; }
+  if(list.some(a=>a.tipo==='lavoro'&&a.cantMode==='new'&&!(a.cantNewName||'').trim())){ toast('⚠ Dai un nome al nuovo cantiere'); return; }
+  document.getElementById('loading').style.display='flex';
+  let ok=false; try{ ok=await diarioSalvaTutto(list); }catch(e){ toast('⚠ '+e.message); }
+  document.getElementById('loading').style.display='none';
+  if(ok) diarioRenderDone(list); else toast('⚠ Un\'altra app sta scrivendo — riprova tra qualche secondo');
+}
+
+function diarioRenderDone(list){
+  document.getElementById('dia-done-count').innerHTML=`<b>${list.length}</b> ${list.length===1?'voce inserita':'voci inserite'} nelle app giuste.`;
+  const rows=DIARIO_ORDER.flatMap(t=>list.filter(a=>a.tipo===t)).map(a=>{
+    const m=DIARIO_META[a.tipo]; let d='',dest=m.dest;
+    const who=a.dipId?(DB.personale.find(p=>p.id===a.dipId)||{}).nome:a.dipRaw;
+    if(a.tipo==='turno') d=`${who} · ${a.oraI}–${a.oraF}${a.importo?' · '+fm(a.importo):''}`;
+    if(a.tipo==='anticipo') d=`${who} · ${fm(a.importo)}`;
+    if(a.tipo==='pagamento') d=`${who} · ${fm(a.importo)}`;
+    if(a.tipo==='spesa') d=`${a.fornitore||'Spesa'} · ${fm(a.importo)}`;
+    if(a.tipo==='danno') d=`${who} · ${fm(a.importo)}`;
+    if(a.tipo==='incasso') d=`${a.committente||'Cliente'} · ${fm(a.importo)}`;
+    if(a.tipo==='lavoro'){ const cn=a.cantMode==='new'?(a.cantNewName||'nuovo cantiere'):(a.cantMatch?a.cantMatch.nome:'—'); d=`${a.data} · ${a.squadra.length} pers. · ${cn}`; dest=a.cantMode==='new'?(a.creaPreventivo?'Planning + Preventivi':'Planning · nuovo'):'Planning · lavoraz.'; }
+    if(a.tipo==='promemoria') d=`${a.titolo||'Promemoria'}${a.data?' · '+a.data:''}${a.ora?' '+a.ora:''}`;
+    return `<div class="ri"><span style="font-size:16px">${m.ic}</span><span>${_de(d)}</span><span class="to">${_de(dest)}</span></div>`;
+  }).join('');
+  document.getElementById('dia-recap').innerHTML=rows;
+  const prev=list.filter(a=>a.tipo==='lavoro'&&a.cantMode==='new'&&a.creaPreventivo).length;
+  if(prev) toast(`✓ Salvato · ${prev} preventivo da completare in Preventivi`);
+  diarioShow('done');
+}
+
+// Tasti rapidi: inseriscono un modello da completare
+document.addEventListener('DOMContentLoaded',()=>{
+  const q=document.getElementById('dia-quick');
+  if(q) q.addEventListener('click',e=>{
+    const b=e.target.closest('.dia-qb'); if(!b) return;
+    const tpl=DIARIO_TPL[b.dataset.t]; if(!tpl) return;
+    const ta=document.getElementById('diario-txt'); const cur=(ta.value||'').trim();
+    ta.value=cur?cur+'\n'+tpl:tpl; ta.focus();
+    const br=ta.value.indexOf('[',ta.value.lastIndexOf(tpl)); if(br>=0){const end=ta.value.indexOf(']',br);ta.setSelectionRange(br,end>=0?end+1:br);}
+    ta.scrollTop=ta.scrollHeight;
+  });
+});
 
 // ── PWA: registra il service worker ───────────────────────────────────────
 // sw.js è NETWORK-FIRST sulla pagina: quando c'è rete serve sempre la versione
