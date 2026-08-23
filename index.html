@@ -2470,6 +2470,7 @@ async function diarioCreaPreventivo(cantId, nome, committente, righe){
 async function diarioElabora(){
   const txt=(document.getElementById('diario-txt').value||'').trim();
   if(!txt){ toast('Scrivi cosa è successo'); return; }
+  if(/\[[^\]]*\]/.test(txt)){ toast('✏️ Compila i campi tra [ ] (o scrivi la frase per intero), poi Elabora'); return; }
   const btn=document.getElementById('diario-go'); btn.disabled=true; btn.textContent='Sto leggendo…';
   document.getElementById('loading').style.display='flex';
   try{
@@ -2482,7 +2483,7 @@ async function diarioElabora(){
     DIARIO_AZIONI=(j.azioni||[]).map((a,i)=>diarioNorm(a,i));
     diarioRenderPreview();
     diarioShow('preview');
-    if(!DIARIO_AZIONI.length) toast('Non ho riconosciuto azioni — prova a essere più esplicito');
+    if(!DIARIO_AZIONI.length) toast('Non ho riconosciuto azioni — scrivi con nomi, importi, date o orari (es. "Appuntamento col Comune giovedì alle 10")');
   }catch(e){ toast('⚠ '+e.message); }
   finally{ document.getElementById('loading').style.display='none'; btn.disabled=false; btn.textContent='✨ Elabora'; }
 }
