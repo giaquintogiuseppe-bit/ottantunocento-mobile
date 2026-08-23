@@ -2348,11 +2348,17 @@ async function risLoad(){
     fetch(`${SB_URL}/rest/v1/depositi?select=*`,H).then(r=>r.ok?r.json():[]),
     fetch(`${SB_URL}/rest/v1/ubicazioni?select=*`,H).then(r=>r.ok?r.json():[])
   ]);
-  RISM.ris=ris;RISM.mov=mov;RISM.dep=dep;RISM.ubi=ubi;RISM.loaded=true;
+  RISM.ris=ris;RISM.mov=mov;RISM.dep=dep;RISM.ubi=ubi;
+  RISM.mov.forEach(m=>{
+    if(!m.a_tipo){ if(m.cantiere_id){ m.a_tipo='cantiere'; m.a_id=m.a_id||m.cantiere_id; m.a_nome=m.a_nome||m.cantiere_nome; }
+      else { m.a_tipo='deposito'; m.a_id=m.a_id||m.deposito_id; m.a_nome=m.a_nome||risDepNome(m.deposito_id); } }
+    if(!m.da_tipo){ m.da_tipo='deposito'; m.da_id=m.da_id||m.deposito_id; m.da_nome=m.da_nome||risDepNome(m.deposito_id); }
+  });
+  RISM.loaded=true;
 }
 function risById(id){return RISM.ris.find(r=>r.id===id);}
 function risMovDi(id){return RISM.mov.filter(m=>m.risorsa_id===id);}
-function risAperto(m){return m.stato!=='rientrata'&&!m.data_rientro_effettiva;}
+function risAperto(m){return !['rientrata','trasferita','annullata'].includes(m.stato)&&!m.data_rientro_effettiva;}
 function risFuori(m){return m.a_tipo&&m.a_tipo!=='deposito';}
 function risFuoriOggi(){const t=today();return RISM.mov.filter(m=>risAperto(m)&&risFuori(m)&&m.data_uscita<=t&&(!m.data_rientro||m.data_rientro>=t));}
 function risRitardo(){const t=today();return RISM.mov.filter(m=>risAperto(m)&&risFuori(m)&&m.data_rientro&&m.data_rientro<t);}
