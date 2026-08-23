@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="81|00">
 <meta name="theme-color" content="#0e7c66">
 <title>81|00 Mobile</title>
@@ -26,7 +26,7 @@
 html,body{height:100%;background:var(--navy);color:var(--text);font-family:'IBM Plex Sans',-apple-system,BlinkMacSystemFont,'Helvetica Neue',sans-serif;overflow:hidden}
 /* LAYOUT */
 #app{display:flex;flex-direction:column;height:100dvh}
-#hdr{background:var(--navy2);padding:calc(env(safe-area-inset-top)+10px) 16px 10px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--brd);flex-shrink:0}
+#hdr{background:var(--navy2);padding:calc(env(safe-area-inset-top)+14px) 16px 12px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--brd);flex-shrink:0}
 #hdr h1{font-size:18px;font-weight:800;color:var(--teal)}
 #hdr-status{display:flex;align-items:center;gap:6px}
 #status-dot{width:8px;height:8px;border-radius:50%;background:var(--text2)}
@@ -326,7 +326,7 @@ button{touch-action:manipulation}
   <div id="hdr-status">
     <span id="status-dot"></span>
     <span id="status-txt">Connessione...</span>
-    <button onclick="syncCloud()" style="background:rgba(14,124,102,.15);border:1px solid rgba(14,124,102,.3);color:var(--teal);border-radius:8px;padding:5px 10px;font-size:12px;font-weight:700;cursor:pointer">↻ Sync</button>
+    <button onclick="syncCloud()" style="background:rgba(14,124,102,.15);border:1px solid rgba(14,124,102,.3);color:var(--teal);border-radius:8px;padding:8px 14px;min-height:40px;font-size:13px;font-weight:700;cursor:pointer;-webkit-tap-highlight-color:transparent;touch-action:manipulation">↻ Sync</button>
   </div>
 </div>
 
