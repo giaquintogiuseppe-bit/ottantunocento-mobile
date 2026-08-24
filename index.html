@@ -38,6 +38,11 @@ html,body{height:100%;background:var(--navy);color:var(--text);font-family:'IBM 
 .risf{display:block;font-size:12px;font-weight:600;color:var(--text2);margin-bottom:10px}
 .risf select,.risf input{display:block;width:100%;margin-top:4px;padding:11px 12px;border:1px solid var(--brd);border-radius:10px;font-size:15px;font-family:inherit;background:var(--card);color:var(--text)}
 .risf select:focus,.risf input:focus{outline:2px solid var(--teal);border-color:var(--teal)}
+.ct-chip{flex-shrink:0;font-size:13px;font-weight:600;padding:6px 12px;border-radius:20px;border:1px solid var(--brd);background:var(--navy2);color:var(--text2);cursor:pointer;white-space:nowrap;font-family:inherit}
+.ct-chip.on{background:var(--teal);color:#fff;border-color:var(--teal)}
+.badge-tp{display:inline-flex;align-items:center;gap:3px;font-size:10px;font-weight:700;padding:1px 6px;border-radius:5px;letter-spacing:.02em;white-space:nowrap}
+.cont-dot{font-size:9px;font-weight:700;color:var(--teal);border:1px solid var(--teal);border-radius:4px;padding:0 4px}
+.cli-grp{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--teal);margin:16px 2px 8px;display:flex;justify-content:space-between;align-items:center}
 .nav-btn.active{color:var(--teal)}
 /* PAGINE */
 .pg{display:none;padding:16px;animation:fi .2s ease}
@@ -474,6 +479,15 @@ button{touch-action:manipulation}
       <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text2);white-space:nowrap;cursor:pointer">
         <input type="checkbox" id="cant-mostra-arch" onchange="renderCantieri()" style="accent-color:var(--teal)"> 🗄 Archivio
       </label>
+    </div>
+    <div style="display:flex;gap:6px;overflow-x:auto;padding-bottom:4px;margin-bottom:8px" id="cant-tipo-chips">
+      <button class="ct-chip on" data-t="tutti"  onclick="mobSetTipo('tutti',this)">Tutti</button>
+      <button class="ct-chip" data-t="evento"    onclick="mobSetTipo('evento',this)">🎪</button>
+      <button class="ct-chip" data-t="noleggio"  onclick="mobSetTipo('noleggio',this)">🔄</button>
+      <button class="ct-chip" data-t="fornitura" onclick="mobSetTipo('fornitura',this)">📦</button>
+      <button class="ct-chip" data-t="servizio"  onclick="mobSetTipo('servizio',this)">🚚</button>
+      <button class="ct-chip" data-t="interno"   onclick="mobSetTipo('interno',this)">🏠</button>
+      <button class="ct-chip" style="margin-left:auto" id="cant-percli-btn" onclick="mobTogglePerCliente(this)">👥 Per cliente</button>
     </div>
     <div id="cant-list"></div>
   </div>
@@ -1879,6 +1893,32 @@ async function salvaSpesa(){
 }
 
 // ── CANTIERI ──────────────────────────────────────────────────────────────
+// ── Commesse: tipi (multipli) + badge ──
+const MOB_TIPO_META = {
+  evento:   {ic:'🎪', lbl:'Evento',    col:'var(--teal)', bg:'rgba(14,124,102,.14)'},
+  noleggio: {ic:'🔄', lbl:'Noleggio',  col:'#3a52c4',     bg:'rgba(122,160,255,.16)'},
+  fornitura:{ic:'📦', lbl:'Fornitura', col:'var(--gold)', bg:'rgba(232,184,75,.15)'},
+  servizio: {ic:'🚚', lbl:'Servizio',  col:'#c26a1f',     bg:'rgba(214,138,58,.15)'},
+  interno:  {ic:'🏠', lbl:'Interno',   col:'var(--text2)',bg:'rgba(120,140,160,.14)'},
+};
+function mobCantTipi(c){
+  const t=c&&c.tipoCant;
+  if(Array.isArray(t)) return t.filter(x=>MOB_TIPO_META[x]);
+  if(typeof t==='string' && MOB_TIPO_META[t]) return [t];
+  return [];
+}
+function mobBadgeTipi(c){
+  const tipi=mobCantTipi(c);
+  let h=tipi.map(t=>{const m=MOB_TIPO_META[t];return `<span class="badge-tp" style="background:${m.bg};color:${m.col}">${m.ic} ${m.lbl}</span>`;}).join('');
+  if(c&&c.continuativa) h+=`<span class="cont-dot">CONTINUATIVA</span>`;
+  return h?`<div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:5px">${h}</div>`:'';
+}
+let _mobCantTipo='tutti', _mobCantPerCliente=false;
+function mobSetTipo(t,el){ _mobCantTipo=t; document.querySelectorAll('#cant-tipo-chips .ct-chip[data-t]').forEach(x=>x.classList.remove('on')); if(el)el.classList.add('on'); renderCantieri(); }
+function mobTogglePerCliente(el){ _mobCantPerCliente=!_mobCantPerCliente; if(el)el.classList.toggle('on',_mobCantPerCliente); renderCantieri(); }
+function mobMatchTipo(c){ return _mobCantTipo==='tutti' || mobCantTipi(c).includes(_mobCantTipo); }
+function mobClienteDi(c){ return (c.committente||c.clienteNome||'').trim() || '— senza cliente —'; }
+
 function renderCantieri(){
   const archIds = new Set(DB._cantieriArchiviati||[]);
   const q = (document.getElementById('cant-search')?.value||'').toLowerCase();
@@ -1934,7 +1974,8 @@ function renderCantieri(){
         <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px">
           <div style="flex:1;margin-right:8px">
             <div style="font-weight:700;font-size:15px">${c.nome}${archiviato?' 🗄':''}</div>
-            <div style="font-size:12px;color:var(--text2);margin-top:2px">${periodoCantiere(c)}</div>
+            <div style="font-size:12px;color:var(--text2);margin-top:2px">${periodoCantiere(c)}${!_mobCantPerCliente&&mobClienteDi(c)!=='— senza cliente —'?' · '+mobClienteDi(c):''}</div>
+            ${mobBadgeTipi(c)}
           </div>
           ${statoBadge(c)}
         </div>
@@ -1958,10 +1999,23 @@ function renderCantieri(){
     </div>`;
   };
 
-  let html = attivi.map(c=>cardCantiere(c,false)).join('');
-  if(depositi.length){
-    html += `<div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#3a52c4;margin:18px 0 8px">📦 Depositi attrezzature (${depositi.length})</div>`;
-    html += depositi.map(c=>{
+  const attiviF = attivi.filter(mobMatchTipo);
+  let html;
+  if(_mobCantPerCliente){
+    const groups={};
+    attiviF.forEach(c=>{ const k=mobClienteDi(c); (groups[k]=groups[k]||[]).push(c); });
+    html = Object.keys(groups).sort((a,b)=>a.localeCompare(b)).map(cli=>{
+      const arr=groups[cli];
+      const tot=arr.reduce((a,c)=>a+getBudget(c.id,c.nome),0);
+      return `<div class="cli-grp"><span>${cli} · ${arr.length}</span><span style="color:var(--gold);font-family:'IBM Plex Mono',monospace">${tot?fm(tot):''}</span></div>`+arr.map(c=>cardCantiere(c,false)).join('');
+    }).join('');
+  } else {
+    html = attiviF.map(c=>cardCantiere(c,false)).join('');
+  }
+  const depositiF = depositi.filter(mobMatchTipo);
+  if(depositiF.length){
+    html += `<div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#3a52c4;margin:18px 0 8px">📦 Depositi attrezzature (${depositiF.length})</div>`;
+    html += depositiF.map(c=>{
       const gg=c.dataRitiro?Math.ceil((new Date(c.dataRitiro+'T12:00:00')-new Date())/86400000):null;
       const cid=c.id||c.nome.replace(/\s/g,'_');
       return `<div class="card" style="border-color:rgba(122,160,255,.3)" onclick="apriDettCantiere('${cid}')">
@@ -1979,15 +2033,16 @@ function renderCantieri(){
   if(!html) html='<div style="color:var(--text2);text-align:center;padding:30px;font-size:14px">Nessun cantiere attivo</div>';
 
   // Storico: conclusi + archiviati in sezione collassabile
-  const nStorico=conclusi.length+archiviati.length;
+  const conclusiF=conclusi.filter(mobMatchTipo), archiviatiF=archiviati.filter(mobMatchTipo);
+  const nStorico=conclusiF.length+archiviatiF.length;
   if(nStorico>0){
     html+=`<button onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none';this.textContent=this.textContent.includes('▸')?this.textContent.replace('▸','▾'):this.textContent.replace('▾','▸')"
       style="width:100%;margin-top:14px;background:rgba(100,120,140,.1);border:1px solid rgba(100,120,140,.2);border-radius:10px;padding:11px;color:var(--text2);font-size:13px;font-weight:600;cursor:pointer;text-align:left">
       🗄 Storico conclusi e archiviati (${nStorico}) ▸
     </button>
     <div style="display:none">
-      ${conclusi.length?`<div style="font-size:12px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--green);padding:12px 4px 6px">✅ Conclusi (${conclusi.length})</div>${conclusi.map(c=>cardCantiere(c,false)).join('')}`:''}
-      ${archiviati.length?`<div style="font-size:12px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--text2);padding:12px 4px 6px">🗄 Archiviati (${archiviati.length})</div>${archiviati.map(c=>cardCantiere(c,true)).join('')}`:''}
+      ${conclusiF.length?`<div style="font-size:12px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--green);padding:12px 4px 6px">✅ Conclusi (${conclusiF.length})</div>${conclusiF.map(c=>cardCantiere(c,false)).join('')}`:''}
+      ${archiviatiF.length?`<div style="font-size:12px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--text2);padding:12px 4px 6px">🗄 Archiviati (${archiviatiF.length})</div>${archiviatiF.map(c=>cardCantiere(c,true)).join('')}`:''}
     </div>`;
   }
 
