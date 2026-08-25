@@ -348,6 +348,7 @@ button{touch-action:manipulation}
       <button class="qa" onclick="qaSpesa()"><span class="qi">📷</span>Registra spesa</button>
       <button class="qa" onclick="qaSaldi()"><span class="qi">💶</span>Chi pagare</button>
       <button class="qa" onclick="goTo('richieste',null)"><span class="qi">🗂️</span>Le richieste</button>
+      <button class="qa" onclick="goTo('regia',null)"><span class="qi">🗺️</span>Regia</button>
       <button class="qa" onclick="goTo('risorse',null)"><span class="qi">📦</span>Risorse</button>
     </div>
     <div class="kpi-row" id="dash-kpi"></div>
@@ -392,6 +393,17 @@ button{touch-action:manipulation}
       <button class="btn btn-teal" style="width:100%;padding:14px;font-size:15px;font-weight:800" onclick="richSalva(this)">💾 Salva richiesta</button>
       <div style="font-size:11px;color:var(--text2);text-align:center;margin-top:10px">Il numero REQ e il triage (preventivo / intervento / diretta) si fanno dopo, con calma, dal Gestionale.</div>
     </div>
+  </div>
+
+  <!-- REGIA / SAL (specchio di sola lettura del perno) -->
+  <div class="pg" id="pg-regia">
+    <div class="kpi-row" id="regia-kpi"></div>
+    <div class="sec-lbl">🧾 Interventi da fatturare</div>
+    <div id="regia-daf"><div style="color:var(--text2);text-align:center;padding:14px">—</div></div>
+    <div class="sec-lbl" style="margin-top:16px">🗺️ Commesse aperte</div>
+    <input type="text" id="regia-search" placeholder="🔍 Cerca commessa/cliente…" oninput="regiaRender()"
+      style="width:100%;background:var(--navy2);border:1px solid var(--brd);border-radius:10px;color:var(--text);font-size:16px;padding:11px 14px;outline:none;margin-bottom:10px">
+    <div id="regia-list"><div style="color:var(--text2);text-align:center;padding:20px">Carico…</div></div>
   </div>
 
   <!-- PRESENZE -->
@@ -2424,6 +2436,63 @@ function goTo(pg,el){
   if(pg==='diario') diarioInit();
   if(pg==='risorse') renderRisorseMob();
   if(pg==='richieste') richLoad();
+  if(pg==='regia') regiaLoad();
+}
+
+/* ═══════════ REGIA / SAL — specchio di sola lettura del perno ═══════════
+   Legge le tabelle cloud commesse + interventi. Vista tascabile per capire
+   al volo, mentre sei in giro, lo stato delle commesse aperte e cosa resta
+   da fatturare. Non modifica nulla. */
+const REGIA={comm:[],inter:[],loaded:false};
+function regiaEsc(s){return (s==null?'':String(s)).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+function regiaNum(n){n=Number(n)||0;return n.toLocaleString('it-IT',{maximumFractionDigits:0});}
+function regiaFmtD(iso){if(!iso)return '';const p=String(iso).slice(0,10).split('-');return p.length===3?p[2]+'/'+p[1]:iso;}
+async function regiaLoad(){
+  const H={headers:{apikey:SB_KEY,Authorization:`Bearer ${SB_KEY}`},cache:'no-cache'};
+  try{
+    const [c,i]=await Promise.all([
+      fetch(`${SB_URL}/rest/v1/commesse?select=*`,H).then(r=>r.ok?r.json():[]),
+      fetch(`${SB_URL}/rest/v1/interventi?select=*`,H).then(r=>r.ok?r.json():[])
+    ]);
+    REGIA.comm=Array.isArray(c)?c:[]; REGIA.inter=Array.isArray(i)?i:[]; REGIA.loaded=true;
+  }catch(e){ REGIA.comm=[]; REGIA.inter=[]; }
+  regiaRender();
+}
+function _regiaAperta(c){ const s=(c.stato||'').toLowerCase(); return !c.archiviato && s!=='concluso' && s!=='archivio' && s!=='perso'; }
+function regiaRender(){
+  const aperte=REGIA.comm.filter(_regiaAperta);
+  const conPrev=aperte.filter(c=>c.preventivo_id).length;
+  const daFatt=REGIA.inter.filter(it=>!it.fatturato && (it.stato==='concluso'||it.stato==='in_corso'));
+  const kpi=document.getElementById('regia-kpi');
+  if(kpi) kpi.innerHTML=`
+    <div class="kpi tc"><div class="lb">Commesse aperte</div><div class="vl">${aperte.length}</div></div>
+    <div class="kpi"><div class="lb">con preventivo</div><div class="vl">${conPrev}</div></div>
+    <div class="kpi go"><div class="lb">Int. da fatturare</div><div class="vl">${daFatt.length}</div></div>`;
+  const dafBox=document.getElementById('regia-daf');
+  if(dafBox){
+    dafBox.innerHTML=daFatt.length?daFatt.map(it=>{
+      const cm=REGIA.comm.find(c=>c.id===it.commessa_id);
+      return `<div style="background:var(--navy2);border:1px solid var(--brd);border-radius:10px;padding:11px 13px;margin-bottom:8px">
+        <div style="display:flex;justify-content:space-between;gap:8px"><div style="font-weight:700;font-size:13px">${regiaEsc(it.titolo||it.numero||'Intervento')}</div>${it.importo?`<div style="color:var(--green);font-weight:700;font-size:13px">€ ${regiaNum(it.importo)}</div>`:''}</div>
+        <div style="font-size:11px;color:var(--text2);margin-top:2px">${regiaEsc((cm&&(cm.codice||cm.nome))||it.commessa_codice||'')}${it.data_inizio?' · '+regiaFmtD(it.data_inizio):''}${it.luogo?' · '+regiaEsc(it.luogo):''}</div>
+      </div>`;
+    }).join(''):'<div style="color:var(--text2);text-align:center;padding:14px">Niente da fatturare 👍</div>';
+  }
+  const box=document.getElementById('regia-list'); if(!box)return;
+  const q=(document.getElementById('regia-search')?.value||'').toLowerCase().trim();
+  let l=aperte.slice().sort((a,b)=>(a.codice||'').localeCompare(b.codice||''));
+  if(q) l=l.filter(c=>((c.codice||'')+' '+(c.nome||'')+' '+(c.cliente_nome||'')+' '+(c.committente||'')).toLowerCase().includes(q));
+  if(!l.length){ box.innerHTML='<div style="color:var(--text2);text-align:center;padding:20px">Nessuna commessa aperta.</div>'; return; }
+  box.innerHTML=l.map(c=>{
+    const cli=regiaEsc(c.cliente_nome||c.committente||'');
+    const tipi=Array.isArray(c.tipo_cant)?c.tipo_cant:[];
+    return `<div style="background:var(--navy2);border:1px solid var(--brd);border-radius:12px;padding:12px 14px;margin-bottom:9px">
+      <div style="font-family:monospace;font-size:10px;color:var(--text2);letter-spacing:.5px">${regiaEsc(c.codice||'')}${c.preventivo_id?' · 🧾 '+regiaEsc(c.preventivo_id):''}</div>
+      <div style="font-weight:800;font-size:14px;margin-top:1px">${regiaEsc(c.nome||'—')}</div>
+      ${cli?`<div style="font-size:12px;color:var(--text2);margin-top:2px">${cli}</div>`:''}
+      ${tipi.length?`<div style="font-size:11px;color:var(--teal);margin-top:3px">${tipi.map(regiaEsc).join(' · ')}${c.continuativa?' · ♾️ continuativa':''}</div>`:''}
+    </div>`;
+  }).join('');
 }
 
 /* ═══════════ RICHIESTE — cattura antenna (tabella cloud "richieste") ═══════════
