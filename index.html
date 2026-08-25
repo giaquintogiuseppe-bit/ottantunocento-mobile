@@ -372,7 +372,7 @@ button{touch-action:manipulation}
 
   <!-- Modal nuova richiesta -->
   <div id="rich-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:60;overflow-y:auto">
-    <div style="background:var(--navy2);margin:20px 12px;border-radius:14px;padding:16px">
+    <div style="background:var(--navy2);margin:20px 12px calc(env(safe-area-inset-bottom) + 90px);border-radius:14px;padding:16px">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
         <div style="font-size:16px;font-weight:800">📥 Nuova richiesta</div>
         <button onclick="richChiudi()" style="background:var(--card);border:none;color:var(--text);width:32px;height:32px;border-radius:8px;font-size:16px;cursor:pointer">✕</button>
@@ -422,7 +422,7 @@ button{touch-action:manipulation}
     </div>
     <!-- Modal importa Planning -->
     <div id="mob-imp-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:50;overflow-y:auto">
-      <div style="background:var(--navy2);margin:20px 12px;border-radius:14px;padding:16px;min-height:auto">
+      <div style="background:var(--navy2);margin:20px 12px calc(env(safe-area-inset-bottom) + 90px);border-radius:14px;padding:16px;min-height:auto">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
           <div style="font-size:15px;font-weight:800">📅 Importa turni</div>
           <button onclick="document.getElementById('mob-imp-modal').style.display='none'" style="background:var(--card);border:none;color:var(--text);width:30px;height:30px;border-radius:8px;font-size:16px;cursor:pointer">✕</button>
