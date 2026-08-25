@@ -343,9 +343,11 @@ button{touch-action:manipulation}
   <!-- DASHBOARD -->
   <div class="pg active" id="pg-dash">
     <div class="quick-actions">
+      <button class="qa" onclick="richNuova()"><span class="qi">📥</span>Nuova richiesta</button>
       <button class="qa" onclick="qaPresenzeOggi()"><span class="qi">📅</span>Presenze oggi</button>
       <button class="qa" onclick="qaSpesa()"><span class="qi">📷</span>Registra spesa</button>
       <button class="qa" onclick="qaSaldi()"><span class="qi">💶</span>Chi pagare</button>
+      <button class="qa" onclick="goTo('richieste',null)"><span class="qi">🗂️</span>Le richieste</button>
       <button class="qa" onclick="goTo('risorse',null)"><span class="qi">📦</span>Risorse</button>
     </div>
     <div class="kpi-row" id="dash-kpi"></div>
@@ -353,6 +355,43 @@ button{touch-action:manipulation}
     <div id="dash-saldi"></div>
     <div class="sec-lbl">Cantieri attivi</div>
     <div id="dash-cantieri"></div>
+  </div>
+
+  <!-- RICHIESTE (cattura antenna) -->
+  <div class="pg" id="pg-richieste">
+    <button class="btn btn-teal" style="width:100%;margin-bottom:14px;font-size:15px;padding:15px;font-weight:800" onclick="richNuova()">➕ Nuova richiesta</button>
+    <input type="text" id="rich-search" placeholder="🔍 Cerca..." oninput="richRender()"
+      style="width:100%;background:var(--navy2);border:1px solid var(--brd);border-radius:10px;color:var(--text);font-size:16px;padding:12px 14px;outline:none;margin-bottom:12px">
+    <div class="chips" style="margin-bottom:14px" id="rich-filtri">
+      <button class="chip on" data-f="aperte" onclick="richFiltro('aperte',this)">Aperte</button>
+      <button class="chip" data-f="tutte" onclick="richFiltro('tutte',this)">Tutte</button>
+    </div>
+    <div id="rich-list"><div style="color:var(--text2);text-align:center;padding:20px">Carico…</div></div>
+  </div>
+
+  <!-- Modal nuova richiesta -->
+  <div id="rich-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:60;overflow-y:auto">
+    <div style="background:var(--navy2);margin:20px 12px;border-radius:14px;padding:16px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+        <div style="font-size:16px;font-weight:800">📥 Nuova richiesta</div>
+        <button onclick="richChiudi()" style="background:var(--card);border:none;color:var(--text);width:32px;height:32px;border-radius:8px;font-size:16px;cursor:pointer">✕</button>
+      </div>
+      <div class="field"><label>Chi ti ha contattato</label>
+        <input type="text" id="rich-chi" placeholder="Nome o riferimento (anche approssimativo)" autocomplete="off"></div>
+      <div class="field"><label>Cosa serve</label>
+        <input type="text" id="rich-cosa" placeholder="Es. palco 6×4, service audio, facchinaggio…" autocomplete="off"></div>
+      <div class="field"><label>Urgenza</label>
+        <div class="chips" id="rich-urg-chips">
+          <button type="button" class="chip" data-u="alta" onclick="richSetUrg('alta',this)">🔴 Oggi</button>
+          <button type="button" class="chip on" data-u="media" onclick="richSetUrg('media',this)">🟡 Settimana</button>
+          <button type="button" class="chip" data-u="bassa" onclick="richSetUrg('bassa',this)">⚪ Quando capita</button>
+        </div>
+      </div>
+      <div class="field"><label>Note</label>
+        <textarea id="rich-note" rows="3" placeholder="Dettagli, luogo, contatto… (facoltativo)" style="resize:vertical"></textarea></div>
+      <button class="btn btn-teal" style="width:100%;padding:14px;font-size:15px;font-weight:800" onclick="richSalva(this)">💾 Salva richiesta</button>
+      <div style="font-size:11px;color:var(--text2);text-align:center;margin-top:10px">Il numero REQ e il triage (preventivo / intervento / diretta) si fanno dopo, con calma, dal Gestionale.</div>
+    </div>
   </div>
 
   <!-- PRESENZE -->
@@ -2384,6 +2423,80 @@ function goTo(pg,el){
   if(pg==='ops') populateSelects();
   if(pg==='diario') diarioInit();
   if(pg==='risorse') renderRisorseMob();
+  if(pg==='richieste') richLoad();
+}
+
+/* ═══════════ RICHIESTE — cattura antenna (tabella cloud "richieste") ═══════════
+   Mobile = punto d'ingresso: catturi al volo chi/cosa/urgenza/note.
+   Il numero REQ-YYYY-NNN lo assegna il DB. Il triage (preventivo/intervento/
+   diretta) e l'aggancio a cliente/commessa si fanno dal Gestionale. */
+const RICH={list:[],loaded:false,filtro:'aperte',urg:'media'};
+const _RICH_STATI={nuova:{l:'Nuova',c:'#4be87a'},in_lavorazione:{l:'In lavorazione',c:'#e8b84b'},
+  preventivo:{l:'Preventivo',c:'#5b8def'},importata:{l:'Importata',c:'#5b8def'},confermata:{l:'Confermata',c:'#0e7c66'},
+  persa:{l:'Persa',c:'#e0645f'},chiusa:{l:'Chiusa',c:'#8a95a3'}};
+const _RICH_URG={alta:{l:'🔴 Oggi',c:'#e0645f'},media:{l:'🟡 Settimana',c:'#e8b84b'},bassa:{l:'⚪ Quando capita',c:'#8a95a3'}};
+function richEsc(s){return (s==null?'':String(s)).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+async function richLoad(){
+  try{
+    const H={headers:{apikey:SB_KEY,Authorization:`Bearer ${SB_KEY}`},cache:'no-cache'};
+    const r=await fetch(`${SB_URL}/rest/v1/richieste?select=*&order=creato_il.desc`,H);
+    RICH.list=r.ok?await r.json():[]; RICH.loaded=true;
+  }catch(e){ RICH.list=[]; }
+  richRender();
+}
+function richFiltro(f,el){ RICH.filtro=f; document.querySelectorAll('#rich-filtri .chip').forEach(c=>c.classList.remove('on')); if(el)el.classList.add('on'); richRender(); }
+function richRender(){
+  const box=document.getElementById('rich-list'); if(!box)return;
+  const q=(document.getElementById('rich-search')?.value||'').toLowerCase().trim();
+  const aperte=new Set(['nuova','in_lavorazione']);
+  let l=RICH.list.slice();
+  if(RICH.filtro==='aperte') l=l.filter(r=>aperte.has(r.stato));
+  if(q) l=l.filter(r=>((r.richiedente_nome||'')+' '+(r.cliente_nome||'')+' '+(r.oggetto||'')+' '+(r.numero||'')+' '+(r.note||'')).toLowerCase().includes(q));
+  if(!l.length){ box.innerHTML='<div style="color:var(--text2);text-align:center;padding:24px 12px">Nessuna richiesta '+(RICH.filtro==='aperte'?'aperta':'')+'.<br>Tocca <b>➕ Nuova richiesta</b> per catturarne una.</div>'; return; }
+  box.innerHTML=l.map(r=>{
+    const st=_RICH_STATI[r.stato]||{l:r.stato||'—',c:'#8a95a3'};
+    const ur=_RICH_URG[r.priorita]||null;
+    const chi=richEsc(r.cliente_nome||r.richiedente_nome||'(senza nome)');
+    const d=r.creato_il?String(r.creato_il).slice(0,10).split('-').reverse().join('/'):'';
+    return `<div style="background:var(--navy2);border:1px solid var(--brd);border-radius:12px;padding:13px 14px;margin-bottom:10px">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
+        <div style="font-weight:800;font-size:14px">${chi}</div>
+        <span style="font-size:10px;font-weight:800;color:#0a0f16;background:${st.c};padding:2px 8px;border-radius:6px;white-space:nowrap">${st.l}</span>
+      </div>
+      ${r.oggetto?`<div style="font-size:13px;color:var(--text);margin-top:4px">${richEsc(r.oggetto)}</div>`:''}
+      ${r.note?`<div style="font-size:12px;color:var(--text2);margin-top:3px">${richEsc(r.note)}</div>`:''}
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px;font-size:11px;color:var(--text2)">
+        <span>${r.numero?richEsc(r.numero):'—'} · ${d}</span>
+        ${ur?`<span style="color:${ur.c};font-weight:700">${ur.l}</span>`:''}
+      </div>
+    </div>`;
+  }).join('');
+}
+function richNuova(){
+  document.getElementById('rich-chi').value='';
+  document.getElementById('rich-cosa').value='';
+  document.getElementById('rich-note').value='';
+  richSetUrg('media',document.querySelector('#rich-urg-chips .chip[data-u="media"]'));
+  document.getElementById('rich-modal').style.display='block';
+  setTimeout(()=>document.getElementById('rich-chi').focus(),100);
+}
+function richChiudi(){ document.getElementById('rich-modal').style.display='none'; }
+function richSetUrg(u,el){ RICH.urg=u; document.querySelectorAll('#rich-urg-chips .chip').forEach(c=>c.classList.remove('on')); if(el)el.classList.add('on'); }
+async function richSalva(btn){
+  const chi=document.getElementById('rich-chi').value.trim();
+  const cosa=document.getElementById('rich-cosa').value.trim();
+  const note=document.getElementById('rich-note').value.trim();
+  if(!chi && !cosa){ alert('Metti almeno chi ti ha contattato o cosa serve.'); return; }
+  const body={ richiedente_nome:chi||null, oggetto:cosa||null, note:note||null, priorita:RICH.urg, canale:'app', stato:'nuova', creato_da:'mobile' };
+  if(btn){ btn.disabled=true; btn.textContent='Salvo…'; }
+  try{
+    const res=await fetch(`${SB_URL}/rest/v1/richieste`,{method:'POST',headers:{apikey:SB_KEY,Authorization:`Bearer ${SB_KEY}`,'Content-Type':'application/json',Prefer:'return=minimal'},body:JSON.stringify(body)});
+    if(!res.ok) throw new Error(await res.text());
+    richChiudi();
+    if(typeof toast==='function') toast('✓ Richiesta salvata'); else alert('✓ Richiesta salvata');
+    goTo('richieste',null); await richLoad();
+  }catch(e){ alert('⚠ Errore nel salvataggio. Riprova.'); }
+  finally{ if(btn){ btn.disabled=false; btn.textContent='💾 Salva richiesta'; } }
 }
 
 /* ═══════════ RISORSE & DEPOSITI (modulo campo) ═══════════
