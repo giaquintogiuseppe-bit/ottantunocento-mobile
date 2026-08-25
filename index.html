@@ -398,7 +398,7 @@ button{touch-action:manipulation}
   <!-- REGIA / SAL (specchio di sola lettura del perno) -->
   <div class="pg" id="pg-regia">
     <div class="kpi-row" id="regia-kpi"></div>
-    <div class="sec-lbl">🧾 Interventi da fatturare</div>
+    <div class="sec-lbl">🧾 Periodi da fatturare</div>
     <div id="regia-daf"><div style="color:var(--text2);text-align:center;padding:14px">—</div></div>
     <div class="sec-lbl" style="margin-top:16px">🗺️ Commesse aperte</div>
     <input type="text" id="regia-search" placeholder="🔍 Cerca commessa/cliente…" oninput="regiaRender()"
@@ -2452,7 +2452,7 @@ async function regiaLoad(){
   try{
     const [c,i]=await Promise.all([
       fetch(`${SB_URL}/rest/v1/commesse?select=*`,H).then(r=>r.ok?r.json():[]),
-      fetch(`${SB_URL}/rest/v1/interventi?select=*`,H).then(r=>r.ok?r.json():[])
+      fetch(`${SB_URL}/rest/v1/periodi?select=*`,H).then(r=>r.ok?r.json():[])
     ]);
     REGIA.comm=Array.isArray(c)?c:[]; REGIA.inter=Array.isArray(i)?i:[]; REGIA.loaded=true;
   }catch(e){ REGIA.comm=[]; REGIA.inter=[]; }
@@ -2462,12 +2462,12 @@ function _regiaAperta(c){ const s=(c.stato||'').toLowerCase(); return !c.archivi
 function regiaRender(){
   const aperte=REGIA.comm.filter(_regiaAperta);
   const conPrev=aperte.filter(c=>c.preventivo_id).length;
-  const daFatt=REGIA.inter.filter(it=>!it.fatturato && (it.stato==='concluso'||it.stato==='in_corso'));
+  const daFatt=REGIA.inter.filter(it=>!it.fatturato);
   const kpi=document.getElementById('regia-kpi');
   if(kpi) kpi.innerHTML=`
     <div class="kpi tc"><div class="lb">Commesse aperte</div><div class="vl">${aperte.length}</div></div>
     <div class="kpi"><div class="lb">con preventivo</div><div class="vl">${conPrev}</div></div>
-    <div class="kpi go"><div class="lb">Int. da fatturare</div><div class="vl">${daFatt.length}</div></div>`;
+    <div class="kpi go"><div class="lb">Periodi da fatt.</div><div class="vl">${daFatt.length}</div></div>`;
   const dafBox=document.getElementById('regia-daf');
   if(dafBox){
     dafBox.innerHTML=daFatt.length?daFatt.map(it=>{
