@@ -515,7 +515,7 @@ button{touch-action:manipulation}
           <option>Carburante</option><option>Trasferta / Vitto</option><option>Servizi esterni</option><option>Altro</option>
         </select>
       </div>
-      <div class="field"><label>Cantiere</label><select id="sp-cant"><option value="">— Nessuno —</option></select></div>
+      <div class="field"><label>Cantiere</label><input id="sp-cant" list="sp-cant-dl" placeholder="🔍 Cerca cantiere… (vuoto = nessuno)" autocomplete="off" data-af="1"><datalist id="sp-cant-dl"></datalist></div>
       <div class="field"><label>Note</label><input type="text" id="sp-note" placeholder="Opzionale"></div>
       <button class="btn btn-teal" onclick="salvaSpesa()">🧾 Registra spesa</button>
     </div>
@@ -1104,7 +1104,7 @@ function renderIncassiMob(){
   // Popola select cantieri
   const sel=document.getElementById('minc-cant');
   if(sel) sel.innerHTML='<option value="">— Seleziona —</option>'+
-    (DB.cantieri||[]).filter(c=>!archIds.has(c.id)).map(c=>`<option value="${c.id}">${c.nome}</option>`).join('');
+    _cantieriOrdinati().map(c=>`<option value="${c.id}">${_de(c.nome)}</option>`).join('');
   if(!document.getElementById('minc-data').value)
     document.getElementById('minc-data').value=today();
 
@@ -1369,8 +1369,7 @@ function loadPres(){
       <div class="kpi go"><div class="lb">Maturato</div><div class="vl">${fm(totOggi)}</div></div>
     </div>`;
 
-  const archIds=new Set(DB._cantieriArchiviati||[]);
-  const cantOpzioni=(DB.cantieri||[]).filter(c=>!archIds.has(c.id)).map(c=>`<option value="${c.nome}">${c.nome}</option>`).join('');
+  const cantOpzioni=_cantieriOrdinati().map(c=>`<option value="${_de(c.nome)}">${_de(c.nome)}</option>`).join('');
 
   document.getElementById('pres-list').innerHTML=DB.personale.map(p=>{
     const pr=giornata[p.id];
@@ -1655,17 +1654,56 @@ function setOpsTab(tab,el){
   });
 }
 
+// Cantieri non archiviati ordinati "attivi prima": prima gli operativi, poi i
+// depositi/lungo periodo, in fondo i conclusi/persi. Riduce la sfilza nei menu.
+function _cantieriOrdinati(){
+  const archIds=new Set(DB._cantieriArchiviati||[]);
+  const isConcl=c=>{const s=(c.stato||'').toLowerCase();return s.includes('conclus')||s.includes('pers');};
+  const rank=c=>isConcl(c)?2:(c.tipo==='lungo_periodo'?1:0);
+  return (DB.cantieri||[]).filter(c=>!archIds.has(c.id))
+    .slice().sort((a,b)=>rank(a)-rank(b)||(a.nome||'').localeCompare(b.nome||''));
+}
+
 function populateSelects(){
   const opts=DB.personale.map(p=>`<option value="${p.id}">${p.nome}</option>`).join('');
   ['ant-dip','pag-dip','dn-dip'].forEach(id=>{
     const el=document.getElementById(id);
     if(el) el.innerHTML='<option value="">Seleziona...</option>'+opts;
   });
-  const archIds=new Set(DB._cantieriArchiviati||[]);
-  const cantOpts=DB.cantieri.filter(c=>!archIds.has(c.id)).map(c=>`<option value="${c.nome}">${c.nome}</option>`).join('');
-  const sc=document.getElementById('sp-cant');
-  if(sc) sc.innerHTML='<option value="">— Nessuno —</option>'+cantOpts;
+  // Spesa: campo con ricerca (datalist). Digiti poche lettere e filtra da solo.
+  const ord=_cantieriOrdinati();
+  const dl=document.getElementById('sp-cant-dl');
+  if(dl) dl.innerHTML=ord.map(c=>`<option value="${_de(c.nome)}"></option>`).join('');
 }
+
+// ── Stop autofill contatti del telefono (rubrica) sui campi di testo ──
+// Su iOS/Android il sistema propone i nominativi della rubrica sopra ai campi
+// nome: fastidioso e coprente. Disattiviamo l'autofill su tutti i campi testo
+// (tranne quelli marcati data-af="1" già gestiti o che vogliono i suggerimenti).
+function _killAutofill(root){
+  const NO=['date','time','number','checkbox','radio','file','range','color','password','hidden'];
+  (root||document).querySelectorAll('input').forEach(el=>{
+    if(el.dataset.afDone) return;
+    const t=(el.getAttribute('type')||'text').toLowerCase();
+    if(NO.includes(t)) return;
+    el.setAttribute('autocomplete','off');
+    el.setAttribute('autocorrect','off');
+    el.setAttribute('spellcheck','false');
+    el.dataset.afDone='1';
+  });
+}
+document.addEventListener('DOMContentLoaded',()=>{
+  _killAutofill(document);
+  try{
+    new MutationObserver(ms=>{
+      for(const m of ms) for(const n of m.addedNodes){
+        if(n.nodeType!==1) continue;
+        if(n.matches&&n.matches('input')) _killAutofill(n.parentNode||document);
+        else if(n.querySelector&&n.querySelector('input')) _killAutofill(n);
+      }
+    }).observe(document.body,{childList:true,subtree:true});
+  }catch(e){}
+});
 
 // Quando selezioni dipendente per pagamento, mostra il saldo attuale
 document.addEventListener('DOMContentLoaded',()=>{
