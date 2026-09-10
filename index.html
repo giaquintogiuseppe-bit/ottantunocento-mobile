@@ -567,8 +567,33 @@ button{touch-action:manipulation}
     <!-- Preventivo collegato / crea -->
     <div id="dett-prev-box" style="margin-bottom:14px"></div>
 
+    <!-- Forniture / voci di ricavo (preventivo integrativo o aggiunta al volo) -->
+    <div style="background:rgba(232,184,75,.06);border:1px solid rgba(232,184,75,.3);border-radius:12px;padding:14px;margin-bottom:14px">
+      <div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--gold);margin-bottom:8px">📦 Forniture / voci di ricavo</div>
+      <div id="dett-forn-list"></div>
+      <button onclick="toggleMFornForm()" id="m-forn-toggle" style="width:100%;background:var(--navy2);border:1.5px dashed rgba(232,184,75,.5);border-radius:10px;padding:11px;color:var(--gold);font-size:13px;font-weight:700;cursor:pointer;margin-top:6px">➕ Aggiungi fornitura / voce di ricavo</button>
+      <div id="m-forn-form" style="display:none;background:var(--navy2);border:1px solid var(--brd);border-radius:12px;padding:14px;margin-top:8px">
+        <div class="field"><label>Tipo</label>
+          <select id="mf-tipo"><option value="fornitura">📦 Fornitura</option><option value="servizio">🚚 Servizio</option><option value="allestimento">🎪 Allestimento</option></select>
+        </div>
+        <div class="field"><label>Descrizione</label><input type="text" id="mf-desc" placeholder="es. Palco + torri"></div>
+        <div class="field"><label>Ricavo aggiuntivo (€)</label><input type="number" id="mf-importo" step="0.01" placeholder="0.00" inputmode="decimal"></div>
+        <div class="field"><label>Note</label><input type="text" id="mf-note" placeholder="Opzionale"></div>
+        <label style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text);margin:2px 0 10px;cursor:pointer">
+          <input type="checkbox" id="mf-prev" style="accent-color:var(--gold);width:18px;height:18px"> 🧾 Crea anche il preventivo integrativo (bozza) in Preventivi
+        </label>
+        <div style="display:flex;gap:8px">
+          <button onclick="toggleMFornForm()" style="flex:1;background:var(--navy);border:1px solid var(--brd);border-radius:8px;padding:11px;color:var(--text2);font-size:13px;font-weight:700;cursor:pointer">Annulla</button>
+          <button onclick="addFornituraDaCantiere()" style="flex:2;background:var(--gold);border:none;border-radius:8px;padding:11px;color:#000;font-size:13px;font-weight:800;cursor:pointer">💾 Aggiungi</button>
+        </div>
+      </div>
+    </div>
+
     <!-- KPI costi -->
     <div class="kpi-row" id="dett-kpi"></div>
+
+    <!-- Avviso spese da riconciliare con fattura -->
+    <div id="dett-ric-hint"></div>
 
     <!-- Form aggiunta spesa diretta -->
     <div style="margin-bottom:14px">
@@ -833,6 +858,26 @@ async function sbSet(data, versioneAttesa){
   if(!res.ok) throw new Error('HTTP '+res.status);
   const rows = await res.json();
   return rows.length > 0;
+}
+
+// Scrittura atomica sull'intero blob `dati` per i campi che salvaCloud NON riscrive
+// (es. cantieri[]: la mobile li ricarica sempre dal remoto). Legge → applica il
+// mutatore sui dati freschi → scrive col lock ottimistico, con retry sui conflitti.
+// Al successo allinea DB e la versione anti-rientro. Ritorna true se salvato.
+async function mobPatchDati(mutator){
+  for(let tentativo=1; tentativo<=3; tentativo++){
+    const row=await sbGet();
+    const D=(row&&row.dati)?row.dati:{};
+    const versione=(row&&row.versione!=null)?row.versione:null;
+    mutator(D);
+    const ok=await sbSet(D, versione);
+    if(ok){
+      Object.assign(DB, D);
+      try{ const r=await sbGet(); if(r&&r.versione!=null) _mobUltimaVersione=r.versione; }catch(_){}
+      return true;
+    }
+  }
+  return false;
 }
 
 // ── STATO CONNESSIONE ─────────────────────────────────────────────────────
@@ -1966,12 +2011,14 @@ async function salvaSpesa(){
   const imp=parseFloat(document.getElementById('sp-imp').value||0);
   if(!imp||imp<=0){toast('Inserisci importo');return;}
   const cantiere=document.getElementById('sp-cant').value;
-  const spesa={id:uid(),data:document.getElementById('sp-data').value||today(),importo:imp,fornitore:document.getElementById('sp-forn').value,categoria:document.getElementById('sp-cat').value,cantiere,note:document.getElementById('sp-note').value,foto:_fotoBase64,fonte:'mobile'};
+  // statoRic: 'da_riconciliare' → registrata al volo, la fattura arriverà (o no);
+  // in fase di allineamento fatture serve a NON duplicarla. Vedi riconciliaSpesa().
+  const spesa={id:uid(),data:document.getElementById('sp-data').value||today(),importo:imp,fornitore:document.getElementById('sp-forn').value,categoria:document.getElementById('sp-cat').value,cantiere,note:document.getElementById('sp-note').value,foto:_fotoBase64,fonte:'mobile',statoRic:'da_riconciliare',fattura:''};
   if(!DB.scontrini) DB.scontrini=[];
   DB.scontrini.push(spesa);
   if(cantiere){
     if(!DB.speseCantiere) DB.speseCantiere=[];
-    DB.speseCantiere.push({id:uid(),cantiere,data:spesa.data,importo:imp,categoria:spesa.categoria,fornitore:spesa.fornitore,descrizione:spesa.note});
+    DB.speseCantiere.push({id:uid(),cantiere,data:spesa.data,importo:imp,categoria:spesa.categoria,fornitore:spesa.fornitore,descrizione:spesa.note,fonte:'mobile',statoRic:'da_riconciliare',fattura:'',scontrinoRef:spesa.id});
   }
   document.getElementById('sp-imp').value='';
   document.getElementById('sp-forn').value='';
@@ -2194,7 +2241,8 @@ async function addMSpesaDaCantiere(){
     data:document.getElementById('ms-data').value||today(),
     importo, categoria:document.getElementById('ms-categoria').value,
     fornitore:document.getElementById('ms-fornitore').value,
-    descrizione:document.getElementById('ms-desc').value
+    descrizione:document.getElementById('ms-desc').value,
+    fonte:'mobile', statoRic:'da_riconciliare', fattura:''
   });
   await salvaCloud(true);
   toggleMSpesaForm();
@@ -2208,6 +2256,134 @@ async function eliminaMSpesa(id){
   await salvaCloud(true);
   renderDett();
   toast('Spesa eliminata');
+}
+
+// ── RICONCILIAZIONE SPESE (anti-duplicazione con l'allineamento fatture) ──
+// Una spesa nasce 'da_riconciliare'. Quando arriva la fattura la si collega qui
+// (statoRic='riconciliata' + n° fattura): in fase di allineamento fatture non va
+// reinserita. Se la fattura non arriverà mai, la si marca 'definitiva' e resta.
+function _spesaBadge(s){
+  const st=s.statoRic || ((s.fonte==='mobile'||s.fonte==='diario')?'da_riconciliare':'');
+  if(st==='riconciliata') return `<span title="Collegata alla fattura ${s.fattura||''}" style="font-size:10px;font-weight:800;color:var(--green);background:rgba(75,232,122,.14);border:1px solid rgba(75,232,122,.4);border-radius:6px;padding:1px 6px;white-space:nowrap">✅ ${s.fattura?_de(s.fattura):'fatturata'}</span>`;
+  if(st==='definitiva')   return `<span title="Resta senza fattura" style="font-size:10px;font-weight:800;color:var(--text2);background:rgba(120,140,160,.14);border:1px solid var(--brd);border-radius:6px;padding:1px 6px;white-space:nowrap">🔒 senza fatt.</span>`;
+  if(st==='da_riconciliare') return `<span title="Da collegare a una fattura" style="font-size:10px;font-weight:800;color:var(--gold);background:rgba(232,184,75,.14);border:1px solid rgba(232,184,75,.4);border-radius:6px;padding:1px 6px;white-space:nowrap">⏳ da riconc.</span>`;
+  return '';
+}
+async function riconciliaSpesa(id){
+  const s=(DB.speseCantiere||[]).find(x=>x.id===id);
+  if(!s){ toast('Spesa non trovata'); return; }
+  const idx=await sheetChoice(`${(s.fornitore||'Spesa')} · ${fm(s.importo)}`,[
+    {label:'Collega fattura (riconcilia)',emoji:'🔗'},
+    {label:'Nessuna fattura — tieni definitiva',emoji:'🔒'},
+    {label:'Rimetti "da riconciliare"',emoji:'⏳'}
+  ]);
+  if(idx===null) return;
+  if(idx===0){
+    const nf=await sheetPrompt('N° fattura', s.fattura||'', 'es. FT123/2026', {ok:'Collega'});
+    if(nf===null) return;
+    if(!nf.trim()){ toast('Inserisci il numero fattura'); return; }
+    s.fattura=nf.trim(); s.statoRic='riconciliata';
+  } else if(idx===1){ s.statoRic='definitiva'; s.fattura=''; }
+  else { s.statoRic='da_riconciliare'; }
+  // Allinea lo scontrino collegato (letto dal Gestionale in fase di allineamento fatture)
+  if(s.scontrinoRef){ const sc=(DB.scontrini||[]).find(x=>x.id===s.scontrinoRef); if(sc){ sc.statoRic=s.statoRic; sc.fattura=s.fattura||''; } }
+  await salvaCloud(true);
+  renderDett();
+  toast(idx===0?'Fattura collegata ✓':idx===1?'Spesa definitiva ✓':'Rimessa da riconciliare');
+}
+
+// ── FORNITURE / VOCI DI RICAVO (preventivo integrativo o aggiunta al volo) ──
+// Ogni voce (fornitura/servizio/allestimento) somma al ricavo previsto del
+// cantiere (budgetCantieri). Può agganciare un preventivo integrativo in Preventivi.
+const FORN_TIPO_META = {
+  fornitura:   {ic:'📦', lbl:'Fornitura'},
+  servizio:    {ic:'🚚', lbl:'Servizio'},
+  allestimento:{ic:'🎪', lbl:'Allestimento'}
+};
+function fornituraTotale(c){ return (c&&Array.isArray(c.forniture)?c.forniture:[]).reduce((a,v)=>a+parseFloat(v.importo||0),0); }
+function toggleMFornForm(){
+  const f=document.getElementById('m-forn-form');
+  const t=document.getElementById('m-forn-toggle');
+  if(f.style.display==='none'){
+    f.style.display='block';
+    t.textContent='✕ Chiudi';
+    document.getElementById('mf-tipo').value='fornitura';
+    document.getElementById('mf-desc').value='';
+    document.getElementById('mf-importo').value='';
+    document.getElementById('mf-note').value='';
+    document.getElementById('mf-prev').checked=false;
+  } else {
+    f.style.display='none';
+    t.textContent='➕ Aggiungi fornitura / voce di ricavo';
+  }
+}
+async function addFornituraDaCantiere(){
+  const c=(DB.cantieri||[]).find(x=>x.nome===_dettNomeMobile);
+  if(!c){ toast('Cantiere non trovato'); return; }
+  const importo=parseFloat(document.getElementById('mf-importo').value||0);
+  const descrizione=(document.getElementById('mf-desc').value||'').trim();
+  const tipo=document.getElementById('mf-tipo').value||'fornitura';
+  const note=(document.getElementById('mf-note').value||'').trim();
+  const creaPrev=document.getElementById('mf-prev').checked;
+  if(!descrizione){ toast('Inserisci una descrizione'); return; }
+  if(!importo||importo<=0){ toast('Inserisci un importo'); return; }
+  const voce={id:uid(),tipo,descrizione,importo,data:today(),preventivoRef:'',note,stato:'confermata',fonte:'mobile'};
+  document.getElementById('loading').style.display='flex';
+  try{
+    // Preventivo integrativo (opzionale): bozza in Preventivi agganciata al cantiere
+    if(creaPrev && typeof diarioCreaPreventivo==='function'){
+      try{ voce.preventivoRef=await diarioCreaPreventivo(c.id, c.nome+' — '+descrizione, c.committente||'', [{descrizione,qta:1,prezzo:importo}]); }
+      catch(e){ toast('⚠ Preventivo non creato: '+e.message); }
+    }
+    const ok=await mobPatchDati(D=>{
+      const cc=(D.cantieri||[]).find(x=>x.id===c.id); if(!cc) return;
+      if(!Array.isArray(cc.forniture)) cc.forniture=[];
+      cc.forniture.push(voce);
+      // Il ricavo previsto totale (letto dal Gestionale) cresce della voce
+      if(!Array.isArray(D.budgetCantieri)) D.budgetCantieri=[];
+      const b=D.budgetCantieri.find(x=>x.cantiereId===c.id);
+      if(b){ b.ricavoPrevisto=parseFloat(b.ricavoPrevisto||0)+importo; b.cantiereName=c.nome; }
+      else D.budgetCantieri.push({cantiereId:c.id,cantiereName:c.nome,ricavoPrevisto:importo,note:''});
+    });
+    document.getElementById('loading').style.display='none';
+    if(!ok){ toast('⚠ Un\'altra app sta scrivendo — riprova tra qualche secondo'); return; }
+    // budget già persistito dalla scrittura atomica: niente _budgetDirty (eviterebbe
+    // di ri-asserire un valore vecchio sovrascrivendo una modifica del Gestionale).
+    toggleMFornForm();
+    renderDett(); renderCantieri();
+    toast('Fornitura aggiunta ✓'+(voce.preventivoRef?' · '+voce.preventivoRef:''));
+  }catch(e){ document.getElementById('loading').style.display='none'; toast('⚠ '+e.message); }
+}
+async function eliminaFornitura(id){
+  const c=(DB.cantieri||[]).find(x=>x.nome===_dettNomeMobile); if(!c) return;
+  const voce=(c.forniture||[]).find(x=>x.id===id); if(!voce) return;
+  if(!(await sheetConfirm(`Eliminare "${_de(voce.descrizione||'')}" (${fm(voce.importo)})?<br><span style="color:var(--text2);font-size:12px">Il ricavo previsto verrà ridotto di conseguenza.</span>`,{ok:'Elimina',danger:true}))) return;
+  document.getElementById('loading').style.display='flex';
+  const ok=await mobPatchDati(D=>{
+    const cc=(D.cantieri||[]).find(x=>x.id===c.id); if(!cc) return;
+    cc.forniture=(cc.forniture||[]).filter(x=>x.id!==id);
+    const b=(D.budgetCantieri||[]).find(x=>x.cantiereId===c.id);
+    if(b) b.ricavoPrevisto=Math.max(0, parseFloat(b.ricavoPrevisto||0)-parseFloat(voce.importo||0));
+  });
+  document.getElementById('loading').style.display='none';
+  if(!ok){ toast('⚠ Riprova tra qualche secondo'); return; }
+  renderDett(); renderCantieri();
+  toast('Voce eliminata');
+}
+async function creaPrevFornitura(id){
+  const c=(DB.cantieri||[]).find(x=>x.nome===_dettNomeMobile); if(!c) return;
+  const voce=(c.forniture||[]).find(x=>x.id===id); if(!voce) return;
+  if(voce.preventivoRef){ toast('Preventivo già collegato: '+voce.preventivoRef); return; }
+  if(typeof diarioCreaPreventivo!=='function'){ toast('Funzione non disponibile'); return; }
+  document.getElementById('loading').style.display='flex';
+  try{
+    const numero=await diarioCreaPreventivo(c.id, c.nome+' — '+voce.descrizione, c.committente||'', [{descrizione:voce.descrizione,qta:1,prezzo:voce.importo}]);
+    const ok=await mobPatchDati(D=>{ const cc=(D.cantieri||[]).find(x=>x.id===c.id); if(!cc) return; const v=(cc.forniture||[]).find(x=>x.id===id); if(v) v.preventivoRef=numero; });
+    document.getElementById('loading').style.display='none';
+    if(!ok){ toast('⚠ Riprova tra qualche secondo'); return; }
+    renderDett();
+    toast('✓ '+numero+' creato in Preventivi');
+  }catch(e){ document.getElementById('loading').style.display='none'; toast('⚠ Preventivo non creato: '+e.message); }
 }
 
 async function archiviaCantiere(id){
@@ -2270,14 +2446,7 @@ async function creaPreventivoDaDett(){
   try{
     const numero=await diarioCreaPreventivo(c.id, c.nome, c.committente||'');
     // Persisti preventivoRef sul cantiere (write atomico che include i cantieri, con lock)
-    let ok=false;
-    for(let t=1;t<=3;t++){
-      const row=await sbGet(); const D=(row&&row.dati)?row.dati:{};
-      const cc=(D.cantieri||[]).find(x=>x.id===c.id);
-      if(cc) cc.preventivoRef=numero;
-      ok=await sbSet(D,(row&&row.versione!=null)?row.versione:null);
-      if(ok){ Object.assign(DB,D); try{const r=await sbGet(); if(r&&r.versione!=null)_mobUltimaVersione=r.versione;}catch(_){} break; }
-    }
+    await mobPatchDati(D=>{ const cc=(D.cantieri||[]).find(x=>x.id===c.id); if(cc) cc.preventivoRef=numero; });
     c.preventivoRef=numero;
     document.getElementById('loading').style.display='none';
     renderDett(); renderCantieri();
@@ -2303,6 +2472,34 @@ function renderDett(){
     } else if(c){
       pb.innerHTML=`<button onclick="creaPreventivoDaDett()" style="width:100%;background:rgba(122,160,255,.08);border:1.5px dashed rgba(122,160,255,.5);border-radius:12px;padding:12px;color:#3a52c4;font-size:14px;font-weight:700;cursor:pointer">🧾 Crea preventivo (bozza)</button>`;
     } else pb.innerHTML='';
+  }
+  // Forniture / voci di ricavo
+  const fl=document.getElementById('dett-forn-list');
+  if(fl){
+    const voci=(c&&Array.isArray(c.forniture))?c.forniture:[];
+    if(voci.length){
+      const totF=fornituraTotale(c);
+      fl.innerHTML=voci.map(v=>{
+        const m=FORN_TIPO_META[v.tipo]||FORN_TIPO_META.fornitura;
+        return `<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--brd)">
+          <div style="min-width:0"><div style="font-size:13px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${m.ic} ${_de(v.descrizione||m.lbl)}</div>
+          <div style="font-size:11px;color:var(--text2)">${m.lbl}${v.preventivoRef?' · 🧾 '+_de(v.preventivoRef):''}${v.note?' · '+_de(v.note):''}</div></div>
+          <div style="display:flex;gap:5px;align-items:center;flex-shrink:0">
+            <span style="color:var(--gold);font-weight:800;font-family:'IBM Plex Mono',monospace">${fm(v.importo)}</span>
+            ${v.preventivoRef?'':`<button onclick="creaPrevFornitura('${v.id}')" title="Crea preventivo integrativo" style="background:rgba(122,160,255,.12);border:1px solid rgba(122,160,255,.5);border-radius:6px;padding:3px 7px;color:#3a52c4;font-size:12px;cursor:pointer">🧾</button>`}
+            <button onclick="eliminaFornitura('${v.id}')" style="background:rgba(232,84,84,.15);border:1px solid var(--red);border-radius:6px;padding:3px 7px;color:var(--red);font-size:12px;cursor:pointer">✕</button>
+          </div>
+        </div>`;
+      }).join('')+`<div style="display:flex;justify-content:space-between;padding-top:8px;font-size:13px;font-weight:800"><span style="color:var(--text2)">Totale forniture</span><span style="color:var(--gold);font-family:'IBM Plex Mono',monospace">${fm(totF)}</span></div>`;
+    } else {
+      fl.innerHTML='<div style="font-size:12px;color:var(--text2);padding-bottom:6px">Nessuna voce. Aggiungi una fornitura, un servizio o un allestimento: il ricavo previsto crescerà di conseguenza.</div>';
+    }
+  }
+  // Avviso spese da riconciliare (su tutto il cantiere, non solo il periodo filtrato)
+  const rh=document.getElementById('dett-ric-hint');
+  if(rh){
+    const nDaRic=(DB.speseCantiere||[]).filter(s=>(s.cantiere||'').toLowerCase().trim()===nome.toLowerCase().trim() && (s.statoRic==='da_riconciliare' || (!s.statoRic && (s.fonte==='mobile'||s.fonte==='diario')))).length;
+    rh.innerHTML=nDaRic? `<div style="background:rgba(232,184,75,.08);border:1px solid rgba(232,184,75,.4);border-radius:10px;padding:9px 12px;margin-bottom:14px;font-size:12px;color:var(--gold);font-weight:700">⏳ ${nDaRic} spesa${nDaRic>1?'e':''} da riconciliare con fattura — toccala per collegarla o segnarla definitiva</div>` : '';
   }
   const nLC=nome.toLowerCase().trim();
   const match=s=>(s||'').toLowerCase().trim()===nLC;
@@ -2357,8 +2554,11 @@ function renderDett(){
           <div style="display:flex;justify-content:space-between"><b style="font-size:13px">👷 ${x.nome}</b><span style="color:var(--gold);font-weight:700">${fm(x.tot)}</span></div>
           ${(x.turni||[]).map(t=>`<div style="font-size:12px;color:var(--text2);padding-left:12px;margin-top:2px">${t.oraI}–${t.oraF}${t.notturno?' 🌙':''} · ${fm(t.importo)}</div>`).join('')}
         </div>`).join('')}
-        ${g.s.map(x=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid var(--brd)">
-          <span style="font-size:13px">💳 <b>${x.fornitore||'—'}</b> ${x.categoria||''}</span>
+        ${g.s.map(x=>`<div style="display:flex;justify-content:space-between;align-items:center;gap:6px;padding:5px 0;border-bottom:1px solid var(--brd)">
+          <div onclick="riconciliaSpesa('${x.id}')" style="min-width:0;cursor:pointer;flex:1">
+            <div style="font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">💳 <b>${_de(x.fornitore||'—')}</b> <span style="color:var(--text2)">${_de(x.categoria||'')}</span></div>
+            ${_spesaBadge(x)?`<div style="margin-top:3px">${_spesaBadge(x)}</div>`:''}
+          </div>
           <div style="display:flex;gap:5px;align-items:center;flex-shrink:0">
             <span style="color:var(--red);font-weight:700">${fm(x.importo)}</span>
             <button onclick="eliminaMSpesa('${x.id}')" style="background:rgba(232,84,84,.15);border:1px solid var(--red);border-radius:6px;padding:3px 8px;color:var(--red);font-size:12px;cursor:pointer">✕</button>
@@ -2438,6 +2638,30 @@ function sheetChoice(title, options){
     requestAnimationFrame(()=>w.classList.add('on'));
     const done=v=>{ _sheetClose(); resolve(v); };
     w.querySelectorAll('[data-i]').forEach(b=>b.onclick=()=>done(parseInt(b.dataset.i)));
+    w.querySelector('#sheet-cancel').onclick=()=>done(null);
+    w.addEventListener('click',e=>{ if(e.target===w) done(null); });
+  });
+}
+// Input di testo in bottom-sheet: risolve la stringa (anche vuota) o null se annullato
+function sheetPrompt(title, initial, placeholder, opts){
+  const o=opts||{};
+  return new Promise(resolve=>{
+    _sheetClose();
+    const w=document.createElement('div'); w.id='ui-sheet'; w.className='sheet-wrap';
+    w.innerHTML=`<div class="sheet">
+      <div class="sheet-title">${title}</div>
+      <input type="${o.type||'text'}" id="sheet-input" ${o.type==='number'?'inputmode="decimal" step="0.01"':''} placeholder="${placeholder||''}"
+        style="width:100%;background:var(--navy);border:1px solid var(--teal);border-radius:10px;color:var(--text);font-size:16px;padding:12px;outline:none;margin-bottom:12px">
+      <button class="btn btn-teal" id="sheet-ok">${o.ok||'Conferma'}</button>
+      <button class="btn btn-ghost" id="sheet-cancel">Annulla</button>
+    </div>`;
+    document.body.appendChild(w);
+    requestAnimationFrame(()=>w.classList.add('on'));
+    const inp=w.querySelector('#sheet-input'); inp.value=initial||'';
+    setTimeout(()=>{ try{inp.focus();}catch(_){} },250);
+    const done=v=>{ _sheetClose(); resolve(v); };
+    w.querySelector('#sheet-ok').onclick=()=>done(inp.value);
+    inp.addEventListener('keydown',e=>{ if(e.key==='Enter') done(inp.value); });
     w.querySelector('#sheet-cancel').onclick=()=>done(null);
     w.addEventListener('click',e=>{ if(e.target===w) done(null); });
   });
@@ -3098,8 +3322,8 @@ function diarioApply(a,D){
     pr.totale=pr.turni.reduce((s,t)=>s+parseFloat(t.importo||0),0);
   } else if(a.tipo==='anticipo'){ if(!dip)return; (D.anticipi=D.anticipi||[]).push({id:uid(),data:a.data,dipId:dip.id,dipNome:dip.nome,importo:imp,metodo:a.metodo||'Contanti',note:a.note||'Da Diario'});
   } else if(a.tipo==='pagamento'){ if(!dip)return; (D.pagamenti=D.pagamenti||[]).push({id:uid(),data:a.data,dipId:dip.id,dipNome:dip.nome,pagato:imp,note:a.note||'Da Diario',periodoDa:'',periodoAl:a.data});
-  } else if(a.tipo==='spesa'){ (D.scontrini=D.scontrini||[]).push({id:uid(),data:a.data,importo:imp,fornitore:a.fornitore||'',categoria:a.categoria||'Materiali di consumo',cantiere:cantName,note:a.note||'',foto:null,fonte:'diario'});
-    if(cantName)(D.speseCantiere=D.speseCantiere||[]).push({id:uid(),cantiere:cantName,data:a.data,importo:imp,categoria:a.categoria||'',fornitore:a.fornitore||'',descrizione:a.note||a.testo||''});
+  } else if(a.tipo==='spesa'){ const _scId=uid(); (D.scontrini=D.scontrini||[]).push({id:_scId,data:a.data,importo:imp,fornitore:a.fornitore||'',categoria:a.categoria||'Materiali di consumo',cantiere:cantName,note:a.note||'',foto:null,fonte:'diario',statoRic:'da_riconciliare',fattura:''});
+    if(cantName)(D.speseCantiere=D.speseCantiere||[]).push({id:uid(),cantiere:cantName,data:a.data,importo:imp,categoria:a.categoria||'',fornitore:a.fornitore||'',descrizione:a.note||a.testo||'',fonte:'diario',statoRic:'da_riconciliare',fattura:'',scontrinoRef:_scId});
   } else if(a.tipo==='danno'){ if(!dip)return; (D.addebiti=D.addebiti||[]).push({id:uid(),dipId:dip.id,dipNome:dip.nome,importo:imp,data:a.data,descrizione:a.descrizione||'Danno',mezzo:a.mezzo||'',scalature:[],chiuso:false});
   } else if(a.tipo==='incasso'){ const c=a.cantMatch; (D.incassi=D.incassi||[]).push({id:uid(),cantiereId:c?c.id:'',cantiereName:c?c.nome:(a.cantRaw||''),committente:a.committente||'',data:a.data,importo:imp,metodo:a.metodo||'Bonifico',fattura:'',note:a.causale||a.note||''});
   } else if(a.tipo==='promemoria'){ (D.promemoria=D.promemoria||[]).push({id:uid(),data:a.data||'',ora:a.ora||'',titolo:a.titolo||a.testo||'Promemoria',note:a.note||'',fatto:false,creato:today()});
