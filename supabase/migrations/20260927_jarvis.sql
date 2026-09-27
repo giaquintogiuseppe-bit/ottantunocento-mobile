@@ -28,3 +28,12 @@ create table if not exists public.jarvis_update_visti (
   visto_il timestamptz not null default now()
 );
 alter table public.jarvis_update_visti enable row level security;
+
+-- Lo storico revisioni dei contratti sponsor era leggibile/scrivibile da QUALSIASI utente loggato
+-- (anche l'account Campo). Ora come le altre tabelle contratti_*: admin o area contratti_sponsor.
+drop policy if exists "revisioni lettura" on public.contratti_revisioni;
+drop policy if exists "revisioni scrittura" on public.contratti_revisioni;
+create policy "revisioni lettura" on public.contratti_revisioni
+  for select to authenticated using (e_admin() or ha_area('contratti_sponsor'));
+create policy "revisioni scrittura" on public.contratti_revisioni
+  for insert to authenticated with check (e_admin() or ha_area('contratti_sponsor'));
