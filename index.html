@@ -3444,9 +3444,13 @@ if('serviceWorker' in navigator){
     data-sc-persona="Nome Cognome"  (in cima i cantieri dove la persona è in squadra quel giorno)
   Il controllo originale resta nel DOM (nascosto) e tiene il valore: il codice che legge .value
   e gli onchange esistenti funzionano come prima (alla scelta parte un evento 'change').
-  Legge i cantieri da DB.cantieri e l'archivio da DB._cantieriArchiviati / c.archiviato. -->
+  Legge i cantieri da DB.cantieri e l'archivio da DB._cantieriArchiviati / c.archiviato.
+  INTERRUTTORE D'EMERGENZA (tornano le tendine classiche, nessun dato toccato):
+    per tutti   → DB._selettoreCommessaOff = true  (chiave nel blob gestionale_dati 'unico')
+    un telefono → aprire l'app con ?sc=off  (?sc=on per riattivarlo) -->
 <style>
 .sc-orig{display:none!important}
+.sc-btn[hidden]{display:none!important}
 #sc-sheet[hidden],#sc-scrim[hidden],#sc-sheet [hidden]{display:none!important}
 .sc-btn{width:100%;display:flex;align-items:center;gap:10px;text-align:left;min-height:48px;padding:10px 12px;border:1px solid var(--brd,#e2e5ea);border-radius:10px;background:var(--navy2,#fff);color:var(--text,#1b2740);font:15px 'IBM Plex Sans',-apple-system,sans-serif;cursor:pointer}
 .sc-btn .sc-bt{display:flex;flex-direction:column;gap:1px;min-width:0;flex:1}
@@ -3719,13 +3723,23 @@ if('serviceWorker' in navigator){
     if(d&&d.set) try{ Object.defineProperty(el,'value',{configurable:true,get(){return d.get.call(el);},set(v){d.set.call(el,v);etichetta(el);}}); }catch(e){}
     etichetta(el);
   }
+  function spento(){
+    try{ if(localStorage.getItem('sc81_off')==='1') return true; }catch(e){}
+    return !!(typeof DB!=='undefined'&&DB&&DB._selettoreCommessaOff===true);
+  }
   let pend=false;
   function scansiona(){
     pend=false;
-    document.querySelectorAll('[data-sc]').forEach(el=>{ if(!el._scBtn) potenzia(el); else etichetta(el); });
+    const off=spento();
+    document.querySelectorAll('[data-sc]').forEach(el=>{
+      if(off){ if(el._scBtn){ el.classList.remove('sc-orig'); el._scBtn.hidden=true; } return; }
+      if(!el._scBtn) potenzia(el); else { el.classList.add('sc-orig'); el._scBtn.hidden=false; etichetta(el); }
+    });
   }
   function pianifica(){ if(!pend){ pend=true; (window.requestAnimationFrame||setTimeout)(scansiona); } }
   function avvia(){
+    try{ const q=new URLSearchParams(location.search).get('sc');
+      if(q==='off') localStorage.setItem('sc81_off','1'); else if(q==='on') localStorage.removeItem('sc81_off'); }catch(e){}
     scansiona();
     // ignora le modifiche fatte dal selettore stesso (foglio e bottoni), altrimenti si rincorre
     const nostro=t=>(sheet&&(t===sheet||sheet.contains(t)))||(t.closest&&t.closest('.sc-btn'));
@@ -3733,7 +3747,7 @@ if('serviceWorker' in navigator){
       .observe(document.body,{childList:true,subtree:true}); }catch(e){}
   }
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',avvia); else avvia();
-  window.SelettoreCommessa={versione:SC_VER,apri,aggiorna:scansiona};
+  window.SelettoreCommessa={versione:SC_VER,apri,aggiorna:scansiona,spento};
 })();
 </script>
 <!-- ═══════════ fine SELETTORE COMMESSA v1 ═══════════ -->
