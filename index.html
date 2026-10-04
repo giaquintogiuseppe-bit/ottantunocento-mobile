@@ -3433,7 +3433,7 @@ if('serviceWorker' in navigator){
   });
 }
 </script>
-<!-- ═══════════ SELETTORE COMMESSA v1 — blocco condiviso app 81100 ═══════════
+<!-- ═══════════ SELETTORE COMMESSA v1.1 — blocco condiviso app 81100 ═══════════
   Copiare IDENTICO nelle altre app (Gestionale, Planning, Roberto, Buono Consegna, Preventivi).
   Uso: aggiungere a un <select> o <input> esistente
     data-sc="id"   → il controllo contiene l'ID del cantiere
@@ -3442,6 +3442,9 @@ if('serviceWorker' in navigator){
     data-sc-profilo="economico"  (incassi/fatture: finestra conclusi 180 gg; default operativo 60 gg)
     data-sc-data="#id-campo-data" oppure data-sc-giorno="AAAA-MM-GG"  (data del record → suggeriti)
     data-sc-persona="Nome Cognome"  (in cima i cantieri dove la persona è in squadra quel giorno)
+    data-sc-compatto  (bottone basso, per righe di tabella; automatico sulle select con classe "ie")
+  Se la select contiene l'opzione value="__nuovo__", il foglio offre "➕ Crea nuovo cantiere"
+  (sceglie __nuovo__ e lascia la creazione al codice dell'app, come prima).
   Il controllo originale resta nel DOM (nascosto) e tiene il valore: il codice che legge .value
   e gli onchange esistenti funzionano come prima (alla scelta parte un evento 'change').
   Legge i cantieri da DB.cantieri e l'archivio da DB._cantieriArchiviati / c.archiviato.
@@ -3451,6 +3454,10 @@ if('serviceWorker' in navigator){
 <style>
 .sc-orig{display:none!important}
 .sc-btn[hidden]{display:none!important}
+.sc-btn:disabled{opacity:.45;cursor:default}
+.sc-btn.sc-compact{min-height:34px;padding:4px 8px;font-size:13px;gap:6px}
+.sc-btn.sc-compact .sc-bm{display:none}
+.sc-btn.sc-compact .sc-bn,.sc-btn.sc-compact .sc-ph{font-size:12px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 #sc-sheet[hidden],#sc-scrim[hidden],#sc-sheet [hidden]{display:none!important}
 .sc-btn{width:100%;display:flex;align-items:center;gap:10px;text-align:left;min-height:48px;padding:10px 12px;border:1px solid var(--brd,#e2e5ea);border-radius:10px;background:var(--navy2,#fff);color:var(--text,#1b2740);font:15px 'IBM Plex Sans',-apple-system,sans-serif;cursor:pointer}
 .sc-btn .sc-bt{display:flex;flex-direction:column;gap:1px;min-width:0;flex:1}
@@ -3483,9 +3490,9 @@ if('serviceWorker' in navigator){
 #sc-sheet .sc-m{font-size:13px;color:var(--text2,#5f6a7d);overflow-wrap:anywhere}
 #sc-sheet .sc-tags{display:flex;gap:6px;flex-wrap:wrap;margin-top:3px}
 #sc-sheet .sc-tag{font:600 11px 'IBM Plex Mono',ui-monospace,monospace;padding:1px 6px;border-radius:5px;background:var(--navy,#eef1f5);color:var(--text2,#5f6a7d);border:1px solid var(--brd,#e2e5ea)}
-#sc-sheet .sc-tag.att{color:var(--teal,#0e7c66);border-color:var(--teal,#0e7c66);background:rgba(14,124,102,.08)}
+#sc-sheet .sc-tag.att{color:var(--teal,#0e7c66);border-color:var(--teal,#0e7c66);background:var(--td,rgba(14,124,102,.08))}
 #sc-sheet .sc-tag.lp{color:var(--gold,#a9781a);border-color:var(--gold,#a9781a);background:rgba(169,120,26,.08)}
-#sc-sheet .sc-tag.why{font-family:inherit;color:var(--teal,#0e7c66);border-color:transparent;background:rgba(14,124,102,.1)}
+#sc-sheet .sc-tag.why{font-family:inherit;color:var(--teal,#0e7c66);border-color:transparent;background:var(--td,rgba(14,124,102,.1))}
 #sc-sheet mark{background:#fde9a8;color:inherit;border-radius:3px;padding:0 1px}
 #sc-sheet .sc-more{width:100%;margin-top:16px;padding:14px;border-radius:12px;border:1.5px dashed var(--teal,#0e7c66);background:transparent;color:var(--teal,#0e7c66);font:700 15px inherit;font-family:inherit;cursor:pointer;min-height:52px}
 #sc-sheet .sc-none{width:100%;margin-top:12px;padding:12px;border-radius:12px;border:1px solid var(--brd,#e2e5ea);background:transparent;color:var(--text2,#5f6a7d);font:600 14px inherit;font-family:inherit;cursor:pointer;min-height:48px}
@@ -3494,7 +3501,8 @@ if('serviceWorker' in navigator){
 <script>
 (function(){
   'use strict';
-  const SC_VER='1';
+  const SC_VER='1.1';
+  const NUOVO='__nuovo__';
   const FINESTRA={operativo:60,economico:180};
   const MAX_RECENTI=5, LS_RECENTI='sc81_recenti';
   const MESI=['gennaio','febbraio','marzo','aprile','maggio','giugno','luglio','agosto','settembre','ottobre','novembre','dicembre'];
@@ -3524,7 +3532,7 @@ if('serviceWorker' in navigator){
       if(ini){let y=+ini.slice(0,4),m=+ini.slice(5,7);const fy=+fin.slice(0,4),fm=+fin.slice(5,7);
         for(let k=0;k<24&&(y<fy||(y===fy&&m<=fm));k++){mesi.push(MESI[m-1]);m++;if(m>12){m=1;y++;}}}
       return {c,id:c.id,nome,cli,luogo:c.luogo||'',cod:c.codice||'',stato:c.stato||'',ini,fin,ivs,
-        lp:c.tipo==='lungo_periodo',arc,conc,att:!arc&&!conc,mese:ini?ini.slice(0,7):'',
+        lp:c.tipo==='lungo_periodo',arc,conc,att:!arc&&!conc,mese:ini?ini.slice(0,7):'',nn:' '+norm(nome),
         hay:norm([nome,cli,c.luogo,c.codice,mesi.join(' '),ini.slice(0,4)].join(' '))};
     });
   }
@@ -3591,9 +3599,16 @@ if('serviceWorker' in navigator){
     sheet.querySelector('#sc-ctx').textContent=(cur.profilo==='economico'?'Incassi e fatture':'Lavoro operativo')+' · record del '+fmtD(d)+' '+d.slice(0,4)+' · conclusi ultimi '+FINESTRA[cur.profilo]+' giorni';
     let h='';
     if(toks.length){
-      const hits=L.filter(x=>toks.every(t=>x.hay.includes(t)));
-      h+=gruppo('Risultati',hits.filter(inFinestra).sort((a,b)=>(b.att-a.att)||perData(a,b)),toks,null,selId);
-      h+=gruppo('Più vecchie e archivio',hits.filter(x=>!inFinestra(x)).sort(perData),toks,null,selId);
+      // pertinenza: parola del NOME che inizia col testo cercato > dentro il nome > altrove (cliente, luogo…)
+      const punti=x=>toks.reduce((a,t)=>a+(x.nn.includes(' '+t)?3:x.nn.includes(t)?2:0),0);
+      const hits=L.filter(x=>toks.every(t=>x.hay.includes(t))).map(x=>({x,p:punti(x)}));
+      const best=hits.reduce((m,h)=>Math.max(m,h.p),0);
+      const ord=(a,b)=>(b.p-a.p)||(b.x.att-a.x.att)||perData(a.x,b.x);
+      // in alto: le più pertinenti (anche se vecchie) e quelle nella finestra; sotto il resto dell'archivio
+      const top=hits.filter(h=>h.p===best&&best>0||inFinestra(h.x)).sort(ord).map(h=>h.x);
+      const resto=hits.filter(h=>!(h.p===best&&best>0||inFinestra(h.x))).sort(ord).map(h=>h.x);
+      h+=gruppo('Risultati',top,toks,null,selId);
+      h+=gruppo('Più vecchie e archivio',resto,toks,null,selId);
       if(!hits.length) h+='<div class="sc-empty">Nessuna commessa contiene “'+esc(q)+'”.<br>Prova con il cliente, il luogo, il mese (es. “agosto”) o il codice COM.</div>';
     }else{
       const {out:sug,why}=suggeriti(L), visti=new Set(sug.map(x=>x.id));
@@ -3607,6 +3622,7 @@ if('serviceWorker' in navigator){
       h+=gruppo('⚪ Conclusi negli ultimi '+FINESTRA[cur.profilo]+' giorni',conc,[],null,selId);
     }
     h+='<button type="button" class="sc-more" data-sc-azione="tutte">Non la trovi? Cerca in tutte le '+L.length+' commesse ›</button>';
+    if(cur.nuovoOk) h+='<button type="button" class="sc-none" data-sc-azione="nuovo">➕ Crea nuovo cantiere</button>';
     if(cur.vuotoOk) h+='<button type="button" class="sc-none" data-sc-azione="nessuno">✕ Nessun cantiere</button>';
     sheet.querySelector('#sc-body').innerHTML=h;
   }
@@ -3628,6 +3644,7 @@ if('serviceWorker' in navigator){
     sheet.querySelector('#sc-body').innerHTML=list.length
       ? keys.map(k=>gruppo(k==='—'?'Senza date':MESI[+k.slice(5)-1].replace(/^./,c=>c.toUpperCase())+' '+k.slice(0,4),byM[k],toks,null,selId)).join('')
       : '<div class="sc-empty">Nessuna commessa con questi filtri.<br>Togli un filtro o cambia la ricerca.</div>';
+    if(cur.nuovoOk) sheet.querySelector('#sc-body').insertAdjacentHTML('beforeend','<button type="button" class="sc-none" data-sc-azione="nuovo">➕ Crea nuovo cantiere</button>');
   }
   function render(){ vista==='tutte'?renderTutte():renderSmart(); }
   function setVista(v){
@@ -3658,7 +3675,7 @@ if('serviceWorker' in navigator){
     ['#sc-f-mese','#sc-f-stato','#sc-f-cli'].forEach(s=>sheet.querySelector(s).addEventListener('change',render));
     sheet.querySelector('#sc-body').addEventListener('click',e=>{
       const a=e.target.closest('[data-sc-azione]');
-      if(a){ if(a.dataset.scAzione==='tutte') setVista('tutte'); else scegli(null); return; }
+      if(a){ const z=a.dataset.scAzione; if(z==='tutte') setVista('tutte'); else if(z==='nuovo') scegli(NUOVO); else scegli(null); return; }
       const it=e.target.closest('[data-sc-id]'); if(it) scegli(it.dataset.scId);
     });
     document.addEventListener('keydown',e=>{ if(e.key==='Escape'&&sheet&&!sheet.hidden) chiudi(); });
@@ -3672,7 +3689,8 @@ if('serviceWorker' in navigator){
     if(!sheet) costruisci();
     cur={el,modo:el.dataset.sc==='id'?'id':'nome',profilo:el.dataset.scProfilo==='economico'?'economico':'operativo',
       giorno:giornoDi(el),persona:el.dataset.scPersona||'',
-      vuotoOk:el.tagName!=='SELECT'||[...el.options].some(o=>o.value==='')};
+      vuotoOk:el.tagName!=='SELECT'||[...el.options].some(o=>o.value===''),
+      nuovoOk:el.tagName==='SELECT'&&[...el.options].some(o=>o.value===NUOVO)};
     sheet.querySelector('#sc-q').value='';
     sheet.querySelector('#sc-f-stato').value='';
     scrim.hidden=false; sheet.hidden=false;
@@ -3686,8 +3704,8 @@ if('serviceWorker' in navigator){
   function scegli(id){
     if(!cur) return;
     const el=cur.el, L=cantieri();
-    const x=id?L.find(y=>y.id===id):null;
-    const v=x?(cur.modo==='id'?x.id:x.nome):'';
+    const x=id&&id!==NUOVO?L.find(y=>y.id===id):null;
+    const v=id===NUOVO?NUOVO:x?(cur.modo==='id'?x.id:x.nome):'';
     if(el.tagName==='SELECT'&&v&&![...el.options].some(o=>o.value===v)){
       const o=document.createElement('option'); o.value=v; o.textContent=x.nome; el.appendChild(o);
     }
@@ -3704,17 +3722,25 @@ if('serviceWorker' in navigator){
     const b=el._scBtn; if(!b) return;
     const v=el.value, L=cantieri();
     const x=!v?null:(el.dataset.sc==='id'?L.find(y=>y.id===v):L.find(y=>norm(y.nome)===norm(v)));
-    b.classList.toggle('sc-warn',!!v&&!x);
-    const h=!v
+    b.disabled=!!el.disabled;
+    b.classList.toggle('sc-warn',!!v&&!x&&v!==NUOVO);
+    const h=v===NUOVO ? '<span class="sc-bn">➕ Nuovo cantiere</span><span class="sc-bm">il nome viene chiesto dall\'app</span>'
+      : !v
       ? '<span class="sc-ph">'+esc(el.dataset.scVuoto||'🔍 Scegli o cerca la commessa…')+'</span>'
       : x ? '<span class="sc-bn">'+esc(x.nome)+'</span><span class="sc-bm">'+esc([x.cli,periodo(x),x.cod].filter(Boolean).join(' · '))+'</span>'
           : '<span class="sc-bn">'+esc(v)+'</span><span class="sc-bm">⚠ non trovato tra le commesse: tocca per ricollegarlo</span>';
     const t=b.querySelector('.sc-bt'); if(t.innerHTML!==h) t.innerHTML=h;
+    const ti=x?[x.nome,x.cli,periodo(x),x.cod].filter(Boolean).join(' · '):(v&&v!==NUOVO?v:'');
+    if(b.title!==ti) b.title=ti;
   }
   function potenzia(el){
     if(el._scBtn||!el.parentNode) return;
     const b=document.createElement('button'); b.type='button'; b.className='sc-btn';
     b.innerHTML='<span class="sc-bt"></span><span class="sc-chev">›</span>';
+    if(el.classList.contains('ie')||el.hasAttribute('data-sc-compatto')) b.classList.add('sc-compact');
+    // in una riga flex il bottone prende lo stesso spazio della select originale
+    if(el.style.flex){ b.style.flex=el.style.flex; b.style.width='auto'; }
+    if(el.style.minWidth) b.style.minWidth=el.style.minWidth;
     b.addEventListener('click',()=>{ if(el.disabled) return; apri(el); cur.btn=b; });
     el.parentNode.insertBefore(b,el.nextSibling);
     el.classList.add('sc-orig'); el._scBtn=b; el.dataset.scOk=SC_VER;
@@ -3744,12 +3770,12 @@ if('serviceWorker' in navigator){
     // ignora le modifiche fatte dal selettore stesso (foglio e bottoni), altrimenti si rincorre
     const nostro=t=>(sheet&&(t===sheet||sheet.contains(t)))||(t.closest&&t.closest('.sc-btn'));
     try{ new MutationObserver(ms=>{ if(ms.every(m=>nostro(m.target))) return; pianifica(); })
-      .observe(document.body,{childList:true,subtree:true}); }catch(e){}
+      .observe(document.body,{childList:true,subtree:true,attributes:true,attributeFilter:['disabled']}); }catch(e){}
   }
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',avvia); else avvia();
   window.SelettoreCommessa={versione:SC_VER,apri,aggiorna:scansiona,spento};
 })();
 </script>
-<!-- ═══════════ fine SELETTORE COMMESSA v1 ═══════════ -->
+<!-- ═══════════ fine SELETTORE COMMESSA v1.1 ═══════════ -->
 </body>
 </html>
