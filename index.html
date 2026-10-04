@@ -515,7 +515,7 @@ button{touch-action:manipulation}
           <option>Carburante</option><option>Trasferta / Vitto</option><option>Servizi esterni</option><option>Altro</option>
         </select>
       </div>
-      <div class="field"><label>Cantiere</label><input id="sp-cant" list="sp-cant-dl" placeholder="🔍 Cerca cantiere… (vuoto = nessuno)" autocomplete="off" data-af="1"><datalist id="sp-cant-dl"></datalist></div>
+      <div class="field"><label>Cantiere</label><input id="sp-cant" list="sp-cant-dl" placeholder="🔍 Cerca cantiere… (vuoto = nessuno)" autocomplete="off" data-af="1" data-sc="nome" data-sc-data="#sp-data"><datalist id="sp-cant-dl"></datalist></div>
       <div class="field"><label>Note</label><input type="text" id="sp-note" placeholder="Opzionale"></div>
       <button class="btn btn-teal" onclick="salvaSpesa()">🧾 Registra spesa</button>
     </div>
@@ -655,7 +655,7 @@ button{touch-action:manipulation}
     <div class="kpi-row" id="inc-kpi-m"></div>
     <div style="background:var(--navy2);border:1px solid var(--brd);border-radius:12px;padding:14px;margin-bottom:14px">
       <div style="font-size:12px;font-weight:700;color:var(--teal);text-transform:uppercase;letter-spacing:1px;margin-bottom:12px">➕ Registra incasso</div>
-      <div class="field"><label>Cantiere</label><select id="minc-cant"><option value="">— Seleziona —</option></select></div>
+      <div class="field"><label>Cantiere</label><select id="minc-cant" data-sc="id" data-sc-profilo="economico" data-sc-data="#minc-data"><option value="">— Seleziona —</option></select></div>
       <div class="field"><label>Data</label><input type="date" id="minc-data"></div>
       <div class="field"><label>Importo (€)</label><input type="number" id="minc-importo" step="0.01" placeholder="0.00" inputmode="decimal"></div>
       <div class="field"><label>Metodo</label><select id="minc-metodo"><option>Bonifico</option><option>Contanti</option><option>Assegno</option><option>RID/SEPA</option><option>Altro</option></select></div>
@@ -1414,7 +1414,11 @@ function loadPres(){
       <div class="kpi go"><div class="lb">Maturato</div><div class="vl">${fm(totOggi)}</div></div>
     </div>`;
 
-  const cantOpzioni=_cantieriOrdinati().map(c=>`<option value="${_de(c.nome)}">${_de(c.nome)}</option>`).join('');
+  // Opzioni del turno: seleziona per uguaglianza (anche nomi con apostrofi/virgolette)
+  // e mantiene il cantiere del turno anche se archiviato o rinominato.
+  const _ordT=_cantieriOrdinati();
+  const cantOpzioni=v=>{let h=_ordT.map(c=>`<option value="${_de(c.nome)}"${c.nome===v?' selected':''}>${_de(c.nome)}</option>`).join('');
+    if(v&&!_ordT.some(c=>c.nome===v)) h=`<option value="${_de(v)}" selected>${_de(v)}</option>`+h; return h;};
 
   document.getElementById('pres-list').innerHTML=DB.personale.map(p=>{
     const pr=giornata[p.id];
@@ -1438,9 +1442,9 @@ function loadPres(){
           <div style="background:${t.notturno?'rgba(100,150,255,.08)':'var(--navy)'};border:1px solid ${t.notturno?'rgba(100,150,255,.3)':'var(--brd)'};border-radius:10px;padding:10px;margin-bottom:8px">
             <div style="margin-bottom:6px">
               <label style="font-size:12px;color:var(--text2);font-weight:700;text-transform:uppercase;display:block;margin-bottom:3px">Cantiere</label>
-              <select style="width:100%;background:var(--navy2);border:1px solid var(--brd);border-radius:8px;color:var(--text);font-family:'IBM Plex Sans',sans-serif;font-size:13px;padding:8px;outline:none" onchange="updateTurnoM('${p.id}',${ti},'cantiere',this.value)">
+              <select style="width:100%;background:var(--navy2);border:1px solid var(--brd);border-radius:8px;color:var(--text);font-family:'IBM Plex Sans',sans-serif;font-size:13px;padding:8px;outline:none" data-sc="nome" data-sc-data="#pres-data" data-sc-persona="${_de(p.nome)}" onchange="updateTurnoM('${p.id}',${ti},'cantiere',this.value)">
                 <option value="">— Nessun cantiere —</option>
-                ${cantOpzioni.replace(`value="${t.cantiere}"`,`value="${t.cantiere}" selected`)}
+                ${cantOpzioni(t.cantiere||'')}
               </select>
             </div>
             <div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap">
@@ -3189,7 +3193,7 @@ function diarioNorm(a,i){
 window.diarioToggle=i=>{DIARIO_AZIONI[i].on=!DIARIO_AZIONI[i].on;const el=document.getElementById('dia-act-'+i);if(el)el.classList.toggle('off',!DIARIO_AZIONI[i].on);diarioUpdCount();};
 window.diarioSet=(i,f,v)=>{DIARIO_AZIONI[i][f]=v;};
 window.diarioSetDip=(i,v)=>{DIARIO_AZIONI[i].dipId=v;diarioRenderPreview();};
-window.diarioSetCant=(i,v)=>{DIARIO_AZIONI[i].cantMatch=diarioActiveCant().find(c=>c.id===v)||null;DIARIO_AZIONI[i].cantRaw=DIARIO_AZIONI[i].cantMatch?DIARIO_AZIONI[i].cantMatch.nome:'';diarioRenderPreview();};
+window.diarioSetCant=(i,v)=>{DIARIO_AZIONI[i].cantMatch=(DB.cantieri||[]).find(c=>c.id===v)||null;DIARIO_AZIONI[i].cantRaw=DIARIO_AZIONI[i].cantMatch?DIARIO_AZIONI[i].cantMatch.nome:'';diarioRenderPreview();};
 window.diarioSetCantMode=(i,m)=>{DIARIO_AZIONI[i].cantMode=m;diarioRenderPreview();};
 window.diarioSetBool=(i,f,v)=>{DIARIO_AZIONI[i][f]=v;};
 
@@ -3202,7 +3206,7 @@ function diarioDipSelect(a){
 function diarioCantSelect(a,label){
   const opts=['<option value="">— nessuno —</option>'].concat(diarioActiveCant().map(c=>`<option value="${c.id}"${a.cantMatch&&a.cantMatch.id===c.id?' selected':''}>${_de(c.nome)}</option>`)).join('');
   return `<div class="dia-f full"><label>${label||'Cantiere'}</label>
-    <select class="${a.cantMatch?'dia-ok':'dia-warn'}" onchange="diarioSetCant(${a._i},this.value)">${opts}</select>
+    <select class="${a.cantMatch?'dia-ok':'dia-warn'}" data-sc="id" data-sc-giorno="${_de(a.data||'')}" onchange="diarioSetCant(${a._i},this.value)">${opts}</select>
     ${a.cantMatch?`<span class="dia-badge ok">✓ ${_de(a.cantMatch.nome)}</span>`:(a.cantRaw?`<span class="dia-badge warn">⚠ "${_de(a.cantRaw)}" non trovato</span>`:'')}</div>`;
 }
 function diarioCantBlock(a){
@@ -3214,7 +3218,7 @@ function diarioCantBlock(a){
       <button class="dia-segb${isNew?' on':''}" onclick="diarioSetCantMode(${a._i},'new')">➕ Nuovo</button>
     </div>
     ${!isNew
-      ? `<select class="${a.cantMatch?'dia-ok':'dia-warn'}" style="margin-top:8px" onchange="diarioSetCant(${a._i},this.value)">${opts}</select>${a.cantMatch?`<span class="dia-badge ok">✓ lavorazione su ${_de(a.cantMatch.nome)}</span>`:'<span class="dia-badge warn">⚠ scegli il cantiere</span>'}`
+      ? `<select class="${a.cantMatch?'dia-ok':'dia-warn'}" style="margin-top:8px" data-sc="id" data-sc-giorno="${_de(a.data||'')}" onchange="diarioSetCant(${a._i},this.value)">${opts}</select>${a.cantMatch?`<span class="dia-badge ok">✓ lavorazione su ${_de(a.cantMatch.nome)}</span>`:'<span class="dia-badge warn">⚠ scegli il cantiere</span>'}`
       : `<div style="margin-top:8px;display:grid;gap:8px">
           <input placeholder="Nome nuovo cantiere" value="${_de(a.cantNewName)}" onchange="diarioSet(${a._i},'cantNewName',this.value)">
           <input placeholder="Committente / cliente" value="${_de(a.cantNewComm)}" onchange="diarioSet(${a._i},'cantNewComm',this.value)">
@@ -3429,5 +3433,309 @@ if('serviceWorker' in navigator){
   });
 }
 </script>
+<!-- ═══════════ SELETTORE COMMESSA v1 — blocco condiviso app 81100 ═══════════
+  Copiare IDENTICO nelle altre app (Gestionale, Planning, Roberto, Buono Consegna, Preventivi).
+  Uso: aggiungere a un <select> o <input> esistente
+    data-sc="id"   → il controllo contiene l'ID del cantiere
+    data-sc="nome" → il controllo contiene il NOME del cantiere
+  opzionali:
+    data-sc-profilo="economico"  (incassi/fatture: finestra conclusi 180 gg; default operativo 60 gg)
+    data-sc-data="#id-campo-data" oppure data-sc-giorno="AAAA-MM-GG"  (data del record → suggeriti)
+    data-sc-persona="Nome Cognome"  (in cima i cantieri dove la persona è in squadra quel giorno)
+  Il controllo originale resta nel DOM (nascosto) e tiene il valore: il codice che legge .value
+  e gli onchange esistenti funzionano come prima (alla scelta parte un evento 'change').
+  Legge i cantieri da DB.cantieri e l'archivio da DB._cantieriArchiviati / c.archiviato. -->
+<style>
+.sc-orig{display:none!important}
+#sc-sheet[hidden],#sc-scrim[hidden],#sc-sheet [hidden]{display:none!important}
+.sc-btn{width:100%;display:flex;align-items:center;gap:10px;text-align:left;min-height:48px;padding:10px 12px;border:1px solid var(--brd,#e2e5ea);border-radius:10px;background:var(--navy2,#fff);color:var(--text,#1b2740);font:15px 'IBM Plex Sans',-apple-system,sans-serif;cursor:pointer}
+.sc-btn .sc-bt{display:flex;flex-direction:column;gap:1px;min-width:0;flex:1}
+.sc-btn .sc-bn{font-weight:600;overflow-wrap:anywhere}
+.sc-btn .sc-bm{font-size:12px;color:var(--text2,#5f6a7d);overflow-wrap:anywhere}
+.sc-btn .sc-ph{color:var(--text2,#5f6a7d)}
+.sc-btn .sc-chev{color:var(--text2,#5f6a7d);font-size:20px;line-height:1}
+.sc-btn.sc-warn{border-color:var(--gold,#a9781a)}
+#sc-scrim{position:fixed;inset:0;background:rgba(20,28,45,.45);z-index:100000}
+#sc-sheet{position:fixed;left:0;right:0;bottom:0;top:max(24px,env(safe-area-inset-top,0px));z-index:100001;background:var(--navy,#eef1f5);border-radius:16px 16px 0 0;display:flex;flex-direction:column;max-width:640px;margin:0 auto;box-shadow:0 -8px 30px rgba(0,0,0,.18);font-family:'IBM Plex Sans',-apple-system,sans-serif;color:var(--text,#1b2740)}
+#sc-sheet .sc-top{padding:10px 16px;display:flex;flex-direction:column;gap:8px;border-bottom:1px solid var(--brd,#e2e5ea);background:var(--navy2,#fff);border-radius:16px 16px 0 0}
+#sc-sheet .sc-row1{display:flex;align-items:center;gap:6px}
+#sc-sheet .sc-row1 h3{font-size:17px;flex:1;min-width:0;margin:0}
+#sc-sheet .sc-lnk{border:none;background:transparent;font:600 15px inherit;font-family:inherit;color:var(--teal,#0e7c66);cursor:pointer;min-height:44px;padding:0 6px}
+#sc-sheet input[type=search],#sc-sheet select{width:100%;font:16px inherit;font-family:inherit;padding:11px 12px;border:1px solid var(--brd,#e2e5ea);border-radius:10px;background:var(--navy2,#fff);color:var(--text,#1b2740);outline:none;-webkit-appearance:none;appearance:none}
+#sc-sheet .sc-filt{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+#sc-sheet .sc-filt select{font-size:15px;padding:9px 10px}
+#sc-sheet .sc-ctx{font-size:12px;color:var(--text2,#5f6a7d)}
+#sc-sheet .sc-body{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:2px 16px calc(24px + env(safe-area-inset-bottom,0px))}
+#sc-sheet .sc-grp{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--text2,#5f6a7d);margin:16px 2px 8px;display:flex;justify-content:space-between;gap:8px}
+#sc-sheet .sc-list{display:flex;flex-direction:column;gap:6px}
+#sc-sheet .sc-it{display:flex;gap:12px;align-items:flex-start;width:100%;text-align:left;background:var(--navy2,#fff);border:1px solid var(--brd,#e2e5ea);border-radius:12px;padding:11px 12px;cursor:pointer;color:inherit;font:inherit;min-height:54px}
+#sc-sheet .sc-it.sc-cur{border-color:var(--teal,#0e7c66);box-shadow:inset 0 0 0 1px var(--teal,#0e7c66)}
+#sc-sheet .sc-dot{width:10px;height:10px;border-radius:50%;margin-top:6px;flex-shrink:0;background:#9aa3b2}
+#sc-sheet .sc-dot.att{background:var(--teal,#0e7c66)}#sc-sheet .sc-dot.lp{background:var(--gold,#a9781a)}
+#sc-sheet .sc-dot.wait{background:var(--gold,#a9781a);box-shadow:inset 0 0 0 2px var(--navy2,#fff)}
+#sc-sheet .sc-dot.arc{background:transparent;border:2px solid #9aa3b2}
+#sc-sheet .sc-tx{min-width:0;flex:1;display:flex;flex-direction:column;gap:2px}
+#sc-sheet .sc-n{font-weight:600;font-size:15px;overflow-wrap:anywhere}
+#sc-sheet .sc-m{font-size:13px;color:var(--text2,#5f6a7d);overflow-wrap:anywhere}
+#sc-sheet .sc-tags{display:flex;gap:6px;flex-wrap:wrap;margin-top:3px}
+#sc-sheet .sc-tag{font:600 11px 'IBM Plex Mono',ui-monospace,monospace;padding:1px 6px;border-radius:5px;background:var(--navy,#eef1f5);color:var(--text2,#5f6a7d);border:1px solid var(--brd,#e2e5ea)}
+#sc-sheet .sc-tag.att{color:var(--teal,#0e7c66);border-color:var(--teal,#0e7c66);background:rgba(14,124,102,.08)}
+#sc-sheet .sc-tag.lp{color:var(--gold,#a9781a);border-color:var(--gold,#a9781a);background:rgba(169,120,26,.08)}
+#sc-sheet .sc-tag.why{font-family:inherit;color:var(--teal,#0e7c66);border-color:transparent;background:rgba(14,124,102,.1)}
+#sc-sheet mark{background:#fde9a8;color:inherit;border-radius:3px;padding:0 1px}
+#sc-sheet .sc-more{width:100%;margin-top:16px;padding:14px;border-radius:12px;border:1.5px dashed var(--teal,#0e7c66);background:transparent;color:var(--teal,#0e7c66);font:700 15px inherit;font-family:inherit;cursor:pointer;min-height:52px}
+#sc-sheet .sc-none{width:100%;margin-top:12px;padding:12px;border-radius:12px;border:1px solid var(--brd,#e2e5ea);background:transparent;color:var(--text2,#5f6a7d);font:600 14px inherit;font-family:inherit;cursor:pointer;min-height:48px}
+#sc-sheet .sc-empty{padding:20px 4px;color:var(--text2,#5f6a7d);font-size:14px;text-align:center}
+</style>
+<script>
+(function(){
+  'use strict';
+  const SC_VER='1';
+  const FINESTRA={operativo:60,economico:180};
+  const MAX_RECENTI=5, LS_RECENTI='sc81_recenti';
+  const MESI=['gennaio','febbraio','marzo','aprile','maggio','giugno','luglio','agosto','settembre','ottobre','novembre','dicembre'];
+  const MESI_B=['gen','feb','mar','apr','mag','giu','lug','ago','set','ott','nov','dic'];
+  const norm=s=>String(s==null?'':s).normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase().replace(/[’`]/g,"'").replace(/\s+/g,' ').trim();
+  const esc=s=>String(s==null?'':s).replace(/[&<>"]/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[ch]));
+  const oggiISO=()=>{const d=new Date();return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,10);};
+  const addG=(iso,n)=>{const d=new Date(iso+'T12:00:00');d.setDate(d.getDate()+n);return d.toISOString().slice(0,10);};
+  const fmtD=iso=>{if(!iso)return '';const p=iso.split('-');return (+p[2])+' '+MESI_B[+p[1]-1];};
+
+  // ── dati: legge DB.cantieri ogni volta (si aggiorna da solo dopo un sync)
+  function cantieri(){
+    const db=(typeof DB!=='undefined'&&DB)||{};
+    const arch=new Set(db._cantieriArchiviati||[]);
+    return (db.cantieri||[]).filter(c=>c&&c.id&&(c.nome||c.name)).map(c=>{
+      const nome=String(c.nome||c.name).trim();
+      const s=norm(c.stato);
+      const arc=arch.has(c.id)||c.archiviato===true;
+      const conc=s.includes('conclus')||s.includes('pers')||s.includes('rifiut');
+      const ivs=(Array.isArray(c.interventi)?c.interventi:[]).filter(iv=>iv&&iv.data);
+      let ini=c.periodoInizio||'', fin=c.periodoFine||'';
+      if(!ini&&ivs.length) ini=ivs.reduce((a,iv)=>iv.data<a?iv.data:a,ivs[0].data);
+      if(!fin&&ivs.length) fin=ivs.reduce((a,iv)=>iv.data>a?iv.data:a,ivs[0].data);
+      if(!fin) fin=ini;
+      const cli=c.clienteNome||c.committente||'';
+      const mesi=[];
+      if(ini){let y=+ini.slice(0,4),m=+ini.slice(5,7);const fy=+fin.slice(0,4),fm=+fin.slice(5,7);
+        for(let k=0;k<24&&(y<fy||(y===fy&&m<=fm));k++){mesi.push(MESI[m-1]);m++;if(m>12){m=1;y++;}}}
+      return {c,id:c.id,nome,cli,luogo:c.luogo||'',cod:c.codice||'',stato:c.stato||'',ini,fin,ivs,
+        lp:c.tipo==='lungo_periodo',arc,conc,att:!arc&&!conc,mese:ini?ini.slice(0,7):'',
+        hay:norm([nome,cli,c.luogo,c.codice,mesi.join(' '),ini.slice(0,4)].join(' '))};
+    });
+  }
+  function recenti(){try{return JSON.parse(localStorage.getItem(LS_RECENTI)||'[]')||[];}catch(e){return [];}}
+  function segnaRecente(id){try{localStorage.setItem(LS_RECENTI,JSON.stringify([id,...recenti().filter(x=>x!==id)].slice(0,MAX_RECENTI)));}catch(e){}}
+
+  // ── stato del foglio
+  let cur=null; // {el, modo, profilo, giorno, persona}
+  let vista='smart';
+  let sheet, scrim;
+
+  function periodo(x){ if(!x.ini) return 'date da definire'; return x.ini===x.fin?fmtD(x.ini):fmtD(x.ini)+' – '+fmtD(x.fin); }
+  function dot(x){ if(x.arc) return 'arc'; if(x.conc) return ''; if(x.lp) return 'lp'; const s=norm(x.stato); return (s.includes('confermar')||s.includes('arrivo')||s.includes('fermo'))?'wait':'att'; }
+  function tagStato(x){
+    if(x.arc) return '<span class="sc-tag">archivio</span>';
+    if(x.conc) return '<span class="sc-tag">'+esc(x.stato||'concluso')+'</span>';
+    if(x.lp) return '<span class="sc-tag lp">deposito / lungo periodo</span>';
+    return '<span class="sc-tag att">'+esc(x.stato||'attivo')+'</span>';
+  }
+  function hl(text,toks){
+    text=String(text||''); if(!toks.length) return esc(text);
+    const n=text.normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase();
+    if(n.length!==text.length) return esc(text);
+    const mk=new Array(text.length).fill(false);
+    toks.forEach(t=>{let i=n.indexOf(t);while(i>=0){for(let k=i;k<i+t.length;k++)mk[k]=true;i=n.indexOf(t,i+t.length);}});
+    let s='',open=false;
+    for(let i=0;i<text.length;i++){if(mk[i]&&!open){s+='<mark>';open=true;}if(!mk[i]&&open){s+='</mark>';open=false;}s+=esc(text[i]);}
+    return open?s+'</mark>':s;
+  }
+  function riga(x,toks,why,selId){
+    const meta=[x.cli,x.luogo&&norm(x.luogo)!==norm(x.nome)?x.luogo:'',periodo(x)].filter(Boolean).map(v=>hl(v,toks)).join(' · ');
+    return '<button type="button" class="sc-it'+(x.id===selId?' sc-cur':'')+'" data-sc-id="'+esc(x.id)+'"><span class="sc-dot '+dot(x)+'"></span>'+
+      '<span class="sc-tx"><span class="sc-n">'+hl(x.nome,toks)+'</span><span class="sc-m">'+meta+'</span>'+
+      '<span class="sc-tags">'+(why?'<span class="sc-tag why">'+esc(why)+'</span>':'')+tagStato(x)+(x.cod?'<span class="sc-tag">'+hl(x.cod,toks)+'</span>':'')+'</span></span></button>';
+  }
+  function gruppo(t,items,toks,whyFn,selId){
+    if(!items.length) return '';
+    return '<div class="sc-grp"><span>'+t+'</span><span>'+items.length+'</span></div><div class="sc-list">'+items.map(x=>riga(x,toks,whyFn?whyFn(x):'',selId)).join('')+'</div>';
+  }
+  const perData=(a,b)=>(b.ini||'9999').localeCompare(a.ini||'9999');
+
+  function inFinestra(x){ if(x.arc) return false; if(x.att) return true; return !!x.fin&&x.fin>=addG(oggiISO(),-FINESTRA[cur.profilo]); }
+  function suggeriti(L){
+    const d=cur.giorno||oggiISO(), p=norm(cur.persona);
+    const out=[], why={};
+    const push=(x,w)=>{ if(!why[x.id]){why[x.id]=w;out.push(x);} };
+    if(p) L.forEach(x=>{ if(!x.arc&&x.ivs.some(iv=>iv.data===d&&(iv.squadra||[]).some(n=>norm(n)===p))) push(x,'in squadra quel giorno'); });
+    L.forEach(x=>{ if(!x.arc&&x.ivs.some(iv=>iv.data===d)) push(x,'lavorazione quel giorno'); });
+    L.filter(x=>!x.arc&&x.ini&&x.ini<=addG(d,1)&&x.fin>=addG(d,-1)).sort((a,b)=>(b.att-a.att)||perData(a,b))
+      .forEach(x=>push(x,x.att?'in corso quel giorno':'attivo quel giorno'));
+    return {out,why};
+  }
+  function idCorrente(L){
+    if(!cur) return '';
+    const v=cur.el.value; if(!v) return '';
+    if(cur.modo==='id') return v;
+    const n=norm(v); const x=L.find(y=>norm(y.nome)===n); return x?x.id:'';
+  }
+
+  function renderSmart(){
+    const L=cantieri(), selId=idCorrente(L);
+    const q=sheet.querySelector('#sc-q').value.trim(), toks=norm(q).split(' ').filter(Boolean);
+    const d=cur.giorno||oggiISO();
+    sheet.querySelector('#sc-ctx').textContent=(cur.profilo==='economico'?'Incassi e fatture':'Lavoro operativo')+' · record del '+fmtD(d)+' '+d.slice(0,4)+' · conclusi ultimi '+FINESTRA[cur.profilo]+' giorni';
+    let h='';
+    if(toks.length){
+      const hits=L.filter(x=>toks.every(t=>x.hay.includes(t)));
+      h+=gruppo('Risultati',hits.filter(inFinestra).sort((a,b)=>(b.att-a.att)||perData(a,b)),toks,null,selId);
+      h+=gruppo('Più vecchie e archivio',hits.filter(x=>!inFinestra(x)).sort(perData),toks,null,selId);
+      if(!hits.length) h+='<div class="sc-empty">Nessuna commessa contiene “'+esc(q)+'”.<br>Prova con il cliente, il luogo, il mese (es. “agosto”) o il codice COM.</div>';
+    }else{
+      const {out:sug,why}=suggeriti(L), visti=new Set(sug.map(x=>x.id));
+      const rec=recenti().map(id=>L.find(x=>x.id===id)).filter(x=>x&&!visti.has(x.id)).slice(0,MAX_RECENTI);
+      rec.forEach(x=>visti.add(x.id));
+      const att=L.filter(x=>x.att&&!visti.has(x.id)).sort((a,b)=>(a.lp-b.lp)||perData(a,b));
+      const conc=L.filter(x=>!x.att&&inFinestra(x)&&!visti.has(x.id)).sort((a,b)=>(b.fin||'').localeCompare(a.fin||''));
+      h+=gruppo('⭐ Suggeriti per il '+fmtD(d),sug,[],x=>why[x.id],selId);
+      h+=gruppo('🕘 Usati di recente',rec,[],null,selId);
+      h+=gruppo('🟢 Attivi',att,[],null,selId);
+      h+=gruppo('⚪ Conclusi negli ultimi '+FINESTRA[cur.profilo]+' giorni',conc,[],null,selId);
+    }
+    h+='<button type="button" class="sc-more" data-sc-azione="tutte">Non la trovi? Cerca in tutte le '+L.length+' commesse ›</button>';
+    if(cur.vuotoOk) h+='<button type="button" class="sc-none" data-sc-azione="nessuno">✕ Nessun cantiere</button>';
+    sheet.querySelector('#sc-body').innerHTML=h;
+  }
+  function riempiFiltri(L){
+    const mesi=[...new Set(L.map(x=>x.mese).filter(Boolean))].sort().reverse();
+    sheet.querySelector('#sc-f-mese').innerHTML='<option value="">Tutti i mesi</option>'+mesi.map(m=>'<option value="'+m+'">'+MESI[+m.slice(5)-1].replace(/^./,c=>c.toUpperCase())+' '+m.slice(0,4)+'</option>').join('');
+    const cl={}; L.forEach(x=>{if(x.cli){const k=norm(x.cli);(cl[k]=cl[k]||{n:x.cli,k:0}).k++;}});
+    sheet.querySelector('#sc-f-cli').innerHTML='<option value="">Tutti i clienti</option>'+Object.entries(cl).sort((a,b)=>a[1].n.localeCompare(b[1].n,'it',{sensitivity:'base'})).map(([k,v])=>'<option value="'+esc(k)+'">'+esc(v.n)+' ('+v.k+')</option>').join('');
+  }
+  function renderTutte(){
+    const L=cantieri(), selId=idCorrente(L);
+    const q=sheet.querySelector('#sc-q').value.trim(), toks=norm(q).split(' ').filter(Boolean);
+    const fm=sheet.querySelector('#sc-f-mese').value, fs=sheet.querySelector('#sc-f-stato').value, fc=sheet.querySelector('#sc-f-cli').value;
+    const list=L.filter(x=>toks.every(t=>x.hay.includes(t))&&(!fm||x.mese===fm)&&(!fc||norm(x.cli)===fc)&&
+      (!fs||(fs==='att'&&x.att)||(fs==='conc'&&x.conc&&!x.arc)||(fs==='arc'&&x.arc))).sort(perData);
+    sheet.querySelector('#sc-ctx').textContent='Elenco completo · '+list.length+' di '+L.length+' commesse · dalla più recente';
+    const byM={}; list.forEach(x=>{(byM[x.mese||'—']=byM[x.mese||'—']||[]).push(x);});
+    const keys=Object.keys(byM).sort((a,b)=>a==='—'?-1:b==='—'?1:b.localeCompare(a));
+    sheet.querySelector('#sc-body').innerHTML=list.length
+      ? keys.map(k=>gruppo(k==='—'?'Senza date':MESI[+k.slice(5)-1].replace(/^./,c=>c.toUpperCase())+' '+k.slice(0,4),byM[k],toks,null,selId)).join('')
+      : '<div class="sc-empty">Nessuna commessa con questi filtri.<br>Togli un filtro o cambia la ricerca.</div>';
+  }
+  function render(){ vista==='tutte'?renderTutte():renderSmart(); }
+  function setVista(v){
+    vista=v;
+    sheet.querySelector('#sc-filt').hidden=v!=='tutte';
+    sheet.querySelector('#sc-back').hidden=v!=='tutte';
+    sheet.querySelector('#sc-tit').textContent=v==='tutte'?'Tutte le commesse':'Scegli commessa';
+    if(v==='tutte') riempiFiltri(cantieri());
+    sheet.querySelector('#sc-body').scrollTop=0; render();
+  }
+
+  function costruisci(){
+    scrim=document.createElement('div'); scrim.id='sc-scrim'; scrim.hidden=true;
+    sheet=document.createElement('div'); sheet.id='sc-sheet'; sheet.hidden=true;
+    sheet.setAttribute('role','dialog'); sheet.setAttribute('aria-modal','true');
+    sheet.innerHTML='<div class="sc-top"><div class="sc-row1"><button type="button" class="sc-lnk" id="sc-back" hidden>‹ Indietro</button>'+
+      '<h3 id="sc-tit">Scegli commessa</h3><button type="button" class="sc-lnk" id="sc-close">Chiudi</button></div>'+
+      '<input type="search" id="sc-q" placeholder="🔍 Nome, cliente, luogo, COM-…, mese" autocomplete="off" autocorrect="off" spellcheck="false" data-af="1">'+
+      '<div class="sc-filt" id="sc-filt" hidden><select id="sc-f-mese" aria-label="Mese"></select>'+
+      '<select id="sc-f-stato" aria-label="Stato"><option value="">Tutti gli stati</option><option value="att">Attivi</option><option value="conc">Conclusi</option><option value="arc">Archiviati</option></select>'+
+      '<select id="sc-f-cli" aria-label="Cliente" style="grid-column:1/-1"></select></div>'+
+      '<div class="sc-ctx" id="sc-ctx"></div></div><div class="sc-body" id="sc-body"></div>';
+    document.body.appendChild(scrim); document.body.appendChild(sheet);
+    scrim.addEventListener('click',chiudi);
+    sheet.querySelector('#sc-close').addEventListener('click',chiudi);
+    sheet.querySelector('#sc-back').addEventListener('click',()=>setVista('smart'));
+    sheet.querySelector('#sc-q').addEventListener('input',render);
+    ['#sc-f-mese','#sc-f-stato','#sc-f-cli'].forEach(s=>sheet.querySelector(s).addEventListener('change',render));
+    sheet.querySelector('#sc-body').addEventListener('click',e=>{
+      const a=e.target.closest('[data-sc-azione]');
+      if(a){ if(a.dataset.scAzione==='tutte') setVista('tutte'); else scegli(null); return; }
+      const it=e.target.closest('[data-sc-id]'); if(it) scegli(it.dataset.scId);
+    });
+    document.addEventListener('keydown',e=>{ if(e.key==='Escape'&&sheet&&!sheet.hidden) chiudi(); });
+  }
+  function giornoDi(el){
+    if(el.dataset.scGiorno) return el.dataset.scGiorno;
+    if(el.dataset.scData){ try{ const f=document.querySelector(el.dataset.scData); if(f&&f.value) return f.value; }catch(e){} }
+    return oggiISO();
+  }
+  function apri(el){
+    if(!sheet) costruisci();
+    cur={el,modo:el.dataset.sc==='id'?'id':'nome',profilo:el.dataset.scProfilo==='economico'?'economico':'operativo',
+      giorno:giornoDi(el),persona:el.dataset.scPersona||'',
+      vuotoOk:el.tagName!=='SELECT'||[...el.options].some(o=>o.value==='')};
+    sheet.querySelector('#sc-q').value='';
+    sheet.querySelector('#sc-f-stato').value='';
+    scrim.hidden=false; sheet.hidden=false;
+    setVista('smart');
+    // su telefono non apriamo subito la tastiera: si vedono prima i suggeriti
+    if(!(window.matchMedia&&matchMedia('(pointer:coarse)').matches)) setTimeout(()=>sheet.querySelector('#sc-q').focus(),50);
+  }
+  function chiudi(){ if(!sheet) return; sheet.hidden=true; scrim.hidden=true; if(cur&&cur.btn) try{cur.btn.focus();}catch(e){} cur=null; }
+
+  // imposta il valore sul controllo originale e avvisa il codice esistente
+  function scegli(id){
+    if(!cur) return;
+    const el=cur.el, L=cantieri();
+    const x=id?L.find(y=>y.id===id):null;
+    const v=x?(cur.modo==='id'?x.id:x.nome):'';
+    if(el.tagName==='SELECT'&&v&&![...el.options].some(o=>o.value===v)){
+      const o=document.createElement('option'); o.value=v; o.textContent=x.nome; el.appendChild(o);
+    }
+    el.value=v;
+    if(x) segnaRecente(x.id);
+    chiudi();
+    el.dispatchEvent(new Event('input',{bubbles:true}));
+    el.dispatchEvent(new Event('change',{bubbles:true}));
+    etichetta(el);
+  }
+
+  // ── bottone al posto del controllo
+  function etichetta(el){
+    const b=el._scBtn; if(!b) return;
+    const v=el.value, L=cantieri();
+    const x=!v?null:(el.dataset.sc==='id'?L.find(y=>y.id===v):L.find(y=>norm(y.nome)===norm(v)));
+    b.classList.toggle('sc-warn',!!v&&!x);
+    const h=!v
+      ? '<span class="sc-ph">'+esc(el.dataset.scVuoto||'🔍 Scegli o cerca la commessa…')+'</span>'
+      : x ? '<span class="sc-bn">'+esc(x.nome)+'</span><span class="sc-bm">'+esc([x.cli,periodo(x),x.cod].filter(Boolean).join(' · '))+'</span>'
+          : '<span class="sc-bn">'+esc(v)+'</span><span class="sc-bm">⚠ non trovato tra le commesse: tocca per ricollegarlo</span>';
+    const t=b.querySelector('.sc-bt'); if(t.innerHTML!==h) t.innerHTML=h;
+  }
+  function potenzia(el){
+    if(el._scBtn||!el.parentNode) return;
+    const b=document.createElement('button'); b.type='button'; b.className='sc-btn';
+    b.innerHTML='<span class="sc-bt"></span><span class="sc-chev">›</span>';
+    b.addEventListener('click',()=>{ if(el.disabled) return; apri(el); cur.btn=b; });
+    el.parentNode.insertBefore(b,el.nextSibling);
+    el.classList.add('sc-orig'); el._scBtn=b; el.dataset.scOk=SC_VER;
+    // valori impostati da codice (es. precompila, reset del form) aggiornano il bottone
+    const proto=Object.getPrototypeOf(el), d=Object.getOwnPropertyDescriptor(proto,'value');
+    if(d&&d.set) try{ Object.defineProperty(el,'value',{configurable:true,get(){return d.get.call(el);},set(v){d.set.call(el,v);etichetta(el);}}); }catch(e){}
+    etichetta(el);
+  }
+  let pend=false;
+  function scansiona(){
+    pend=false;
+    document.querySelectorAll('[data-sc]').forEach(el=>{ if(!el._scBtn) potenzia(el); else etichetta(el); });
+  }
+  function pianifica(){ if(!pend){ pend=true; (window.requestAnimationFrame||setTimeout)(scansiona); } }
+  function avvia(){
+    scansiona();
+    // ignora le modifiche fatte dal selettore stesso (foglio e bottoni), altrimenti si rincorre
+    const nostro=t=>(sheet&&(t===sheet||sheet.contains(t)))||(t.closest&&t.closest('.sc-btn'));
+    try{ new MutationObserver(ms=>{ if(ms.every(m=>nostro(m.target))) return; pianifica(); })
+      .observe(document.body,{childList:true,subtree:true}); }catch(e){}
+  }
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',avvia); else avvia();
+  window.SelettoreCommessa={versione:SC_VER,apri,aggiorna:scansiona};
+})();
+</script>
+<!-- ═══════════ fine SELETTORE COMMESSA v1 ═══════════ -->
 </body>
 </html>
