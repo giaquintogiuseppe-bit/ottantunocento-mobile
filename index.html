@@ -900,9 +900,11 @@ async function loadCloud(){
       Object.assign(DB, row.dati);
       ['pagamenti','documenti','carteDkv','scontrini','addebiti','speseCantiere','cantieri','mezziDB','risorse','personaleHR','incassi'].forEach(k=>{if(!DB[k])DB[k]=[];});
       // Auto-chiusura: cantieri con data fine passata → concluso
+      // (MAI se lo stato è stato scelto a mano: c._statoManuale)
       const oggiStr=today();
       (DB.cantieri||[]).forEach(c=>{
         if(c.tipo==='lungo_periodo') return;
+        if(c._statoManuale) return;
         const s=(c.stato||'').toLowerCase();
         if(s.includes('conclus')||s.includes('perso')||s.includes('rifiut')) return;
         const fine=c.periodoFine||c.periodoInizio||'';
@@ -2417,6 +2419,9 @@ async function cambiaStatoCantiere(id){
   ]);
   if(idx===null) return;
   c.stato=stati[idx];
+  // scelta manuale: nessuna chiusura automatica la sovrascrive (concluso/perso la riattivano)
+  c._statoManuale = !['concluso','perso'].includes(c.stato);
+  if(c.stato!=='concluso') c._autoChiuso=false;
   salvaCloud(false); renderCantieri(); toast('Stato aggiornato: '+nomi[idx]);
 }
 
