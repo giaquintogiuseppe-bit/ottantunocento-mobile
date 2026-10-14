@@ -3119,6 +3119,7 @@ function diarioRenderAgenda(){
         <div style="font-size:14px;font-weight:700;${p.fatto?'text-decoration:line-through':''}">${_de(p.titolo||'Promemoria')}</div>
         <div style="font-size:12px;color:${(!p.fatto&&p.data&&p.data<oggi)?'var(--red)':'var(--text2)'};margin-top:2px">📅 ${_diaFmtD(p.data)}${p.ora?' · '+p.ora:''}${(!p.fatto&&p.data&&p.data<oggi)?' · scaduto':''}${p.gcalEventId?' · <span style="color:var(--green)">✓ su Google</span>':(!p.fatto&&p.data&&p.data>=oggi?` · <a onclick="gcalLink('${p.id}')" style="color:var(--teal);font-weight:700;cursor:pointer">➕ Google</a>`:'')}</div>
         ${p.note?`<div style="font-size:12px;color:var(--text2);margin-top:3px">${_de(p.note)}</div>`:''}
+        ${(!p.fatto&&p.data)?`<a onclick="avvisiApri('${p.id}')" style="display:inline-block;margin-top:5px;font-size:12px;color:var(--gold);font-weight:700;cursor:pointer">🔔 ${Array.isArray(p.avvisi)?(p.avvisi.length?_avvisiTxt(p.avvisi)+' prima':'nessun avviso'):'avviso predefinito Google'} ›</a>`:''}
       </div>
       <button onclick="diarioDelPromemoria('${p.id}')" style="background:none;border:none;color:var(--red);font-size:15px;cursor:pointer;flex-shrink:0">✕</button>
     </div></div>`;
@@ -3174,6 +3175,7 @@ async function diarioElabora(){
     const j=await res.json().catch(()=>({}));
     if(!res.ok) throw new Error(j.error||('errore '+res.status));
     DIARIO_AZIONI=(j.azioni||[]).map((a,i)=>diarioNorm(a,i));
+    { const pm=DIARIO_AZIONI.filter(a=>a.tipo==='promemoria'), av=_avvisiDaTesto(txt); if(pm.length===1 && av) pm[0].avvisi=av; }
     diarioRenderPreview();
     diarioShow('preview');
     if(!DIARIO_AZIONI.length) toast('Non ho riconosciuto azioni — scrivi con nomi, importi, date o orari (es. "Appuntamento col Comune giovedì alle 10")');
@@ -3201,7 +3203,7 @@ function diarioNorm(a,i){
     o.cantNewName=c?'':(o.cantRaw||''); o.cantNewComm=a.committente||''; o.mezzo=a.mezzo||'';
     o.righe=(Array.isArray(a.righe)?a.righe:[]).map(r=>({descrizione:r.descrizione||'',qta:(r.qta!=null&&r.qta!=='')?(Number(r.qta)||1):1,prezzo:Number(r.prezzo)||0}));
     o.creaPreventivo=!!a.crea_preventivo || o.righe.length>0; }
-  if(a.tipo==='promemoria'){ o.titolo=a.titolo||o.testo; o.ora=a.ora||''; o.data=a.data||''; }
+  if(a.tipo==='promemoria'){ o.titolo=a.titolo||o.testo; o.ora=a.ora||''; o.data=a.data||''; o.avvisi=_avvisiDaTesto([a.testo,a.titolo,a.note].join(' '))||_avvisiDef(); }
   return o;
 }
 
@@ -3212,6 +3214,7 @@ window.diarioSetDip=(i,v)=>{DIARIO_AZIONI[i].dipId=v;diarioRenderPreview();};
 window.diarioSetCant=(i,v)=>{DIARIO_AZIONI[i].cantMatch=(DB.cantieri||[]).find(c=>c.id===v)||null;DIARIO_AZIONI[i].cantRaw=DIARIO_AZIONI[i].cantMatch?DIARIO_AZIONI[i].cantMatch.nome:'';diarioRenderPreview();};
 window.diarioSetCantMode=(i,m)=>{DIARIO_AZIONI[i].cantMode=m;diarioRenderPreview();};
 window.diarioSetBool=(i,f,v)=>{DIARIO_AZIONI[i][f]=v;};
+window.diarioToggleAvviso=(i,m)=>{ const a=DIARIO_AZIONI[i]; a.avvisi=_avvisiToggle(a.avvisi,m); _avvisiSalvaDef(a.avvisi); diarioRenderPreview(); };
 
 function diarioDipSelect(a){
   const opts=['<option value="">— scegli —</option>'].concat((DB.personale||[]).map(p=>`<option value="${p.id}"${a.dipId===p.id?' selected':''}>${_de(p.nome)}</option>`)).join('');
@@ -3302,7 +3305,8 @@ function diarioCard(a){
     body=`<div class="dia-f"><label>Giorno</label><input type="date" value="${a.data}" onchange="diarioSet(${a._i},'data',this.value)"></div>
       <div class="dia-f"><label>Ora</label><input type="time" value="${a.ora}" onchange="diarioSet(${a._i},'ora',this.value)"></div>
       <div class="dia-f full"><label>Promemoria</label><input value="${_de(a.titolo)}" onchange="diarioSet(${a._i},'titolo',this.value)"></div>
-      <div class="dia-f full"><label>Note</label><input value="${_de(a.note)}" placeholder="opzionale" onchange="diarioSet(${a._i},'note',this.value)"></div>`;
+      <div class="dia-f full"><label>Note</label><input value="${_de(a.note)}" placeholder="opzionale" onchange="diarioSet(${a._i},'note',this.value)"></div>
+      <div class="dia-f full"><label>🔔 Avvisami prima</label><div class="dia-chips">${_avvisiChips(a.avvisi,`diarioToggleAvviso(${a._i},`)}</div></div>`;
   }
   return `<div class="dia-act${a.on?'':' off'}" id="dia-act-${a._i}">
     <div class="dia-ah"><div class="dia-ico" style="background:${m.bg}">${m.ic}</div>
@@ -3346,7 +3350,7 @@ function diarioApply(a,D){
     if(cantName)(D.speseCantiere=D.speseCantiere||[]).push({id:uid(),cantiere:cantName,data:a.data,importo:imp,categoria:a.categoria||'',fornitore:a.fornitore||'',descrizione:a.note||a.testo||'',fonte:'diario',statoRic:'da_riconciliare',fattura:'',scontrinoRef:_scId});
   } else if(a.tipo==='danno'){ if(!dip)return; (D.addebiti=D.addebiti||[]).push({id:uid(),dipId:dip.id,dipNome:dip.nome,importo:imp,data:a.data,descrizione:a.descrizione||'Danno',mezzo:a.mezzo||'',scalature:[],chiuso:false});
   } else if(a.tipo==='incasso'){ const c=a.cantMatch; (D.incassi=D.incassi||[]).push({id:uid(),cantiereId:c?c.id:'',cantiereName:c?c.nome:(a.cantRaw||''),committente:a.committente||'',data:a.data,importo:imp,metodo:a.metodo||'Bonifico',fattura:'',note:a.causale||a.note||''});
-  } else if(a.tipo==='promemoria'){ (D.promemoria=D.promemoria||[]).push({id:uid(),data:a.data||'',ora:a.ora||'',titolo:a.titolo||a.testo||'Promemoria',note:a.note||'',fatto:false,creato:today()});
+  } else if(a.tipo==='promemoria'){ (D.promemoria=D.promemoria||[]).push({id:uid(),data:a.data||'',ora:a.ora||'',titolo:a.titolo||a.testo||'Promemoria',note:a.note||'',avvisi:Array.isArray(a.avvisi)?a.avvisi:_avvisiDef(),fatto:false,creato:today()});
   } else if(a.tipo==='lavoro'){
     D.cantieri=D.cantieri||[]; let cant=null;
     if(a.cantMode==='new'){ cant={id:a.__cantId||uid(),nome:a.cantNewName||'Nuovo cantiere',committente:a.cantNewComm||'',stato:'da confermare',periodoInizio:a.data,periodoFine:a.data,interventi:[],fonte:'diario'}; if(a.__prevNumero)cant.preventivoRef=a.__prevNumero; else if(a.creaPreventivo)cant._preventivoDaFare=true; D.cantieri.push(cant); }
@@ -3420,7 +3424,7 @@ function diarioRenderDone(list){
     if(a.tipo==='danno') d=`${who} · ${fm(a.importo)}`;
     if(a.tipo==='incasso') d=`${a.committente||'Cliente'} · ${fm(a.importo)}`;
     if(a.tipo==='lavoro'){ const cn=a.cantMode==='new'?(a.cantNewName||'nuovo cantiere'):(a.cantMatch?a.cantMatch.nome:'—'); d=`${a.data} · ${a.squadra.length} pers. · ${cn}`; dest=a.cantMode==='new'?(a.__prevNumero?('Planning + '+a.__prevNumero):'Planning · nuovo'):'Planning · lavoraz.'; }
-    if(a.tipo==='promemoria') d=`${a.titolo||'Promemoria'}${a.data?' · '+a.data:''}${a.ora?' '+a.ora:''}`;
+    if(a.tipo==='promemoria') d=`${a.titolo||'Promemoria'}${a.data?' · '+a.data:''}${a.ora?' '+a.ora:''}${a.avvisi&&a.avvisi.length?' · 🔔 '+_avvisiTxt(a.avvisi):''}`;
     return `<div class="ri"><span style="font-size:16px">${m.ic}</span><span>${_de(d)}</span><span class="to">${_de(dest)}</span></div>`;
   }).join('');
   document.getElementById('dia-recap').innerHTML=rows;
@@ -3602,10 +3606,10 @@ function _gcalEvento(p){
     const [h,m]=p.ora.split(':').map(Number); const fine=new Date(2000,0,1,h,(m||0)+60);
     const hf=String(fine.getHours()).padStart(2,'0')+':'+String(fine.getMinutes()).padStart(2,'0');
     const dataFine = fine.getDate()===1 ? p.data : (()=>{ const x=new Date(p.data+'T12:00'); x.setDate(x.getDate()+1); return x.toISOString().slice(0,10); })();
-    return {summary:p.titolo||'Promemoria', description:desc, start:{dateTime:p.data+'T'+p.ora+':00', timeZone:'Europe/Rome'}, end:{dateTime:dataFine+'T'+hf+':00', timeZone:'Europe/Rome'}};
+    return {summary:p.titolo||'Promemoria', description:desc, start:{dateTime:p.data+'T'+p.ora+':00', timeZone:'Europe/Rome'}, end:{dateTime:dataFine+'T'+hf+':00', timeZone:'Europe/Rome'}, reminders:_gcalReminders(p)};
   }
   const x=new Date(p.data+'T12:00'); x.setDate(x.getDate()+1);
-  return {summary:p.titolo||'Promemoria', description:desc, start:{date:p.data}, end:{date:x.toISOString().slice(0,10)}};
+  return {summary:p.titolo||'Promemoria', description:desc, start:{date:p.data}, end:{date:x.toISOString().slice(0,10)}, reminders:_gcalReminders(p)};
 }
 function gcalLink(id){
   const p=(DB.promemoria||[]).find(x=>x.id===id); if(!p||!p.data) return;
@@ -3613,6 +3617,50 @@ function gcalLink(id){
   const dates=ev.start.date? z(ev.start.date)+'/'+z(ev.end.date) : z(ev.start.dateTime)+'/'+z(ev.end.dateTime);
   const u='https://calendar.google.com/calendar/render?action=TEMPLATE&text='+encodeURIComponent(ev.summary)+'&dates='+dates+'&ctz=Europe/Rome&details='+encodeURIComponent(ev.description||'');
   window.open(u,'_blank');
+}
+// ── Avvisi (promemoria Google: notifica sul telefono X minuti prima) ──
+const AVVISI=[{m:15,l:'15 min'},{m:30,l:'30 min'},{m:60,l:'1 ora'},{m:120,l:'2 ore'},{m:1440,l:'1 giorno'},{m:2880,l:'2 giorni'}];
+function _avvisiTxt(a){ return (a||[]).slice().sort((x,y)=>x-y).map(m=>(AVVISI.find(v=>v.m===m)||{l:(m%60?m+' min':(m/60)+' ore')}).l).join(' + '); }
+function _avvisiDef(){ try{ const v=JSON.parse(localStorage.getItem('mob_avvisi_def')||'null'); if(Array.isArray(v)) return v; }catch(e){} return [60]; }
+function _avvisiSalvaDef(a){ try{ localStorage.setItem('mob_avvisi_def',JSON.stringify(a||[])); }catch(e){} }
+function _avvisiToggle(a,m){ a=Array.isArray(a)?a.slice():[]; const i=a.indexOf(m); if(i>=0) a.splice(i,1); else if(a.length<5) a.push(m); return a.sort((x,y)=>x-y); }
+function _avvisiChips(a,fn){ a=a||[]; return AVVISI.map(v=>`<button type="button" class="dia-pchip ${a.includes(v.m)?'ok':''}" onclick="${fn}${v.m})" style="cursor:pointer;${a.includes(v.m)?'':'opacity:.55'}">${a.includes(v.m)?'✓ ':''}${v.l}</button>`).join(''); }
+// "avvisami 2 ore prima", "ricordamelo mezz'ora prima", "avvisami il giorno prima"
+function _avvisiDaTesto(t){
+  t=String(t||'').toLowerCase().replace(/’/g,"'"); if(!/(avvis|ricord|notific|allert)/.test(t)) return null;
+  const out=new Set(), num={un:1,uno:1,una:1,due:2,tre:3,quattro:4,cinque:5,sei:6,dieci:10,quindici:15,venti:20,trenta:30};
+  const re=/(\d+|un[ao]?|due|tre|quattro|cinque|sei|dieci|quindici|venti|trenta|mezz[ao]?)[\s']*(minut\w*|min\b|or[ae]\b|giorn[oi]\b)\s+prima/g; let m;
+  while((m=re.exec(t))){ const n=/^mezz/.test(m[1])?0.5:(num[m[1]]||+m[1]); const u=m[2]; const min=/^min/.test(u)?n:/^or/.test(u)?n*60:n*1440; if(min>0&&min<=40320) out.add(Math.round(min)); }
+  if(/(il|un) giorno prima/.test(t)) out.add(1440);
+  return out.size?[...out].sort((a,b)=>a-b).slice(0,5):null;
+}
+function _gcalReminders(p){ return Array.isArray(p.avvisi)?{useDefault:false,overrides:p.avvisi.map(m=>({method:'popup',minutes:m}))}:{useDefault:true}; }
+function avvisiApri(id){
+  const p=(DB.promemoria||[]).find(x=>x.id===id); if(!p) return;
+  window._AVV_ED={id, a:Array.isArray(p.avvisi)?p.avvisi.slice():_avvisiDef()};
+  _sheetClose();
+  const w=document.createElement('div'); w.id='ui-sheet'; w.className='sheet-wrap';
+  w.innerHTML=`<div class="sheet"><div class="sheet-title">🔔 ${_de(p.titolo||'Promemoria')}</div>
+    <div style="font-size:12.5px;color:var(--text2);margin-bottom:8px">Avvisami prima (puoi sceglierne più di uno, o nessuno):</div>
+    <div class="dia-chips" id="avv-chips" style="margin-bottom:14px"></div>
+    <button class="btn btn-teal" onclick="avvisiSalva()">💾 Salva</button>
+    <button class="btn btn-ghost" onclick="_sheetClose()">Annulla</button></div>`;
+  document.body.appendChild(w); _avvisiRenderEd();
+  requestAnimationFrame(()=>w.classList.add('on'));
+  w.addEventListener('click',e=>{ if(e.target===w) _sheetClose(); });
+}
+function _avvisiRenderEd(){ const el=document.getElementById('avv-chips'); if(el) el.innerHTML=_avvisiChips(window._AVV_ED.a,'avvisiToggleEd('); }
+function avvisiToggleEd(m){ window._AVV_ED.a=_avvisiToggle(window._AVV_ED.a,m); _avvisiRenderEd(); }
+async function avvisiSalva(){
+  const E=window._AVV_ED; const p=(DB.promemoria||[]).find(x=>x.id===E.id); if(!p) return;
+  p.avvisi=E.a; _avvisiSalvaDef(E.a); _sheetClose(); diarioRenderAgenda();
+  const aggiorna=async()=>{ const tok=_gcalTok(); if(!tok||!p.gcalEventId) return;
+    try{ const r=await fetch(GCAL_API+'/'+encodeURIComponent(p.gcalEventId),{method:'PATCH',headers:{Authorization:'Bearer '+tok,'Content-Type':'application/json'},body:JSON.stringify({reminders:_gcalReminders(p)})});
+      toast(r.ok?'✓ Avviso aggiornato anche su Google':'⚠ Google non ha aggiornato l\'avviso ('+r.status+')'); }catch(e){ toast('⚠ '+e.message); } };
+  // il popup Google va aperto subito (stesso tocco), prima di attese di rete
+  if(p.gcalEventId && !gcalCollegato()) gcalCollega(aggiorna);
+  await diarioSalvaAgenda();
+  if(p.gcalEventId){ if(gcalCollegato()) aggiorna(); } else toast('✓ Avviso salvato');
 }
 // Invia a Google gli appuntamenti con data non ancora sincronizzati; salva l'id evento nel blob
 async function gcalSincronizzaAgenda(silenzioso){
