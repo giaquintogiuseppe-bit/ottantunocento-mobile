@@ -3117,7 +3117,7 @@ function diarioRenderAgenda(){
       <button onclick="diarioTogglePromemoria('${p.id}')" style="width:26px;height:26px;flex-shrink:0;border-radius:7px;border:1px solid ${p.fatto?'var(--green)':'var(--brd)'};background:${p.fatto?'rgba(75,232,122,.15)':'transparent'};color:var(--green);font-size:14px;cursor:pointer">${p.fatto?'✓':''}</button>
       <div style="flex:1;min-width:0">
         <div style="font-size:14px;font-weight:700;${p.fatto?'text-decoration:line-through':''}">${_de(p.titolo||'Promemoria')}</div>
-        <div style="font-size:12px;color:${(!p.fatto&&p.data&&p.data<oggi)?'var(--red)':'var(--text2)'};margin-top:2px">📅 ${_diaFmtD(p.data)}${p.ora?' · '+p.ora:''}${(!p.fatto&&p.data&&p.data<oggi)?' · scaduto':''}${p.gcalEventId?' · <span style="color:var(--green)">✓ su Google</span>':''}</div>
+        <div style="font-size:12px;color:${(!p.fatto&&p.data&&p.data<oggi)?'var(--red)':'var(--text2)'};margin-top:2px">📅 ${_diaFmtD(p.data)}${p.ora?' · '+p.ora:''}${(!p.fatto&&p.data&&p.data<oggi)?' · scaduto':''}${p.gcalEventId?' · <span style="color:var(--green)">✓ su Google</span>':(!p.fatto&&p.data&&p.data>=oggi?` · <a onclick="gcalLink('${p.id}')" style="color:var(--teal);font-weight:700;cursor:pointer">➕ Google</a>`:'')}</div>
         ${p.note?`<div style="font-size:12px;color:var(--text2);margin-top:3px">${_de(p.note)}</div>`:''}
       </div>
       <button onclick="diarioDelPromemoria('${p.id}')" style="background:none;border:none;color:var(--red);font-size:15px;cursor:pointer;flex-shrink:0">✕</button>
@@ -3402,7 +3402,7 @@ async function diarioConferma(){
       // appuntamenti con data → Google Calendar (se collegato in questa sessione)
       if(list.some(a=>a.tipo==='promemoria' && a.data)){
         if(gcalCollegato()) gcalSincronizzaAgenda(true);
-        else setTimeout(()=>toast('📅 Per mandarli su Google Calendar: Agenda → Collega'),2400);
+        else setTimeout(async()=>{ if(await sheetConfirm('Aggiungere l\'appuntamento a Google Calendar?',{ok:'📅 Aggiungi'})) gcalCollega(()=>gcalSincronizzaAgenda()); },600);
       }
     } else toast('⚠ Un\'altra app sta scrivendo — riprova tra qualche secondo');
   }catch(e){ document.getElementById('loading').style.display='none'; toast('⚠ '+e.message); }
@@ -3592,8 +3592,8 @@ function gcalCollega(poi){
       try{ sessionStorage.setItem('gcal_mob_tok',JSON.stringify({t:r.access_token,exp:Date.now()+((+r.expires_in||3600)*1000)})); localStorage.setItem('gcal_mob_on','1'); }catch(e){}
       toast('✓ Google Calendar collegato'); diarioRenderAgenda();
       const f=_gcalDopo; _gcalDopo=null; if(f) f();
-    } else toast('⚠ Collegamento a Google non riuscito');
-  }});
+    } else toast('⚠ Google: '+((r&&(r.error_description||r.error))||'collegamento non riuscito'));
+  }, error_callback:e=>{ _gcalDopo=null; toast('⚠ Google: '+((e&&(e.type==='popup_failed_to_open'?'finestra bloccata — usa ➕ Google sul singolo appuntamento':e.type==='popup_closed'?'finestra chiusa':(e.message||e.type)))||'errore')); }});
   _gcalClient.requestAccessToken();
 }
 function _gcalEvento(p){
@@ -3607,18 +3607,25 @@ function _gcalEvento(p){
   const x=new Date(p.data+'T12:00'); x.setDate(x.getDate()+1);
   return {summary:p.titolo||'Promemoria', description:desc, start:{date:p.data}, end:{date:x.toISOString().slice(0,10)}};
 }
+function gcalLink(id){
+  const p=(DB.promemoria||[]).find(x=>x.id===id); if(!p||!p.data) return;
+  const ev=_gcalEvento(p), z=x=>x.replace(/[-:]/g,'');
+  const dates=ev.start.date? z(ev.start.date)+'/'+z(ev.end.date) : z(ev.start.dateTime)+'/'+z(ev.end.dateTime);
+  const u='https://calendar.google.com/calendar/render?action=TEMPLATE&text='+encodeURIComponent(ev.summary)+'&dates='+dates+'&ctz=Europe/Rome&details='+encodeURIComponent(ev.description||'');
+  window.open(u,'_blank');
+}
 // Invia a Google gli appuntamenti con data non ancora sincronizzati; salva l'id evento nel blob
 async function gcalSincronizzaAgenda(silenzioso){
   const tok=_gcalTok();
   if(!tok){ if(!silenzioso) gcalCollega(()=>gcalSincronizzaAgenda()); return 0; }
-  const da=(DB.promemoria||[]).filter(p=>!p.fatto && p.data && !p.gcalEventId);
+  const da=(DB.promemoria||[]).filter(p=>!p.fatto && p.data && p.data>=today() && !p.gcalEventId);
   if(!da.length){ if(!silenzioso) toast('✓ Agenda già allineata con Google Calendar'); return 0; }
   const fatti={}; let err=0;
   for(const p of da){
     try{
       const r=await fetch(GCAL_API,{method:'POST',headers:{Authorization:'Bearer '+tok,'Content-Type':'application/json'},body:JSON.stringify(_gcalEvento(p))});
       if(r.status===401){ sessionStorage.removeItem('gcal_mob_tok'); toast('⚠ Sessione Google scaduta: ricollega'); diarioRenderAgenda(); break; }
-      if(!r.ok){ err++; continue; }
+      if(!r.ok){ err++; try{ const j=await r.json(); console.warn('GCal',r.status,j); if(r.status===403) toast('⚠ Google nega il permesso di scrittura sul calendario'); }catch(e){} continue; }
       const ev=await r.json(); fatti[p.id]=ev.id;
     }catch(e){ err++; }
   }
@@ -3636,7 +3643,7 @@ async function _gcalElimina(p){
   try{ await fetch(GCAL_API+'/'+encodeURIComponent(p.gcalEventId),{method:'DELETE',headers:{Authorization:'Bearer '+tok}}); }catch(e){}
 }
 function _gcalBox(){
-  const on=gcalCollegato(); const n=(DB.promemoria||[]).filter(p=>!p.fatto&&p.data&&!p.gcalEventId).length;
+  const on=gcalCollegato(); const n=(DB.promemoria||[]).filter(p=>!p.fatto&&p.data&&p.data>=today()&&!p.gcalEventId).length;
   return `<div class="card" style="padding:10px 12px;display:flex;align-items:center;gap:10px;margin-bottom:12px">
     <span style="width:9px;height:9px;border-radius:50%;background:${on?'var(--green)':'var(--text2)'};flex-shrink:0"></span>
     <div style="flex:1;font-size:12.5px">${on?'Google Calendar collegato':'Google Calendar non collegato'}${n?` · <b style="color:var(--gold)">${n} da inviare</b>`:''}</div>
