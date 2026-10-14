@@ -3361,7 +3361,8 @@ function diarioApply(a,D){
       if(squad.length){ // intervento nel Planning solo se c'è davvero una squadra (non per i preventivi puri)
         cant.interventi.push({id:uid(),data:a.data,squadra:squad,oraInizio:a.oraI,oraFine:a.oraF,luogo:cant.nome,mezzi:a.mezzo?[a.mezzo]:[]});
         if(!cant.periodoInizio||a.data<cant.periodoInizio)cant.periodoInizio=a.data;
-        if(!cant.periodoFine||a.data>cant.periodoFine)cant.periodoFine=a.data; } }
+        if(!cant.periodoFine||a.data>cant.periodoFine)cant.periodoFine=a.data;
+        _riapriSeChiusoAuto(cant,a.data); } }
   }
 }
 
@@ -3445,6 +3446,12 @@ let PROG_PASSATI=false;
 function _progCantieri(){
   const arch=new Set(DB._cantieriArchiviati||[]);
   return (DB.cantieri||[]).filter(c=>c && !arch.has(c.id) && (c.stato||'')!=='perso');
+}
+// Un cantiere chiuso in automatico (data fine passata) torna "in corso" se gli pianifichi un lavoro da oggi in poi;
+// altrimenti sparisce dall'app Roberto e dalle liste dei cantieri attivi.
+function _riapriSeChiusoAuto(c,data){
+  if(!c||!data||data<today()||c._statoManuale) return;
+  if(/conclus/i.test(c.stato||'') && c._autoChiuso){ c.stato='in corso'; c._autoChiuso=false; }
 }
 function _progMin(h){ const m=/^(\d{1,2}):(\d{2})/.exec(h||''); return m?(+m[1])*60+(+m[2]):null; }
 function _progVoci(){
@@ -3557,6 +3564,7 @@ async function progSalva(){
       if(iv.id==null) iv.id=uid();
       if(!t.c.periodoInizio||data<t.c.periodoInizio) t.c.periodoInizio=data;
       if(!t.c.periodoFine||data>t.c.periodoFine) t.c.periodoFine=data;
+      _riapriSeChiusoAuto(t.c,data);
     });
     if(!trovato){ setStatus(true,'Sincronizzato ✓'); toast('⚠ Lavoro non trovato: forse è stato modificato altrove — ricarica'); _sheetClose(); return; }
     if(!ok){ setStatus(false,'Conflitto'); toast('⚠ Un\'altra app sta scrivendo — riprova'); return; }
