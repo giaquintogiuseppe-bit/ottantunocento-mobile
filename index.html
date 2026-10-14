@@ -319,6 +319,7 @@ button{touch-action:manipulation}
 })();
 </script>
 
+<script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body>
 
@@ -717,7 +718,7 @@ button{touch-action:manipulation}
     <!-- INPUT -->
     <div id="dia-input">
       <div style="display:flex;justify-content:flex-end;margin-bottom:8px">
-        <button onclick="diarioOpenAgenda()" style="background:var(--card);border:1px solid var(--brd);color:var(--text);border-radius:9px;padding:7px 12px;font-size:12px;font-weight:700;cursor:pointer">📅 Agenda <span id="dia-ag-badge" style="color:var(--gold)"></span></button>
+        <button onclick="diarioOpenProgramma()" style="background:var(--card);border:1px solid var(--brd);color:var(--text);border-radius:9px;padding:7px 12px;font-size:12px;font-weight:700;cursor:pointer;margin-right:6px">🗓️ Lavori pianificati</button><button onclick="diarioOpenAgenda()" style="background:var(--card);border:1px solid var(--brd);color:var(--text);border-radius:9px;padding:7px 12px;font-size:12px;font-weight:700;cursor:pointer">📅 Agenda <span id="dia-ag-badge" style="color:var(--gold)"></span></button>
       </div>
       <div class="dia-lead">Racconta la giornata (o cosa c'è da fare) — a voce o scritta. Tocca un tasto rapido per un modello, oppure scrivi libero. Poi <b>Elabora</b>.</div>
       <div class="sec-lbl">Inserimenti rapidi</div>
@@ -755,6 +756,16 @@ button{touch-action:manipulation}
       <div class="dia-recap" id="dia-recap" style="text-align:left;background:var(--card);border:1px solid var(--brd);border-radius:13px;padding:4px 14px;margin-bottom:18px"></div>
       <button class="btn btn-teal" onclick="diarioReset()">📓 Scrivi un'altra cosa</button>
       <button class="btn btn-ghost" onclick="goTo('dash',document.querySelector('.nav-btn'))">Torna alla Home</button>
+    </div>
+
+    <!-- PROGRAMMA LAVORI -->
+    <div id="dia-prog" style="display:none">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
+        <button onclick="diarioShow('input')" style="background:var(--card);border:1px solid var(--brd);color:var(--text);width:34px;height:34px;border-radius:9px;font-size:16px;cursor:pointer">←</button>
+        <div style="font-size:16px;font-weight:800">🗓️ Lavori pianificati</div>
+      </div>
+      <div style="font-size:12px;color:var(--text2);margin:-4px 0 12px">Tutto ciò che è in programma (dal Diario o dal Planning). Tocca un lavoro per cambiare data, orari, squadra o eliminarlo.</div>
+      <div id="dia-prog-list"></div>
     </div>
 
     <!-- AGENDA / PROMEMORIA -->
@@ -3087,7 +3098,7 @@ function diarioMatchCant(nome){
 
 // ── Navigazione sotto-viste del Diario ──
 function diarioShow(v){
-  ['input','preview','done','agenda'].forEach(x=>{const el=document.getElementById('dia-'+x);if(el)el.style.display=x===v?'block':'none';});
+  ['input','preview','done','agenda','prog'].forEach(x=>{const el=document.getElementById('dia-'+x);if(el)el.style.display=x===v?'block':'none';});
   document.getElementById('content').scrollTo(0,0);
 }
 function diarioReset(){ DIARIO_AZIONI=[]; const t=document.getElementById('diario-txt'); if(t)t.value=''; diarioShow('input'); }
@@ -3106,18 +3117,18 @@ function diarioRenderAgenda(){
       <button onclick="diarioTogglePromemoria('${p.id}')" style="width:26px;height:26px;flex-shrink:0;border-radius:7px;border:1px solid ${p.fatto?'var(--green)':'var(--brd)'};background:${p.fatto?'rgba(75,232,122,.15)':'transparent'};color:var(--green);font-size:14px;cursor:pointer">${p.fatto?'✓':''}</button>
       <div style="flex:1;min-width:0">
         <div style="font-size:14px;font-weight:700;${p.fatto?'text-decoration:line-through':''}">${_de(p.titolo||'Promemoria')}</div>
-        <div style="font-size:12px;color:${(!p.fatto&&p.data&&p.data<oggi)?'var(--red)':'var(--text2)'};margin-top:2px">📅 ${_diaFmtD(p.data)}${p.ora?' · '+p.ora:''}${(!p.fatto&&p.data&&p.data<oggi)?' · scaduto':''}</div>
+        <div style="font-size:12px;color:${(!p.fatto&&p.data&&p.data<oggi)?'var(--red)':'var(--text2)'};margin-top:2px">📅 ${_diaFmtD(p.data)}${p.ora?' · '+p.ora:''}${(!p.fatto&&p.data&&p.data<oggi)?' · scaduto':''}${p.gcalEventId?' · <span style="color:var(--green)">✓ su Google</span>':''}</div>
         ${p.note?`<div style="font-size:12px;color:var(--text2);margin-top:3px">${_de(p.note)}</div>`:''}
       </div>
       <button onclick="diarioDelPromemoria('${p.id}')" style="background:none;border:none;color:var(--red);font-size:15px;cursor:pointer;flex-shrink:0">✕</button>
     </div></div>`;
   let html=attivi.length?attivi.map(card).join(''):'<div style="color:var(--text2);text-align:center;padding:24px;font-size:14px">Nessun promemoria attivo</div>';
   if(fatti.length) html+=`<div class="sec-lbl">✓ Fatti (${fatti.length})</div>`+fatti.map(card).join('');
-  document.getElementById('dia-ag-list').innerHTML=html;
+  document.getElementById('dia-ag-list').innerHTML=(typeof _gcalBox==='function'?_gcalBox():'')+html;
   diarioAgBadge();
 }
 async function diarioTogglePromemoria(id){ const p=(DB.promemoria||[]).find(x=>x.id===id); if(!p)return; p.fatto=!p.fatto; diarioRenderAgenda(); await diarioSalvaAgenda(); }
-async function diarioDelPromemoria(id){ if(!(await sheetConfirm('Eliminare questo promemoria?',{ok:'Elimina',danger:true}))) return; DB.promemoria=(DB.promemoria||[]).filter(x=>x.id!==id); diarioRenderAgenda(); await diarioSalvaAgenda(); }
+async function diarioDelPromemoria(id){ if(!(await sheetConfirm('Eliminare questo promemoria?',{ok:'Elimina',danger:true}))) return; try{ await _gcalElimina((DB.promemoria||[]).find(x=>x.id===id)); }catch(e){} DB.promemoria=(DB.promemoria||[]).filter(x=>x.id!==id); diarioRenderAgenda(); await diarioSalvaAgenda(); }
 async function diarioSalvaAgenda(){
   setStatus(null,'Salvataggio…');
   for(let t=1;t<=3;t++){
@@ -3386,7 +3397,14 @@ async function diarioConferma(){
     }
     const ok=await diarioSalvaTutto(list);
     document.getElementById('loading').style.display='none';
-    if(ok) diarioRenderDone(list); else toast('⚠ Un\'altra app sta scrivendo — riprova tra qualche secondo');
+    if(ok){
+      diarioRenderDone(list);
+      // appuntamenti con data → Google Calendar (se collegato in questa sessione)
+      if(list.some(a=>a.tipo==='promemoria' && a.data)){
+        if(gcalCollegato()) gcalSincronizzaAgenda(true);
+        else setTimeout(()=>toast('📅 Per mandarli su Google Calendar: Agenda → Collega'),2400);
+      }
+    } else toast('⚠ Un\'altra app sta scrivendo — riprova tra qualche secondo');
   }catch(e){ document.getElementById('loading').style.display='none'; toast('⚠ '+e.message); }
 }
 
@@ -3410,6 +3428,220 @@ function diarioRenderDone(list){
   const prevs=list.filter(a=>a.tipo==='lavoro'&&a.__prevNumero).map(a=>a.__prevNumero);
   if(prevs.length) toast(`✓ Salvato · ${prevs.join(', ')} creato in Preventivi`);
   diarioShow('done');
+}
+
+
+// ═══════════════ PROGRAMMA LAVORI (verifica e modifica di ciò che hai pianificato) ═══════════════
+// Mostra gli interventi pianificati (anche quelli creati dal Diario) giorno per giorno,
+// con squadra, orari e conflitti di persone; tocca un lavoro per modificarlo o eliminarlo.
+// Salvataggio atomico sul blob (mobPatchDati, lock di versione). L'eliminazione lascia
+// l'id in _interventiEliminati così il merge del Planning non lo fa "risorgere".
+let PROG_PASSATI=false;
+function _progCantieri(){
+  const arch=new Set(DB._cantieriArchiviati||[]);
+  return (DB.cantieri||[]).filter(c=>c && !arch.has(c.id) && (c.stato||'')!=='perso');
+}
+function _progMin(h){ const m=/^(\d{1,2}):(\d{2})/.exec(h||''); return m?(+m[1])*60+(+m[2]):null; }
+function _progVoci(){
+  const oggi=today(); const d0=new Date(); d0.setDate(d0.getDate()-7);
+  const da=PROG_PASSATI ? d0.toISOString().slice(0,10) : oggi;
+  const out=[];
+  _progCantieri().forEach(c=>(c.interventi||[]).forEach((iv,i)=>{
+    if(!iv || !iv.data || iv.data<da) return;
+    out.push({c, iv, idx:i});
+  }));
+  out.sort((a,b)=>(a.iv.data+(a.iv.oraInizio||'')).localeCompare(b.iv.data+(b.iv.oraInizio||'')));
+  return out;
+}
+// persone assegnate a più lavori sovrapposti nello stesso giorno
+function _progConflitti(voci){
+  const map={};
+  voci.forEach(v=>{ const sq=Array.isArray(v.iv.squadra)?v.iv.squadra:[]; sq.forEach(n=>{ const k=v.iv.data+'|'+String(n).toLowerCase(); (map[k]=map[k]||[]).push(v); }); });
+  const conf=new Map();
+  Object.entries(map).forEach(([k,arr])=>{
+    if(arr.length<2) return;
+    for(let i=0;i<arr.length;i++) for(let j=i+1;j<arr.length;j++){
+      const a=arr[i].iv, b=arr[j].iv;
+      const a1=_progMin(a.oraInizio)??480, a2=_progMin(a.oraFine)??1080, b1=_progMin(b.oraInizio)??480, b2=_progMin(b.oraFine)??1080;
+      if(a1<b2 && b1<a2){ const n=k.split('|')[1]; [arr[i],arr[j]].forEach(v=>{ const s=conf.get(v)||new Set(); s.add(n); conf.set(v,s); }); }
+    }
+  });
+  return conf;
+}
+function diarioOpenProgramma(){ diarioRenderProgramma(); diarioShow('prog'); }
+function progTogglePassati(){ PROG_PASSATI=!PROG_PASSATI; diarioRenderProgramma(); }
+function diarioRenderProgramma(){
+  const voci=_progVoci(); const conf=_progConflitti(voci);
+  window._PROG_VOCI=voci;
+  const giorni={}; voci.forEach((v,k)=>{ (giorni[v.iv.data]=giorni[v.iv.data]||[]).push(k); });
+  const nomeG=d=>{ const x=new Date(d+'T12:00'); return x.toLocaleDateString('it-IT',{weekday:'long',day:'2-digit',month:'long'}); };
+  const oggi=today();
+  let h=`<div style="display:flex;gap:8px;margin-bottom:12px"><button class="dia-segb ${PROG_PASSATI?'on':''}" onclick="progTogglePassati()">${PROG_PASSATI?'✓ ':''}Mostra anche ultimi 7 giorni</button></div>`;
+  if(!voci.length) h+='<div style="color:var(--text2);text-align:center;padding:24px;font-size:14px">Nessun lavoro pianificato da oggi in poi.<br>Usa il Diario («Domani Renato a Gaeta dalle 8 alle 17…») per pianificarne.</div>';
+  Object.keys(giorni).forEach(d=>{
+    h+=`<div class="sec-lbl" style="${d<oggi?'opacity:.6':''}">${d===oggi?'Oggi · ':''}${nomeG(d)}</div>`;
+    giorni[d].forEach(k=>{
+      const v=voci[k]; const iv=v.iv; const sq=Array.isArray(iv.squadra)?iv.squadra:[]; const cf=conf.get(v);
+      h+=`<div class="card" style="padding:12px;cursor:pointer;${cf?'border-color:rgba(232,84,84,.55)':''}" onclick="progApri(${k})">
+        <div style="display:flex;justify-content:space-between;gap:8px;align-items:flex-start">
+          <div style="min-width:0"><div style="font-size:14px;font-weight:800">${_de(v.c.nome||'Cantiere')}</div>
+          <div style="font-size:12px;color:var(--text2);margin-top:2px">🕗 ${_de(iv.oraInizio||'08:00')}–${_de(iv.oraFine||'18:00')}${iv.descrizione?' · '+_de(iv.descrizione):''}</div></div>
+          <span style="font-size:18px;color:var(--text2)">✎</span>
+        </div>
+        <div class="dia-chips" style="margin-top:8px">${sq.length?sq.map(n=>`<span class="dia-pchip ${cf&&cf.has(String(n).toLowerCase())?'warn':'ok'}">${_de(n)}</span>`).join(''):'<span class="dia-pchip warn">nessuna squadra</span>'}
+        ${(iv.mezzi||[]).length?`<span class="dia-pchip">🚐 ${_de((iv.mezzi||[]).join(', '))}</span>`:''}</div>
+        ${cf?`<div style="font-size:11.5px;color:var(--red);margin-top:6px">⚠ ${_de(sq.filter(n=>cf.has(String(n).toLowerCase())).join(', '))} anche su un altro lavoro nello stesso orario</div>`:''}
+      </div>`;
+    });
+  });
+  document.getElementById('dia-prog-list').innerHTML=h;
+}
+function progApri(k){
+  const v=(window._PROG_VOCI||[])[k]; if(!v) return;
+  const iv=v.iv; const sq=new Set((Array.isArray(iv.squadra)?iv.squadra:[]).map(String));
+  const pers=[...new Set([...(DB.personale||[]).map(p=>p.nome).filter(Boolean), ...sq])].sort((a,b)=>a.localeCompare(b));
+  window._PROG_ED={k, sq:new Set(sq)};
+  _sheetClose();
+  const w=document.createElement('div'); w.id='ui-sheet'; w.className='sheet-wrap';
+  const inp='width:100%;background:var(--navy);border:1px solid var(--brd);border-radius:9px;color:var(--text);padding:10px;font-size:16px;font-family:inherit';
+  w.innerHTML=`<div class="sheet" style="overflow:auto">
+    <div class="sheet-title">✎ ${_de(v.c.nome||'Lavoro')}</div>
+    <label style="font-size:11px;color:var(--text2);font-weight:700;text-transform:uppercase">Data</label>
+    <input type="date" id="pe-data" value="${_de(iv.data)}" style="${inp};margin:4px 0 10px">
+    <div style="display:flex;gap:8px">
+      <div style="flex:1"><label style="font-size:11px;color:var(--text2);font-weight:700;text-transform:uppercase">Dalle</label><input type="time" id="pe-oi" value="${_de(iv.oraInizio||'08:00')}" style="${inp};margin-top:4px"></div>
+      <div style="flex:1"><label style="font-size:11px;color:var(--text2);font-weight:700;text-transform:uppercase">Alle</label><input type="time" id="pe-of" value="${_de(iv.oraFine||'18:00')}" style="${inp};margin-top:4px"></div>
+    </div>
+    <label style="font-size:11px;color:var(--text2);font-weight:700;text-transform:uppercase;display:block;margin-top:10px">Lavoro</label>
+    <input id="pe-desc" value="${_de(iv.descrizione||'')}" placeholder="es. montaggio palco" style="${inp};margin:4px 0 10px">
+    <label style="font-size:11px;color:var(--text2);font-weight:700;text-transform:uppercase">Squadra (tocca per aggiungere o togliere)</label>
+    <div class="dia-chips" id="pe-sq" style="margin:6px 0 14px">${pers.map(n=>`<button type="button" class="dia-pchip ${sq.has(n)?'ok':''}" data-n="${_de(n)}" onclick="progToggleSq(this)" style="cursor:pointer;${sq.has(n)?'':'opacity:.55'}">${sq.has(n)?'✓ ':''}${_de(n)}</button>`).join('')}</div>
+    <button class="btn btn-teal" onclick="progSalva()">💾 Salva modifiche</button>
+    <button class="btn btn-red" onclick="progElimina()">🗑 Elimina questo lavoro</button>
+    <button class="btn btn-ghost" onclick="_sheetClose()">Annulla</button>
+  </div>`;
+  document.body.appendChild(w);
+  requestAnimationFrame(()=>w.classList.add('on'));
+  w.addEventListener('click',e=>{ if(e.target===w) _sheetClose(); });
+}
+function progToggleSq(b){
+  const n=b.dataset.n; const S=window._PROG_ED.sq;
+  if(S.has(n)){ S.delete(n); b.classList.remove('ok'); b.style.opacity='.55'; b.textContent=n; }
+  else { S.add(n); b.classList.add('ok'); b.style.opacity=''; b.textContent='✓ '+n; }
+}
+// trova l'intervento nel blob fresco: per id, altrimenti per data+ora nello stesso cantiere
+function _progTrova(D, v){
+  const c=(D.cantieri||[]).find(x=>x.id===v.c.id); if(!c||!Array.isArray(c.interventi)) return null;
+  let i = v.iv.id!=null ? c.interventi.findIndex(x=>x && x.id===v.iv.id) : -1;
+  if(i<0) i=c.interventi.findIndex(x=>x && x.data===v.iv.data && (x.oraInizio||'')===(v.iv.oraInizio||'') && JSON.stringify(x.squadra||[])===JSON.stringify(v.iv.squadra||[]));
+  return i<0 ? null : {c, i};
+}
+async function progSalva(){
+  const E=window._PROG_ED; const v=(window._PROG_VOCI||[])[E.k]; if(!v) return;
+  const data=document.getElementById('pe-data').value, oi=document.getElementById('pe-oi').value, of=document.getElementById('pe-of').value;
+  const desc=document.getElementById('pe-desc').value.trim(); const squadra=[...E.sq];
+  if(!data){ toast('⚠ Metti la data'); return; }
+  setStatus(null,'Salvataggio…');
+  let trovato=true;
+  try{
+    const ok=await mobPatchDati(D=>{
+      const t=_progTrova(D, v); if(!t){ trovato=false; return; }
+      const iv=t.c.interventi[t.i];
+      iv.data=data; iv.oraInizio=oi||'08:00'; iv.oraFine=of||'18:00'; iv.squadra=squadra;
+      if(desc) iv.descrizione=desc; else delete iv.descrizione;
+      if(iv.id==null) iv.id=uid();
+      if(!t.c.periodoInizio||data<t.c.periodoInizio) t.c.periodoInizio=data;
+      if(!t.c.periodoFine||data>t.c.periodoFine) t.c.periodoFine=data;
+    });
+    if(!trovato){ setStatus(true,'Sincronizzato ✓'); toast('⚠ Lavoro non trovato: forse è stato modificato altrove — ricarica'); _sheetClose(); return; }
+    if(!ok){ setStatus(false,'Conflitto'); toast('⚠ Un\'altra app sta scrivendo — riprova'); return; }
+    setStatus(true,'Sincronizzato ✓'); _sheetClose(); renderAll&&renderAll(); diarioRenderProgramma(); toast('✓ Lavoro aggiornato');
+  }catch(e){ setStatus(false,'Errore'); toast('⚠ '+e.message); }
+}
+async function progElimina(){
+  const E=window._PROG_ED; const v=(window._PROG_VOCI||[])[E.k]; if(!v) return;
+  _sheetClose();
+  if(!(await sheetConfirm(`Eliminare il lavoro del ${_diaFmtD(v.iv.data)} su «${_de(v.c.nome||'')}»?`,{ok:'Elimina',danger:true}))) return;
+  setStatus(null,'Salvataggio…');
+  try{
+    const ok=await mobPatchDati(D=>{
+      const t=_progTrova(D, v); if(!t) return;
+      const iv=t.c.interventi[t.i];
+      t.c.interventi.splice(t.i,1);
+      if(iv && iv.id!=null){ D._interventiEliminati=Array.isArray(D._interventiEliminati)?D._interventiEliminati:[]; if(!D._interventiEliminati.includes(String(iv.id))) D._interventiEliminati.push(String(iv.id)); }
+    });
+    if(!ok){ setStatus(false,'Conflitto'); toast('⚠ Un\'altra app sta scrivendo — riprova'); return; }
+    setStatus(true,'Sincronizzato ✓'); renderAll&&renderAll(); diarioRenderProgramma(); toast('🗑 Lavoro eliminato');
+  }catch(e){ setStatus(false,'Errore'); toast('⚠ '+e.message); }
+}
+
+// ═══════════════ GOOGLE CALENDAR — appuntamenti dell'Agenda ═══════════════
+// Stesso client OAuth del Planning (stessa origine github.io), ma con permesso di
+// SCRITTURA sugli eventi. Il token dura ~1 ora: dopo va ricollegato con un tocco.
+const GCAL_CLIENT_ID='728971439296-02m5rg881uil90qtqct0cqsnc7bln8om.apps.googleusercontent.com';
+const GCAL_SCOPE='https://www.googleapis.com/auth/calendar.events';
+const GCAL_API='https://www.googleapis.com/calendar/v3/calendars/primary/events';
+let _gcalClient=null, _gcalDopo=null;
+function _gcalTok(){ try{ const t=JSON.parse(sessionStorage.getItem('gcal_mob_tok')||'null'); return (t&&t.exp>Date.now()+60000)?t.t:null; }catch(e){ return null; } }
+function gcalCollegato(){ return !!_gcalTok(); }
+function gcalCollega(poi){
+  if(!window.google||!google.accounts||!google.accounts.oauth2){ toast('Google non ancora caricato, riprova tra un attimo'); return; }
+  _gcalDopo=poi||null;
+  if(!_gcalClient) _gcalClient=google.accounts.oauth2.initTokenClient({client_id:GCAL_CLIENT_ID, scope:GCAL_SCOPE, callback:r=>{
+    if(r&&r.access_token){
+      try{ sessionStorage.setItem('gcal_mob_tok',JSON.stringify({t:r.access_token,exp:Date.now()+((+r.expires_in||3600)*1000)})); localStorage.setItem('gcal_mob_on','1'); }catch(e){}
+      toast('✓ Google Calendar collegato'); diarioRenderAgenda();
+      const f=_gcalDopo; _gcalDopo=null; if(f) f();
+    } else toast('⚠ Collegamento a Google non riuscito');
+  }});
+  _gcalClient.requestAccessToken();
+}
+function _gcalEvento(p){
+  const desc=[p.note||'', '— dall\'Agenda 81|00 Mobile'].filter(Boolean).join('\n');
+  if(p.ora){
+    const [h,m]=p.ora.split(':').map(Number); const fine=new Date(2000,0,1,h,(m||0)+60);
+    const hf=String(fine.getHours()).padStart(2,'0')+':'+String(fine.getMinutes()).padStart(2,'0');
+    const dataFine = fine.getDate()===1 ? p.data : (()=>{ const x=new Date(p.data+'T12:00'); x.setDate(x.getDate()+1); return x.toISOString().slice(0,10); })();
+    return {summary:p.titolo||'Promemoria', description:desc, start:{dateTime:p.data+'T'+p.ora+':00', timeZone:'Europe/Rome'}, end:{dateTime:dataFine+'T'+hf+':00', timeZone:'Europe/Rome'}};
+  }
+  const x=new Date(p.data+'T12:00'); x.setDate(x.getDate()+1);
+  return {summary:p.titolo||'Promemoria', description:desc, start:{date:p.data}, end:{date:x.toISOString().slice(0,10)}};
+}
+// Invia a Google gli appuntamenti con data non ancora sincronizzati; salva l'id evento nel blob
+async function gcalSincronizzaAgenda(silenzioso){
+  const tok=_gcalTok();
+  if(!tok){ if(!silenzioso) gcalCollega(()=>gcalSincronizzaAgenda()); return 0; }
+  const da=(DB.promemoria||[]).filter(p=>!p.fatto && p.data && !p.gcalEventId);
+  if(!da.length){ if(!silenzioso) toast('✓ Agenda già allineata con Google Calendar'); return 0; }
+  const fatti={}; let err=0;
+  for(const p of da){
+    try{
+      const r=await fetch(GCAL_API,{method:'POST',headers:{Authorization:'Bearer '+tok,'Content-Type':'application/json'},body:JSON.stringify(_gcalEvento(p))});
+      if(r.status===401){ sessionStorage.removeItem('gcal_mob_tok'); toast('⚠ Sessione Google scaduta: ricollega'); diarioRenderAgenda(); break; }
+      if(!r.ok){ err++; continue; }
+      const ev=await r.json(); fatti[p.id]=ev.id;
+    }catch(e){ err++; }
+  }
+  const n=Object.keys(fatti).length;
+  if(n){
+    try{ await mobPatchDati(D=>{ (D.promemoria||[]).forEach(p=>{ if(fatti[p.id]) p.gcalEventId=fatti[p.id]; }); }); }catch(e){}
+    (DB.promemoria||[]).forEach(p=>{ if(fatti[p.id]) p.gcalEventId=fatti[p.id]; });
+  }
+  diarioRenderAgenda();
+  if(!silenzioso || n) toast(n?`📅 ${n} appuntament${n>1?'i':'o'} in Google Calendar`+(err?` · ⚠ ${err} non inviati`:''):(err?`⚠ ${err} non inviati`:'Niente da inviare'));
+  return n;
+}
+async function _gcalElimina(p){
+  const tok=_gcalTok(); if(!p||!p.gcalEventId||!tok) return;
+  try{ await fetch(GCAL_API+'/'+encodeURIComponent(p.gcalEventId),{method:'DELETE',headers:{Authorization:'Bearer '+tok}}); }catch(e){}
+}
+function _gcalBox(){
+  const on=gcalCollegato(); const n=(DB.promemoria||[]).filter(p=>!p.fatto&&p.data&&!p.gcalEventId).length;
+  return `<div class="card" style="padding:10px 12px;display:flex;align-items:center;gap:10px;margin-bottom:12px">
+    <span style="width:9px;height:9px;border-radius:50%;background:${on?'var(--green)':'var(--text2)'};flex-shrink:0"></span>
+    <div style="flex:1;font-size:12.5px">${on?'Google Calendar collegato':'Google Calendar non collegato'}${n?` · <b style="color:var(--gold)">${n} da inviare</b>`:''}</div>
+    <button onclick="${on?'gcalSincronizzaAgenda()':'gcalCollega(()=>gcalSincronizzaAgenda())'}" style="background:var(--teal);border:none;color:#fff;border-radius:8px;padding:7px 11px;font-size:12px;font-weight:700;cursor:pointer">${on?'↻ Sincronizza':'📅 Collega'}</button>
+  </div>`;
 }
 
 // Tasti rapidi: inseriscono un modello da completare
