@@ -3175,6 +3175,7 @@ async function diarioElabora(){
     const j=await res.json().catch(()=>({}));
     if(!res.ok) throw new Error(j.error||('errore '+res.status));
     DIARIO_AZIONI=(j.azioni||[]).map((a,i)=>diarioNorm(a,i));
+    _diarioUnisciAvvisi(DIARIO_AZIONI);
     { const pm=DIARIO_AZIONI.filter(a=>a.tipo==='promemoria'), av=_avvisiDaTesto(txt); if(pm.length===1 && av) pm[0].avvisi=av; }
     diarioRenderPreview();
     diarioShow('preview');
@@ -3618,19 +3619,42 @@ function gcalLink(id){
   const u='https://calendar.google.com/calendar/render?action=TEMPLATE&text='+encodeURIComponent(ev.summary)+'&dates='+dates+'&ctz=Europe/Rome&details='+encodeURIComponent(ev.description||'');
   window.open(u,'_blank');
 }
+// L'elaborazione a volte trasforma "avvisami 1 ora prima" in un SECONDO appuntamento
+// ("⚠ PROMEMORIA – tra 1 ora…"): lo riconosco, lo tolgo e lo trasformo nell'avviso dell'appuntamento vero.
+function _diarioUnisciAvvisi(az){
+  const pm=az.filter(a=>a.tipo==='promemoria'&&a.data&&a.ora);
+  const min=h=>{ const m=/^(\d{1,2}):(\d{2})/.exec(h||''); return m?(+m[1])*60+(+m[2]):null; };
+  const eAvviso=a=>/promemoria|avviso|reminder|\btra\s+(\d|un|mezz|due|tre)/i.test((a.titolo||'')+' '+(a.note||''));
+  const togli=new Set();
+  pm.forEach(r=>{
+    if(!eAvviso(r)) return;
+    const testo=(r.titolo||'')+' '+(r.note||'');
+    const cand=pm.filter(q=>q!==r && !togli.has(q) && q.data===r.data && min(q.ora)>min(r.ora) && !eAvviso(q));
+    if(!cand.length) return;
+    const q=cand.find(q=>testo.includes(q.ora)) || (cand.length===1?cand[0]:null); if(!q) return;
+    const diff=min(q.ora)-min(r.ora); if(diff<=0||diff>2880) return;
+    q.avvisi=[...new Set([...(_avvisiDaTesto((q.titolo||'')+' '+(q.note||''))||[]),diff])].sort((a,b)=>a-b);
+    togli.add(r);
+  });
+  for(let i=az.length-1;i>=0;i--) if(togli.has(az[i])) az.splice(i,1);
+  az.forEach((a,i)=>a._i=i);
+}
 // ── Avvisi (promemoria Google: notifica sul telefono X minuti prima) ──
 const AVVISI=[{m:15,l:'15 min'},{m:30,l:'30 min'},{m:60,l:'1 ora'},{m:120,l:'2 ore'},{m:1440,l:'1 giorno'},{m:2880,l:'2 giorni'}];
 function _avvisiTxt(a){ return (a||[]).slice().sort((x,y)=>x-y).map(m=>(AVVISI.find(v=>v.m===m)||{l:(m%60?m+' min':(m/60)+' ore')}).l).join(' + '); }
 function _avvisiDef(){ try{ const v=JSON.parse(localStorage.getItem('mob_avvisi_def')||'null'); if(Array.isArray(v)) return v; }catch(e){} return [60]; }
 function _avvisiSalvaDef(a){ try{ localStorage.setItem('mob_avvisi_def',JSON.stringify(a||[])); }catch(e){} }
 function _avvisiToggle(a,m){ a=Array.isArray(a)?a.slice():[]; const i=a.indexOf(m); if(i>=0) a.splice(i,1); else if(a.length<5) a.push(m); return a.sort((x,y)=>x-y); }
-function _avvisiChips(a,fn){ a=a||[]; return AVVISI.map(v=>`<button type="button" class="dia-pchip ${a.includes(v.m)?'ok':''}" onclick="${fn}${v.m})" style="cursor:pointer;${a.includes(v.m)?'':'opacity:.55'}">${a.includes(v.m)?'✓ ':''}${v.l}</button>`).join(''); }
+function _avvisiChips(a,fn){ a=a||[]; const L=AVVISI.concat(a.filter(m=>!AVVISI.some(v=>v.m===m)).map(m=>({m,l:_avvisiTxt([m])}))).sort((x,y)=>x.m-y.m); return L.map(v=>`<button type="button" class="dia-pchip ${a.includes(v.m)?'ok':''}" onclick="${fn}${v.m})" style="cursor:pointer;${a.includes(v.m)?'':'opacity:.55'}">${a.includes(v.m)?'✓ ':''}${v.l}</button>`).join(''); }
 // "avvisami 2 ore prima", "ricordamelo mezz'ora prima", "avvisami il giorno prima"
 function _avvisiDaTesto(t){
   t=String(t||'').toLowerCase().replace(/’/g,"'"); if(!/(avvis|ricord|notific|allert)/.test(t)) return null;
   const out=new Set(), num={un:1,uno:1,una:1,due:2,tre:3,quattro:4,cinque:5,sei:6,dieci:10,quindici:15,venti:20,trenta:30};
-  const re=/(\d+|un[ao]?|due|tre|quattro|cinque|sei|dieci|quindici|venti|trenta|mezz[ao]?)[\s']*(minut\w*|min\b|or[ae]\b|giorn[oi]\b)\s+prima/g; let m;
-  while((m=re.exec(t))){ const n=/^mezz/.test(m[1])?0.5:(num[m[1]]||+m[1]); const u=m[2]; const min=/^min/.test(u)?n:/^or/.test(u)?n*60:n*1440; if(min>0&&min<=40320) out.add(Math.round(min)); }
+  t=t.replace(/(\d+)\s*h\s*(\d+)/g,(x,h,mm)=>h+' ore e '+mm+' minuti').replace(/(\d+)\s*h\b/g,'$1 ore');
+  const re=/(\d+|un[ao]?|due|tre|quattro|cinque|sei|dieci|quindici|venti|trenta|mezz[ao]?)[\s']*(minut\w*|min\b|or[ae]\b|giorn[oi]\b)(?:\s+e\s+(mezz[ao]|un quarto|\d+\s*min\w*))?\s+(?:di\s+)?prima/g; let m;
+  while((m=re.exec(t))){ const n=/^mezz/.test(m[1])?0.5:(num[m[1]]||+m[1]); const u=m[2]; let min=/^min/.test(u)?n:/^or/.test(u)?n*60:n*1440;
+    if(m[3]) min+= /^mezz/.test(m[3])?30 : /quarto/.test(m[3])?15 : (parseInt(m[3])||0);
+    if(min>0&&min<=40320) out.add(Math.round(min)); }
   if(/(il|un) giorno prima/.test(t)) out.add(1440);
   return out.size?[...out].sort((a,b)=>a-b).slice(0,5):null;
 }
