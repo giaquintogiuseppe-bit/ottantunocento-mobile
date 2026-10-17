@@ -1,4 +1,4 @@
-const CACHE_NAME = 'otto8100-mobile-v12';
+const CACHE_NAME = 'otto8100-mobile-v13';
 
 self.addEventListener('install', e => {
   e.waitUntil(

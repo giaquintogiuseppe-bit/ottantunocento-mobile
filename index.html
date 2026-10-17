@@ -452,6 +452,7 @@ button{touch-action:manipulation}
 
   <!-- SALDI -->
   <div class="pg" id="pg-saldi">
+    <button onclick="goTo('antsett')" style="width:100%;margin-bottom:12px;background:var(--navy2);border:1px solid var(--brd);border-radius:10px;padding:11px;color:var(--gold);font-size:14px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px">💸 Anticipi settimanali per dipendente →</button>
     <div class="kpi-row" id="saldi-kpi"></div>
     <input type="text" placeholder="🔍 Cerca dipendente..." id="saldi-search" oninput="renderSaldi()"
       style="width:100%;background:var(--navy2);border:1px solid var(--brd);border-radius:10px;color:var(--text);font-size:16px;padding:12px 14px;outline:none;margin-bottom:14px">
@@ -462,6 +463,24 @@ button{touch-action:manipulation}
       <button class="chip" data-f="saldato" onclick="setFiltroSaldi('saldato',this)">✓ Saldati</button>
     </div>
     <div id="saldi-list"></div>
+  </div>
+
+  <!-- ANTICIPI SETTIMANALI PER DIPENDENTE -->
+  <div class="pg" id="pg-antsett">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
+      <button onclick="goTo('saldi',document.querySelector('.nav-btn[onclick*=saldi]'))" style="background:var(--navy2);border:1px solid var(--brd);border-radius:10px;padding:9px 13px;color:var(--text);font-size:15px;cursor:pointer">←</button>
+      <div style="font-size:17px;font-weight:800">💸 Anticipi settimanali</div>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px">
+      <button onclick="antSettShift(-1)" style="background:var(--navy2);border:1px solid var(--brd);border-radius:10px;padding:10px 15px;color:var(--text);font-size:16px;cursor:pointer">◀</button>
+      <div style="flex:1;text-align:center">
+        <div id="antsett-label" style="font-size:14px;font-weight:700">—</div>
+        <div id="antsett-oggi" style="font-size:11px;color:var(--teal);cursor:pointer;margin-top:2px" onclick="antSettShift(0)">questa settimana</div>
+      </div>
+      <button onclick="antSettShift(1)" style="background:var(--navy2);border:1px solid var(--brd);border-radius:10px;padding:10px 15px;color:var(--text);font-size:16px;cursor:pointer">▶</button>
+    </div>
+    <div class="kpi-row" id="antsett-kpi"></div>
+    <div id="antsett-list"></div>
   </div>
 
   <!-- OPERAZIONI (anticipi, pagamenti, spese) -->
@@ -927,6 +946,7 @@ async function loadCloud(){
     } else {
       setStatus(true,'Cloud vuoto');
     }
+    _mobSnapshotBase();   // base per la fusione a 3 vie: com'erano i dati appena caricati
     renderAll();
     populateSelects(); // garantisce che le select anticipi/pagamenti siano popolate anche se loadCloud è chiamata più volte
   } catch(err){
@@ -963,6 +983,64 @@ function carburanteRiconciliato(nomeCantiere){
 // budget modificati in questa sessione (per non sovrascrivere quelli altrui col merge)
 const _budgetDirty = new Set();
 
+// ============================================================
+// FUSIONE A 3 VIE (anti-sfasamento Mobile ↔ Gestionale)
+// Il salvataggio NON sovrascrive più in blocco gli array condivisi con la copia
+// locale (che può essere vecchia): fonde record-per-record confrontando
+//   base  = com'era il dato quando la Mobile l'ha caricato
+//   local = com'è ora sulla Mobile
+//   remoto= com'è ADESSO sul cloud (ciò che ha scritto il Gestionale/altri)
+// Regole (PRECEDENZA AL GESTIONALE sui conflitti veri):
+//   • record che la Mobile non ha toccato  → vince il remoto (modifiche/aggiunte del Gestionale)
+//   • record aggiunto solo sulla Mobile     → si aggiunge
+//   • record modificato solo sulla Mobile   → vince la Mobile (se il Gestionale non l'ha toccato)
+//   • record modificato da entrambi         → vince il Gestionale (remoto)
+//   • record cancellato sulla Mobile        → si rimuove (solo se il Gestionale non l'ha modificato nel frattempo)
+// Nessuna aggiunta fatta altrove viene mai persa.
+const MERGE_FLAT = ['personale','carburante','anticipi','pagamenti','addebiti','speseCantiere','documenti','carteDkv','scontrini','incassi'];
+let _mobBase = null;                       // istantanea degli array condivisi al momento del load/ultimo save
+const _m3eq = (a,b)=>JSON.stringify(a)===JSON.stringify(b);
+const _m3key = x => (x && x.id!=null) ? ('id:'+x.id) : ('k:'+JSON.stringify(x));
+function _mobSnapshotBase(){
+  _mobBase = { presenze: JSON.parse(JSON.stringify(DB.presenze||{})) };
+  MERGE_FLAT.forEach(k=>{ _mobBase[k] = JSON.parse(JSON.stringify(DB[k]||[])); });
+}
+// Fusione a 3 vie di un array piatto con chiave per id (ripiego: contenuto).
+function _merge3Arr(base, local, remote){
+  base=Array.isArray(base)?base:[]; local=Array.isArray(local)?local:[]; remote=Array.isArray(remote)?remote:[];
+  const B=new Map(base.map(x=>[_m3key(x),x]));
+  const L=new Map(local.map(x=>[_m3key(x),x]));
+  const R=new Map(remote.map(x=>[_m3key(x),x]));
+  const out=new Map(R);                    // si parte dal remoto → precedenza al Gestionale
+  L.forEach((lv,k)=>{
+    const bv=B.get(k), rv=R.get(k);
+    if(bv===undefined){ if(rv===undefined) out.set(k,lv); }       // aggiunta solo Mobile
+    else if(!_m3eq(bv,lv)){                                        // la Mobile l'ha modificato
+      if(rv!==undefined && _m3eq(rv,bv)) out.set(k,lv);            // il Gestionale non l'ha toccato → vince la Mobile
+      // altrimenti (remoto cancellato o modificato) → vince il Gestionale
+    }
+  });
+  B.forEach((bv,k)=>{                                              // cancellazioni fatte sulla Mobile
+    if(!L.has(k) && R.has(k) && _m3eq(R.get(k),bv)) out.delete(k); // solo se il Gestionale non l'ha modificato
+  });
+  return [...out.values()];
+}
+// Fusione a 3 vie delle presenze: nidificate data → dipId → cella; chiave "data|dipId".
+function _merge3Pres(base, local, remote){
+  const flat=o=>{ const m=new Map(); Object.keys(o||{}).forEach(d=>Object.keys(o[d]||{}).forEach(pid=>m.set(d+'|'+pid,o[d][pid]))); return m; };
+  const B=flat(base), L=flat(local), R=flat(remote);
+  const out=new Map(R);                    // precedenza al Gestionale
+  L.forEach((lv,k)=>{
+    const bv=B.get(k), rv=R.get(k);
+    if(bv===undefined){ if(rv===undefined) out.set(k,lv); }
+    else if(!_m3eq(bv,lv)){ if(rv!==undefined && _m3eq(rv,bv)) out.set(k,lv); }
+  });
+  B.forEach((bv,k)=>{ if(!L.has(k) && R.has(k) && _m3eq(R.get(k),bv)) out.delete(k); });
+  const res={};
+  out.forEach((cell,k)=>{ const i=k.indexOf('|'); const d=k.slice(0,i), pid=k.slice(i+1); if(!res[d]) res[d]={}; res[d][pid]=cell; });
+  return res;
+}
+
 let _saveTimer = null;
 async function salvaCloud(silenzioso){
   try{
@@ -972,14 +1050,19 @@ async function salvaCloud(silenzioso){
     // Se qualcun altro (Gestionale, Planning, altro dispositivo) scrive mentre stiamo
     // salvando, il PATCH condizionato non passa: rifacciamo il merge sui dati freschi
     // invece di sovrascrivere il suo lavoro. Nessuna perdita silenziosa.
-    let salvato = false;
+    ricalcolaSaldi();                       // 'saldi' è derivato: lo ricalcolo, non lo fondo
+    let salvato = false, merged = null;
     for(let tentativo = 1; tentativo <= 3 && !salvato; tentativo++){
       const row = await sbGet();
       const remoto = (row && row.dati) ? row.dati : {};
       const versione = (row && row.versione !== undefined) ? row.versione : null;
 
-      const merged = { ...remoto };
-      CAMPI_GESTIONALE.forEach(k => { merged[k] = DB[k]; });
+      merged = { ...remoto };
+      // Array condivisi: fusione a 3 vie record-per-record (niente più sovrascrittura in blocco).
+      // Precedenza al Gestionale sui conflitti; nessuna aggiunta altrui viene persa.
+      MERGE_FLAT.forEach(k => { merged[k] = _merge3Arr(_mobBase && _mobBase[k], DB[k], remoto[k]); });
+      merged.presenze = _merge3Pres(_mobBase && _mobBase.presenze, DB.presenze, remoto.presenze);
+      merged.saldi = DB.saldi; // derivato: ricalcolato sopra
 
       // budgetCantieri: parte dal remoto e applica SOLO le voci modificate in questa sessione
       // (prima le modifiche al ricavo fatte dalla mobile non venivano mai salvate sul cloud)
@@ -990,12 +1073,6 @@ async function salvaCloud(silenzioso){
         if(i>=0) budgetRemoto[i]=b; else budgetRemoto.push(b);
       });
       merged.budgetCantieri = budgetRemoto;
-      DB.budgetCantieri = budgetRemoto;
-
-      if(remoto.cantieri) DB.cantieri = remoto.cantieri;
-      if(remoto.mezziDB) DB.mezziDB = remoto.mezziDB;
-      if(remoto.risorse) DB.risorse = remoto.risorse;
-      if(remoto.personaleHR) DB.personaleHR = remoto.personaleHR;
 
       salvato = await sbSet(merged, versione);
       if(!salvato){
@@ -1005,6 +1082,19 @@ async function salvaCloud(silenzioso){
     }
 
     if(!salvato) throw new Error('un\'altra app sta scrivendo in questo momento — riprova tra qualche secondo');
+
+    // allinea lo stato locale al risultato della fusione e riparti da qui (nuova base)
+    if(merged){
+      MERGE_FLAT.forEach(k=>{ DB[k]=merged[k]||[]; });
+      DB.presenze = merged.presenze||{};
+      DB.budgetCantieri = merged.budgetCantieri||[];
+      if(merged.cantieri) DB.cantieri = merged.cantieri;
+      if(merged.mezziDB) DB.mezziDB = merged.mezziDB;
+      if(merged.risorse) DB.risorse = merged.risorse;
+      if(merged.personaleHR) DB.personaleHR = merged.personaleHR;
+      ricalcolaSaldi();
+      _mobSnapshotBase();
+    }
 
     setStatus(true,'Sincronizzato ✓');
     try{ const _r = await sbGet(); if(_r && _r.versione != null) _mobUltimaVersione = _r.versione; }catch(_e){}   // allineo il riferimento anti-rientro
@@ -1697,6 +1787,82 @@ async function saldaOraMob(dipId){
   await salvaCloud(true);
   renderSaldi();
   toast(`${s.nome} saldato ✓`);
+}
+
+// ═══════════ ANTICIPI SETTIMANALI PER DIPENDENTE ═══════════
+// Stessa settimana del Gestionale (Domenica → Sabato) e stessa sorgente dati
+// (DB.anticipi, escludendo gli "Anticipo da pagamento"): niente sfasamenti.
+let ANTSETT_REF = null;   // Date dentro la settimana scelta; null = settimana corrente
+function _antSettBounds(ref){
+  const n = ref ? new Date(ref.getTime()) : new Date();
+  n.setHours(12,0,0,0);
+  const dom = new Date(n); dom.setDate(n.getDate()-n.getDay());   // domenica
+  const sab = new Date(dom); sab.setDate(dom.getDate()+6);        // sabato
+  const iso = d => d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+  return { da: iso(dom), al: iso(sab), dom };
+}
+function antSettShift(delta){
+  if(delta===0){ ANTSETT_REF = null; }
+  else {
+    const b = _antSettBounds(ANTSETT_REF);
+    const base = new Date(b.dom.getTime()); base.setDate(base.getDate()+delta*7);
+    ANTSETT_REF = base;
+  }
+  renderAntSett();
+}
+function renderAntSett(){
+  const {da, al} = _antSettBounds(ANTSETT_REF);
+  const oggiB = _antSettBounds(null);
+  const corrente = (da===oggiB.da);
+  const ddmm = iso => iso.slice(8)+'/'+iso.slice(5,7);
+  const lab = document.getElementById('antsett-label');
+  if(lab) lab.textContent = 'Dom '+ddmm(da)+' → Sab '+ddmm(al);
+  const og = document.getElementById('antsett-oggi');
+  if(og) og.style.visibility = corrente ? 'hidden' : 'visible';
+
+  const ants = (DB.anticipi||[]).filter(a=>a.metodo!=='Anticipo da pagamento' && a.data>=da && a.data<=al);
+  const perDip = {};
+  ants.forEach(a=>{
+    const k = a.dipId || a.dipNome || '?';
+    if(!perDip[k]) perDip[k] = { dipId:a.dipId, nome:a.dipNome || (DB.personale.find(p=>p.id===a.dipId)||{}).nome || '—', items:[], tot:0 };
+    perDip[k].items.push(a);
+    perDip[k].tot += parseFloat(a.importo||0);
+  });
+  const righe = Object.values(perDip).sort((x,y)=>y.tot-x.tot);
+  const totSett = righe.reduce((s,r)=>s+r.tot,0);
+
+  document.getElementById('antsett-kpi').innerHTML = `
+    <div class="kpi go"><div class="lb">Anticipi settimana</div><div class="vl">${fm(totSett)}</div></div>
+    <div class="kpi tc"><div class="lb">Dipendenti</div><div class="vl">${righe.length}</div></div>`;
+
+  document.getElementById('antsett-list').innerHTML = righe.length ? righe.map(r=>{
+    const init = r.nome.split(' ').map(x=>x[0]).join('').slice(0,2).toUpperCase();
+    const bid = 'as-'+(r.dipId||r.nome).toString().slice(-6).replace(/[^a-zA-Z0-9]/g,'');
+    const voci = r.items.sort((a,b)=>(b.data||'').localeCompare(a.data||'')).map(a=>
+      `<div class="dip-row" style="padding:8px 12px"><div class="dip-info"><div class="dip-nome" style="font-size:12px">📅 ${fd(a.data)} — ${a.metodo||'Contanti'}</div>${a.note?`<div class="dip-sub">${_de(a.note)}</div>`:''}</div><div class="dip-saldo" style="color:var(--red);font-size:13px">−${fm(a.importo)}</div></div>`
+    ).join('');
+    return `<div class="card">
+      <div class="card-h" onclick="toggleCard('${bid}')">
+        <div class="av" style="background:rgba(232,184,75,.15);color:var(--gold)">${init}</div>
+        <div class="dip-info"><div class="dip-nome">${r.nome}</div><div class="dip-sub">${r.items.length} anticip${r.items.length>1?'i':'o'} questa settimana</div></div>
+        <div style="text-align:right"><div style="font-size:16px;font-weight:800;color:var(--red)">−${fm(r.tot)}</div></div>
+        <span style="color:var(--text2);font-size:14px;margin-left:6px">▾</span>
+      </div>
+      <div class="card-body" id="${bid}">
+        ${voci}
+        ${r.dipId?`<button onclick="nuovoAnticipoPerMob('${r.dipId}','${al}')" style="width:100%;margin-top:10px;background:rgba(232,184,75,.1);border:1px solid var(--gold);border-radius:8px;padding:10px;color:var(--gold);font-size:13px;font-weight:700;cursor:pointer">💸 Aggiungi anticipo a ${r.nome.split(' ')[0]}</button>`:''}
+      </div>
+    </div>`;
+  }).join('') : `<div style="color:var(--text2);text-align:center;padding:30px;font-size:14px">Nessun anticipo in questa settimana.${corrente?'':'<br><span style="color:var(--teal);cursor:pointer" onclick="antSettShift(0)">torna a questa settimana</span>'}</div>`;
+}
+function nuovoAnticipoPerMob(dipId, data){
+  goTo('ops', document.querySelector('.nav-btn[onclick*="ops"]'));
+  const chip = document.querySelector('#ops-tabs .chip');
+  if(chip) setOpsTab('anticipo', chip);
+  populateSelects();
+  const sel=document.getElementById('ant-dip'); if(sel) sel.value=dipId;
+  const dt=document.getElementById('ant-data'); if(dt) dt.value = (data && data>=today()) ? today() : (data||today());
+  const imp=document.getElementById('ant-imp'); if(imp){ imp.value=''; try{ imp.focus(); }catch(e){} }
 }
 
 function setFiltroSaldi(f,el){
@@ -2711,6 +2877,7 @@ function goTo(pg,el){
   if(el) el.classList.add('active');
   document.getElementById('content').scrollTo(0,0);
   if(pg==='saldi') renderSaldi();
+  if(pg==='antsett') renderAntSett();
   if(pg==='cant') renderCantieri();
   if(pg==='dash') renderDash();
   if(pg==='danni') renderDanni();
