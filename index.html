@@ -489,6 +489,7 @@ button{touch-action:manipulation}
       <button class="chip on" onclick="setOpsTab('anticipo',this)">💸 Anticipo</button>
       <button class="chip" onclick="setOpsTab('pagamento',this)">💰 Pagamento</button>
       <button class="chip" onclick="setOpsTab('spesa',this)">🧾 Spesa</button>
+      <button class="chip" onclick="setOpsTab('manodopera',this)">🛠 Manodopera</button>
     </div>
 
     <!-- ANTICIPO -->
@@ -538,6 +539,21 @@ button{touch-action:manipulation}
       <div class="field"><label>Cantiere</label><input id="sp-cant" list="sp-cant-dl" placeholder="🔍 Cerca cantiere… (vuoto = nessuno)" autocomplete="off" data-af="1" data-sc="nome" data-sc-data="#sp-data"><datalist id="sp-cant-dl"></datalist></div>
       <div class="field"><label>Note</label><input type="text" id="sp-note" placeholder="Opzionale"></div>
       <button class="btn btn-teal" onclick="salvaSpesa()">🧾 Registra spesa</button>
+    </div>
+
+    <!-- MANODOPERA (riga da fatturare di sola manodopera, dentro un cantiere) -->
+    <div id="ops-manodopera" style="display:none">
+      <div class="field"><label>Cantiere</label>
+        <select id="md-cant" onchange="mdCantChange()"><option value="">Seleziona cantiere…</option></select>
+      </div>
+      <div class="field"><label>Intestatario (chi fattura)</label>
+        <select id="md-intest"><option value="">(committente del cantiere)</option></select>
+      </div>
+      <div class="field"><label>Importo (€)</label><input type="number" id="md-imp" inputmode="decimal" step="0.01" placeholder="0.00"></div>
+      <div class="field"><label>Descrizione</label><input type="text" id="md-titolo" placeholder="es. Sola manodopera ottobre"></div>
+      <div class="field"><label>Data</label><input type="date" id="md-data"></div>
+      <button class="btn btn-teal" onclick="salvaManodopera()">🛠 Registra manodopera</button>
+      <div style="font-size:11px;color:var(--text2);margin-top:8px">Crea una riga da fatturare di sola manodopera sul cantiere scelto. Compare nel Gestionale (periodi/da fatturare) col suo intestatario.</div>
     </div>
   </div>
 
@@ -1893,9 +1909,41 @@ function setOpsTab(tab,el){
   _opsTab=tab;
   document.querySelectorAll('#ops-tabs .chip').forEach(c=>c.classList.remove('on'));
   el.classList.add('on');
-  ['anticipo','pagamento','spesa'].forEach(t=>{
-    document.getElementById('ops-'+t).style.display=t===tab?'block':'none';
+  ['anticipo','pagamento','spesa','manodopera'].forEach(t=>{
+    const n=document.getElementById('ops-'+t); if(n) n.style.display=t===tab?'block':'none';
   });
+  if(tab==='manodopera'){ const dt=document.getElementById('md-data'); if(dt&&!dt.value) dt.value=today(); }
+}
+
+// Società candidate come intestatario della manodopera: quelle del referente del cantiere scelto
+// (default = committente). Si ricavano dai clienti via referenteId, senza bisogno della tabella referenti.
+function mdCantChange(){
+  const sel=document.getElementById('md-cant'); const intest=document.getElementById('md-intest'); if(!sel||!intest) return;
+  const c=(DB.cantieri||[]).find(x=>x.id===sel.value);
+  const base = c && c.clienteId ? (DB.clienti||[]).find(x=>x.id===c.clienteId) : null;
+  let soc=[];
+  if(base && base.referenteId) soc=(DB.clienti||[]).filter(x=>x.referenteId===base.referenteId);
+  else if(base) soc=[base];
+  if(soc.length){ intest.innerHTML=soc.map(s=>`<option value="${s.id}"${base&&s.id===base.id?' selected':''}>${_de(s.ragioneSociale)}</option>`).join(''); }
+  else { intest.innerHTML='<option value="">(committente del cantiere)</option>'; }
+}
+async function salvaManodopera(){
+  const sel=document.getElementById('md-cant'); const c=(DB.cantieri||[]).find(x=>x.id===(sel?.value||''));
+  if(!c){ toast('Scegli il cantiere'); return; }
+  const imp=parseFloat(document.getElementById('md-imp').value||0);
+  if(!imp||imp<=0){ toast('Inserisci un importo valido'); return; }
+  const intId=document.getElementById('md-intest')?.value||'';
+  const intNome=intId?((DB.clienti||[]).find(x=>x.id===intId)||{}).ragioneSociale||null:null;
+  const body={ commessa_id:c.id, commessa_codice:c.codice||null, titolo:(document.getElementById('md-titolo').value.trim()||'Sola manodopera'),
+    prestazione:'Sola manodopera', importo:imp, stato:'aperto', fatturato:false,
+    data_inizio:document.getElementById('md-data').value||null, data_fine:document.getElementById('md-data').value||null,
+    intestatario_cliente_id:intId||null, intestatario_nome:intNome, creato_da:'mobile' };
+  try{
+    const res=await fetch(`${SB_URL}/rest/v1/periodi`,{method:'POST',headers:{apikey:SB_KEY,Authorization:'Bearer '+SB_KEY,'Content-Type':'application/json',Prefer:'return=minimal'},body:JSON.stringify(body)});
+    if(!res.ok) throw new Error('HTTP '+res.status);
+    document.getElementById('md-imp').value=''; document.getElementById('md-titolo').value='';
+    toast(`🛠 Manodopera ${fm(imp)} su ${c.nome} registrata ✓`);
+  }catch(e){ toast('⚠ Errore: '+String(e.message||e).slice(0,50)); }
 }
 
 // Cantieri non archiviati ordinati "attivi prima": prima gli operativi, poi i
@@ -1918,6 +1966,9 @@ function populateSelects(){
   const ord=_cantieriOrdinati();
   const dl=document.getElementById('sp-cant-dl');
   if(dl) dl.innerHTML=ord.map(c=>`<option value="${_de(c.nome)}"></option>`).join('');
+  // Manodopera: select cantiere (per id, così risaliamo al referente)
+  const mdc=document.getElementById('md-cant');
+  if(mdc){ const cur=mdc.value; mdc.innerHTML='<option value="">Seleziona cantiere…</option>'+ord.map(c=>`<option value="${c.id}">${_de(c.nome)}</option>`).join(''); if(cur) mdc.value=cur; }
 }
 
 // ── Stop autofill contatti del telefono (rubrica) sui campi di testo ──
