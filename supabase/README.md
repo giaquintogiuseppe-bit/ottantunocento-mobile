@@ -1,4 +1,4 @@
-# Backend Supabase — Jarvis 81100
+# Backend Supabase — Agente 81|00 (Jarvis + connettore Claude)
 
 Codice versionato delle Edge Function del bot Telegram (progetto `xqbhujcnjvwbwzpwjujf`).
 **Nessun segreto sta nel codice**: si leggono tutti da *Supabase → Project Settings → Edge Functions → Secrets*.
@@ -7,6 +7,22 @@ Codice versionato delle Edge Function del bot Telegram (progetto `xqbhujcnjvwbwz
 |---|---|
 | `functions/jarvis-81100` | Bot unico: comandi (`/brief /timbra /pianifica /pagata /spesa /richiesta`, foto distinte, vocali) + agente Jarvis in linguaggio libero che **propone** le scritture e le esegue solo dopo il ✅ |
 | `functions/coordinatore-serale` | Webhook Telegram: gestisce il rapporto delle 18:00 / diario di bordo e inoltra tutto il resto a Jarvis |
+| `functions/mcp-81100` | Connettore MCP per l'app Claude (claude.ai / telefono): letture + scritture con anteprima e `codice_conferma` |
+
+## Motore di scrittura condiviso (`migrations/20261018_agente_81100.sql`)
+
+Le quattro scritture standard passano da funzioni SQL uniche, usate sia dal connettore Claude sia da Jarvis:
+
+| Funzione | Cosa fa |
+|---|---|
+| `agente_crea_cantiere(p, conferma, canale)` | nuovo cantiere nel blob (codice COM-AAAA-NNN, anti-doppione, cliente da anagrafica, giornate, budget, specchio `commesse`, collegamento preventivo) |
+| `agente_aggiungi_lavorazione(...)` | giornate di lavoro (interventi) su un cantiere esistente, allarga il periodo, avvisa sovrapposizioni squadra |
+| `agente_aggiungi_presenza(...)` | turno in `presenze[data][idPersona].turni` (cantiere per nome), ricalcola `totale` |
+| `agente_crea_preventivo(...)` | riga in `preventivi` in bozza (PREV-AAAA-NNN con lock), totali IVA 22%, dati cliente dalle anagrafiche |
+
+`conferma=false` = anteprima senza scrivere; `conferma=true` = una sola UPDATE atomica sulla riga bloccata (il trigger alza `versione`, Gestionale e Mobile si riallineano). Ogni scrittura finisce in `agente_log`. Eseguibili solo da `service_role`.
+
+Connettore MCP: `https://xqbhujcnjvwbwzpwjujf.supabase.co/functions/v1/mcp-81100?key=<token>` — il token non sta nel codice, si confronta la sua impronta in `agente_config.mcp_token_sha256` (per cambiarlo vedi `migrations/20261018_agente_config.sql`).
 
 ## Segreti richiesti
 
