@@ -887,25 +887,30 @@ async function sbSet(data, versioneAttesa){
   });
   if(!res.ok) throw new Error('HTTP '+res.status);
   const rows = await res.json();
-  return rows.length > 0;
+  // Ritorna la RIGA aggiornata (con la nuova `versione`) al successo, null se conflitto
+  // (0 righe aggiornate). Così chi salva legge la versione dal PATCH, senza una GET extra.
+  return rows.length ? rows[0] : null;
 }
+// Piccola attesa crescente tra i tentativi in conflitto (altra app che scrive nello stesso istante)
+const _mobSleep = ms => new Promise(r=>setTimeout(r, ms));
 
 // Scrittura atomica sull'intero blob `dati` per i campi che salvaCloud NON riscrive
 // (es. cantieri[]: la mobile li ricarica sempre dal remoto). Legge → applica il
 // mutatore sui dati freschi → scrive col lock ottimistico, con retry sui conflitti.
 // Al successo allinea DB e la versione anti-rientro. Ritorna true se salvato.
 async function mobPatchDati(mutator){
-  for(let tentativo=1; tentativo<=3; tentativo++){
+  for(let tentativo=1; tentativo<=6; tentativo++){
     const row=await sbGet();
     const D=(row&&row.dati)?row.dati:{};
     const versione=(row&&row.versione!=null)?row.versione:null;
     mutator(D);
-    const ok=await sbSet(D, versione);
-    if(ok){
+    const saved=await sbSet(D, versione);
+    if(saved){
       Object.assign(DB, D);
-      try{ const r=await sbGet(); if(r&&r.versione!=null) _mobUltimaVersione=r.versione; }catch(_){}
+      if(saved.versione!=null) _mobUltimaVersione=saved.versione;   // versione dal PATCH, niente GET extra
       return true;
     }
+    await _mobSleep(200*tentativo);   // conflitto: breve attesa crescente, poi rileggo i dati freschi e riprovo
   }
   return false;
 }
@@ -1051,8 +1056,8 @@ async function salvaCloud(silenzioso){
     // salvando, il PATCH condizionato non passa: rifacciamo il merge sui dati freschi
     // invece di sovrascrivere il suo lavoro. Nessuna perdita silenziosa.
     ricalcolaSaldi();                       // 'saldi' è derivato: lo ricalcolo, non lo fondo
-    let salvato = false, merged = null;
-    for(let tentativo = 1; tentativo <= 3 && !salvato; tentativo++){
+    let savedRow = null, merged = null;
+    for(let tentativo = 1; tentativo <= 6 && !savedRow; tentativo++){
       const row = await sbGet();
       const remoto = (row && row.dati) ? row.dati : {};
       const versione = (row && row.versione !== undefined) ? row.versione : null;
@@ -1074,14 +1079,15 @@ async function salvaCloud(silenzioso){
       });
       merged.budgetCantieri = budgetRemoto;
 
-      salvato = await sbSet(merged, versione);
-      if(!salvato){
+      savedRow = await sbSet(merged, versione);
+      if(!savedRow){
         console.warn(`salvaCloud: conflitto di versione (tentativo ${tentativo}) — rifaccio il merge sui dati aggiornati`);
-        setStatus(null,'Dati cambiati — riunisco...');
+        setStatus(null,'Dati cambiati — riunisco…');
+        await _mobSleep(200*tentativo);   // breve attesa crescente, poi rileggo i dati freschi e riprovo
       }
     }
 
-    if(!salvato) throw new Error('un\'altra app sta scrivendo in questo momento — riprova tra qualche secondo');
+    if(!savedRow) throw new Error('un\'altra app sta scrivendo in questo momento — riprova tra qualche secondo');
 
     // allinea lo stato locale al risultato della fusione e riparti da qui (nuova base)
     if(merged){
@@ -1095,13 +1101,14 @@ async function salvaCloud(silenzioso){
       ricalcolaSaldi();
       _mobSnapshotBase();
     }
+    if(savedRow.versione != null) _mobUltimaVersione = savedRow.versione;   // versione dal PATCH: niente GET extra
 
     setStatus(true,'Sincronizzato ✓');
-    try{ const _r = await sbGet(); if(_r && _r.versione != null) _mobUltimaVersione = _r.versione; }catch(_e){}   // allineo il riferimento anti-rientro
     if(!silenzioso) toast('Salvato ✓');
   } catch(err){
     setStatus(false,'Errore sync — riprova');
-    if(!silenzioso) toast('⚠ Errore: '+err.message);
+    // Un salvataggio fallito va sempre segnalato, anche in background: altrimenti sembra "salvato" ma non lo è.
+    toast('⚠ Non salvato sul cloud: '+String(err.message||err).slice(0,50)+' — tocca 🔄 Sync');
     console.error('salvaCloud error:', err);
   }
 }
@@ -1159,6 +1166,11 @@ async function mobControllaAlRientro(){
 document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='visible') mobControllaAlRientro(); });
 window.addEventListener('focus', mobControllaAlRientro);
 window.addEventListener('pageshow', (e)=>{ if(e.persisted) mobControllaAlRientro(); });
+// Poll leggero mentre l'app è in primo piano: porta su mobile le modifiche fatte nel
+// Gestionale/Planning entro ~20s senza dover uscire e rientrare (su iOS standalone gli
+// eventi focus/visibilità non sono affidabili). Controlla solo la `versione` (chiamata
+// minima) e ricarica SOLO se è cambiata e non stai scrivendo in un campo.
+setInterval(()=>{ if(document.visibilityState==='visible') mobControllaAlRientro(); }, 20000);
 
 // ============================================================
 // AUTO-VERSIONE DEL CODICE (mobile index.html) - cintura aggiuntiva al SW:
@@ -1976,8 +1988,8 @@ async function salvaAnticipo(){
   document.getElementById('ant-imp').value='';
   document.getElementById('ant-note').value='';
   renderSaldi();
-  await salvaCloud(false);
   toast(`Anticipo di ${fm(imp)} registrato per ${p.nome} ✓`);
+  await salvaCloud(true);
 }
 
 async function salvaPagamento(){
@@ -2009,7 +2021,7 @@ async function salvaPagamento(){
   document.getElementById('pag-danno-hint').style.display='none';
   renderSaldi();
   toast(`Pagamento ${fm(imp)} a ${p.nome} ✓`);
-  await salvaCloud(false);
+  await salvaCloud(true);
 }
 
 // ============================================================
@@ -2208,7 +2220,8 @@ async function salvaSpesa(){
   document.getElementById('sp-note').value='';
   document.getElementById('foto-preview').style.display='none';
   _fotoBase64=null;
-  await salvaCloud(false);
+  toast(`Spesa di ${fm(imp)} registrata ✓`);
+  await salvaCloud(true);
 }
 
 // ── CANTIERI ──────────────────────────────────────────────────────────────
@@ -3299,11 +3312,12 @@ async function diarioTogglePromemoria(id){ const p=(DB.promemoria||[]).find(x=>x
 async function diarioDelPromemoria(id){ if(!(await sheetConfirm('Eliminare questo promemoria?',{ok:'Elimina',danger:true}))) return; try{ await _gcalElimina((DB.promemoria||[]).find(x=>x.id===id)); }catch(e){} DB.promemoria=(DB.promemoria||[]).filter(x=>x.id!==id); diarioRenderAgenda(); await diarioSalvaAgenda(); }
 async function diarioSalvaAgenda(){
   setStatus(null,'Salvataggio…');
-  for(let t=1;t<=3;t++){
+  for(let t=1;t<=6;t++){
     const row=await sbGet(); const D=(row&&row.dati)?row.dati:{};
     D.promemoria=DB.promemoria||[];
-    const ok=await sbSet(D,(row&&row.versione!=null)?row.versione:null);
-    if(ok){ Object.assign(DB,D); setStatus(true,'Sincronizzato ✓'); return true; }
+    const saved=await sbSet(D,(row&&row.versione!=null)?row.versione:null);
+    if(saved){ Object.assign(DB,D); if(saved.versione!=null)_mobUltimaVersione=saved.versione; setStatus(true,'Sincronizzato ✓'); return true; }
+    await _mobSleep(200*t);
   }
   setStatus(false,'Conflitto'); toast('⚠ Riprova tra poco'); return false;
 }
@@ -3536,16 +3550,17 @@ function diarioApply(a,D){
 // ── Salvataggio atomico dell'intero blob con lock di versione + retry ──
 async function diarioSalvaTutto(list){
   setStatus(null,'Salvataggio…');
-  for(let t=1;t<=4;t++){
+  for(let t=1;t<=6;t++){
     const row=await sbGet();
     const D=(row&&row.dati)?row.dati:{};
     D.presenze=D.presenze||{};
     ['personale','cantieri','anticipi','pagamenti','scontrini','speseCantiere','addebiti','incassi','promemoria'].forEach(k=>{ if(!D[k])D[k]=[]; });
     list.forEach(a=>diarioApply(a,D));
-    const ok=await sbSet(D,(row&&row.versione!=null)?row.versione:null);
-    if(ok){ Object.assign(DB,D); try{const r=await sbGet(); if(r&&r.versione!=null)_mobUltimaVersione=r.versione;}catch(_){}
+    const saved=await sbSet(D,(row&&row.versione!=null)?row.versione:null);
+    if(saved){ Object.assign(DB,D); if(saved.versione!=null)_mobUltimaVersione=saved.versione;
       ricalcolaSaldi(); renderAll(); setStatus(true,'Sincronizzato ✓'); return true; }
     setStatus(null,'Dati cambiati — riprovo…');
+    await _mobSleep(200*t);
   }
   setStatus(false,'Conflitto — riprova'); return false;
 }
