@@ -160,23 +160,57 @@ button{touch-action:manipulation}
   function salva(j){ setSess({ access_token:j.access_token, refresh_token:j.refresh_token,
     expires_at: j.expires_at || (Math.floor(Date.now()/1000) + (j.expires_in||3600)) }); }
 
-  // ── fetch patchato: inietta il token utente sulle chiamate Supabase ──────
-  window.fetch = function(input, init){
-    try{
-      var url = (typeof input === 'string') ? input : (input && input.url) || '';
-      if(url.indexOf(SB_URL) === 0 && url.indexOf('/auth/v1/') < 0){
-        var s = getSess();
-        if(s && s.access_token){
-          var h = new Headers((init && init.headers) || (typeof input!=='string' && input.headers) || {});
-          h.set('apikey', SB_ANON);
-          h.set('Authorization', 'Bearer ' + s.access_token);
-          init = Object.assign({}, init, { headers: h });
-          if(typeof input !== 'string') input = input.url;   // usa l'URL così vincono i nostri header
-        }
+  // ── rinnovo automatico del token (scade ogni ~60 min) ────────────────────
+  var _rinnovoInCorso = null;
+  function rinnova(forza){
+    var s = getSess();
+    if(!s || !s.refresh_token) return Promise.resolve(false);
+    if(!forza && s.expires_at && (Date.now()/1000 < s.expires_at - 300)) return Promise.resolve(true);
+    if(_rinnovoInCorso) return _rinnovoInCorso;
+    _rinnovoInCorso = _fetch(SB_URL + '/auth/v1/token?grant_type=refresh_token', {
+      method:'POST', headers:{ 'Content-Type':'application/json', 'apikey':SB_ANON },
+      body: JSON.stringify({ refresh_token: s.refresh_token })
+    }).then(function(r){ return r.json().then(function(j){
+      if(r.ok && j.access_token){
+        setSess({ access_token:j.access_token, refresh_token:j.refresh_token,
+              expires_at: j.expires_at || (Math.floor(Date.now()/1000) + (j.expires_in||3600)) });
+        return true;
       }
-    }catch(e){}
-    return _fetch(input, init);
+      return false;
+    }); }).catch(function(){ return false; })
+      .then(function(ok){ _rinnovoInCorso = null; return ok; });
+    return _rinnovoInCorso;
+  }
+  function conToken(input, init){
+    var s = getSess();
+    if(!s || !s.access_token) return [input, init];
+    var h = new Headers((init && init.headers) || (typeof input!=='string' && input.headers) || {});
+    h.set('apikey', SB_ANON);
+    h.set('Authorization', 'Bearer ' + s.access_token);
+    return [ (typeof input !== 'string') ? input.url : input, Object.assign({}, init, { headers: h }) ];   // usa l'URL così vincono i nostri header
+  }
+
+  // ── fetch patchato: inietta il token utente sulle chiamate Supabase ──────
+  // Rinnova il token prima che scada e, se il server risponde 401, lo rinnova e riprova una volta.
+  window.fetch = function(input, init){
+    var url = '';
+    try{ url = (typeof input === 'string') ? input : (input && input.url) || ''; }catch(e){}
+    if(url.indexOf(SB_URL) !== 0 || url.indexOf('/auth/v1/') >= 0 || !getSess()) return _fetch(input, init);
+    return rinnova(false).then(function(){
+      var a = conToken(input, init);
+      return _fetch(a[0], a[1]).then(function(r){
+        if(r.status !== 401 || !(getSess()||{}).refresh_token) return r;
+        return rinnova(true).then(function(ok){
+          if(!ok) return r;
+          var b = conToken(input, init);
+          return _fetch(b[0], b[1]);
+        });
+      });
+    });
   };
+  // controllo anche al rientro nell'app e ogni 5 minuti
+  document.addEventListener('visibilitychange', function(){ if(!document.hidden) rinnova(false); });
+  setInterval(function(){ rinnova(false); }, 5*60*1000);
 
   // ── chiamate auth diritte (niente librerie) ──────────────────────────────
   function login(email, password){
@@ -298,6 +332,15 @@ button{touch-action:manipulation}
     if(document.body) ins(); else document.addEventListener('DOMContentLoaded', ins);
   }
 
+  // logout globale utilizzabile dalle app: window.logout81()
+  // (definito prima dell'avvio: col return anticipato non veniva mai creato)
+  window.logout81 = function(){
+    try{ window.localStorage.removeItem(LSK); }catch(e){}
+    try{ window.sessionStorage.removeItem(LSK); }catch(e){}
+    try{ history.replaceState(null, '', location.pathname + location.search); }catch(e){}  // toglie il token del reset dall'URL
+    location.reload();
+  };
+
   // ── avvio: sessione valida? refresh? altrimenti login ────────────────────
   function mostra(){ if(document.body) overlay(); else document.addEventListener('DOMContentLoaded', overlay); }
   var s=getSess();
@@ -309,13 +352,6 @@ button{touch-action:manipulation}
     }).catch(function(){ mostra(); });
   } else { mostra(); }
 
-  // logout globale utilizzabile dalle app: window.logout81()
-  window.logout81 = function(){
-    try{ window.localStorage.removeItem(LSK); }catch(e){}
-    try{ window.sessionStorage.removeItem(LSK); }catch(e){}
-    try{ history.replaceState(null, '', location.pathname + location.search); }catch(e){}  // toglie il token del reset dall'URL
-    location.reload();
-  };
 })();
 </script>
 
@@ -501,7 +537,7 @@ button{touch-action:manipulation}
         <select id="ant-met"><option>Contanti</option><option>Bonifico</option><option>Carta aziendale</option></select>
       </div>
       <div class="field"><label>Note</label><input type="text" id="ant-note" placeholder="Opzionale"></div>
-      <button class="btn btn-gold" onclick="salvaAnticipo()">💸 Registra anticipo</button>
+      <button class="btn btn-gold" onclick="conBlocco(this,salvaAnticipo)">💸 Registra anticipo</button>
     </div>
 
     <!-- PAGAMENTO -->
@@ -517,7 +553,7 @@ button{touch-action:manipulation}
       <div id="pag-danno-hint" style="display:none;font-size:12px;color:var(--text2);margin-bottom:14px;display:flex;align-items:center;gap:6px" onclick="goTo('danni',document.querySelector('[onclick*=danni]'))">
         <span style="color:var(--red)">⚠️</span> <span id="pag-danno-hint-txt"></span> <span style="color:var(--teal);text-decoration:underline">gestisci →</span>
       </div>
-      <button class="btn btn-teal" onclick="salvaPagamento()">💰 Registra pagamento</button>
+      <button class="btn btn-teal" onclick="conBlocco(this,salvaPagamento)">💰 Registra pagamento</button>
     </div>
 
     <!-- SPESA -->
@@ -538,7 +574,7 @@ button{touch-action:manipulation}
       </div>
       <div class="field"><label>Cantiere</label><input id="sp-cant" list="sp-cant-dl" placeholder="🔍 Cerca cantiere… (vuoto = nessuno)" autocomplete="off" data-af="1" data-sc="nome" data-sc-data="#sp-data"><datalist id="sp-cant-dl"></datalist></div>
       <div class="field"><label>Note</label><input type="text" id="sp-note" placeholder="Opzionale"></div>
-      <button class="btn btn-teal" onclick="salvaSpesa()">🧾 Registra spesa</button>
+      <button class="btn btn-teal" onclick="conBlocco(this,salvaSpesa)">🧾 Registra spesa</button>
     </div>
 
     <!-- MANODOPERA (riga da fatturare di sola manodopera, dentro un cantiere) -->
@@ -552,7 +588,7 @@ button{touch-action:manipulation}
       <div class="field"><label>Importo (€)</label><input type="number" id="md-imp" inputmode="decimal" step="0.01" placeholder="0.00"></div>
       <div class="field"><label>Descrizione</label><input type="text" id="md-titolo" placeholder="es. Sola manodopera ottobre"></div>
       <div class="field"><label>Data</label><input type="date" id="md-data"></div>
-      <button class="btn btn-teal" onclick="salvaManodopera()">🛠 Registra manodopera</button>
+      <button class="btn btn-teal" onclick="conBlocco(this,salvaManodopera)">🛠 Registra manodopera</button>
       <div style="font-size:11px;color:var(--text2);margin-top:8px">Crea una riga da fatturare di sola manodopera sul cantiere scelto. Compare nel Gestionale (periodi/da fatturare) col suo intestatario.</div>
     </div>
   </div>
@@ -674,7 +710,7 @@ button{touch-action:manipulation}
       <div class="field"><label>Data evento</label><input type="date" id="dn-data"></div>
       <div class="field"><label>Descrizione</label><input type="text" id="dn-desc" placeholder="es. Specchietto Doblò FS504WE"></div>
       <div class="field"><label>Mezzo / attrezzatura (opzionale)</label><input type="text" id="dn-mezzo" placeholder="es. FS504WE"></div>
-      <button class="btn btn-red" onclick="salvaDanno()">⚠️ Registra danno</button>
+      <button class="btn btn-red" onclick="conBlocco(this,salvaDanno)">⚠️ Registra danno</button>
     </div>
 
     <div class="sec-lbl">Danni attivi</div>
@@ -697,7 +733,7 @@ button{touch-action:manipulation}
       <div class="field"><label>Metodo</label><select id="minc-metodo"><option>Bonifico</option><option>Contanti</option><option>Assegno</option><option>RID/SEPA</option><option>Altro</option></select></div>
       <div class="field"><label>N° Fattura</label><input type="text" id="minc-fattura" placeholder="es. FT001/2026"></div>
       <div class="field"><label>Note</label><input type="text" id="minc-note" placeholder="es. Acconto 50%"></div>
-      <button onclick="salvaIncassoMob()" style="width:100%;background:var(--teal);border:none;border-radius:10px;padding:13px;color:#fff;font-size:14px;font-weight:800;cursor:pointer;margin-top:4px">💾 Registra</button>
+      <button onclick="conBlocco(this,salvaIncassoMob)" style="width:100%;background:var(--teal);border:none;border-radius:10px;padding:13px;color:#fff;font-size:14px;font-weight:800;cursor:pointer;margin-top:4px">💾 Registra</button>
     </div>
     <div id="inc-list-m"></div>
   </div>
@@ -914,15 +950,23 @@ const _mobSleep = ms => new Promise(r=>setTimeout(r, ms));
 // (es. cantieri[]: la mobile li ricarica sempre dal remoto). Legge → applica il
 // mutatore sui dati freschi → scrive col lock ottimistico, con retry sui conflitti.
 // Al successo allinea DB e la versione anti-rientro. Ritorna true se salvato.
+// Le scritture puntuali (mobPatchDati, diario, agenda) partono dal cloud: senza questo passaggio
+// le modifiche locali non ancora salvate (anticipi, presenze, spese…) verrebbero sostituite e perse.
+function _mobPortaModificheLocali(D){
+  MERGE_FLAT.forEach(k=>{ D[k]=_merge3Arr(_mobBase && _mobBase[k], DB[k], D[k]); });
+  D.presenze=_merge3Pres(_mobBase && _mobBase.presenze, DB.presenze, D.presenze);
+}
 async function mobPatchDati(mutator){
   for(let tentativo=1; tentativo<=6; tentativo++){
     const row=await sbGet();
     const D=(row&&row.dati)?row.dati:{};
     const versione=(row&&row.versione!=null)?row.versione:null;
     mutator(D);
+    _mobPortaModificheLocali(D);
     const saved=await sbSet(D, versione);
     if(saved){
       Object.assign(DB, D);
+      _mobSnapshotBase();   // la base della fusione ora coincide con il cloud appena scritto
       if(saved.versione!=null) _mobUltimaVersione=saved.versione;   // versione dal PATCH, niente GET extra
       return true;
     }
@@ -1121,19 +1165,23 @@ async function salvaCloud(silenzioso){
 
     setStatus(true,'Sincronizzato ✓');
     if(!silenzioso) toast('Salvato ✓');
+    return true;
   } catch(err){
     setStatus(false,'Errore sync — riprova');
     // Un salvataggio fallito va sempre segnalato, anche in background: altrimenti sembra "salvato" ma non lo è.
     toast('⚠ Non salvato sul cloud: '+String(err.message||err).slice(0,50)+' — tocca 🔄 Sync');
     console.error('salvaCloud error:', err);
+    return false;
   }
 }
 
 async function syncCloud(){
   document.getElementById('loading').style.display='flex';
   try{
-    // Prima salva i dati locali, poi carica dal cloud
-    await salvaCloud(true);
+    // Prima salva i dati locali, poi carica dal cloud (ma non se il salvataggio è fallito:
+    // il ricaricamento cancellerebbe le modifiche non salvate)
+    const salvato = await salvaCloud(true);
+    if(!salvato && _mobHaModifichePendenti()) return;
     await loadCloud();
     toast('Sincronizzazione completa ✓');
   }
@@ -1155,6 +1203,13 @@ function _mobStaEditando(){
   const ae = document.activeElement;
   return !!(ae && /^(INPUT|TEXTAREA|SELECT)$/.test(ae.tagName));
 }
+function _mobHaModifichePendenti(){
+  if(!_mobBase) return false;
+  try{
+    if(JSON.stringify(_mobBase.presenze||{})!==JSON.stringify(DB.presenze||{})) return true;
+    return MERGE_FLAT.some(k=>JSON.stringify(_mobBase[k]||[])!==JSON.stringify(DB[k]||[]));
+  }catch(e){ return true; }
+}
 async function mobControllaAlRientro(){
   if(_mobRientroInCorso || _mobStaEditando()) return;   // sync in corso o campo attivo (stai scrivendo): non ricarico
   const ora = Date.now();
@@ -1171,6 +1226,9 @@ async function mobControllaAlRientro(){
       if(vRemota != null){
         if(_mobUltimaVersione === null){ _mobUltimaVersione = vRemota; }   // primo aggancio: adotta la versione corrente
         else if(vRemota !== _mobUltimaVersione){
+          // modifiche locali non ancora salvate (es. presenze accese): prima le fondo e salvo, poi ricarico.
+          // Prima il ricaricamento le sovrascriveva senza avvisare.
+          if(_mobHaModifichePendenti() && !(await salvaCloud(true))) return;   // salvataggio fallito: non ricarico
           await loadCloud();   // ricarica dal cloud e ridisegna (renderAll); riallinea _mobUltimaVersione
           if(typeof toast === 'function') toast('🔄 Dati aggiornati altrove: schermata allineata alla versione più recente.');
         }
@@ -2066,7 +2124,7 @@ async function salvaPagamento(){
   });
 
   if(eccesso>0.01){
-    DB.anticipi.push({id:uid(),data:today(),dipId,dipNome:p.nome,importo:eccesso,metodo:'Anticipo da pagamento',note:`Anticipo futuro da pagamento (eccesso ${fm(eccesso)})`});
+    DB.anticipi.push({id:uid(),data:document.getElementById('pag-data').value||today(),dipId,dipNome:p.nome,importo:eccesso,metodo:'Anticipo da pagamento',note:`Anticipo futuro da pagamento (eccesso ${fm(eccesso)})`});
   }
 
   ricalcolaSaldi();
@@ -2246,13 +2304,54 @@ async function confermaScalaDanno(id){
   await salvaCloud(false);
 }
 
+// Evita il doppio tocco: il pulsante resta disattivato finché il salvataggio non è finito
+async function conBlocco(btn, fn){
+  if(!btn || btn.disabled) return;
+  const op=btn.style.opacity; btn.disabled=true; btn.style.opacity='.55';
+  try{ await fn(); } finally{ btn.disabled=false; btn.style.opacity=op; }
+}
+
+// ── FOTO SCONTRINI: compresse e salvate nello Storage (bucket privato scontrini-foto).
+// Nel blob condiviso resta solo il riferimento "sb:…": una foto originale pesava 2,7 MB
+// e rallentava ogni salvataggio di tutte le app.
+let _fotoCompressa=null;
+function _fotoComprimi(src, maxLato=1600, qualita=0.72){
+  return new Promise((ok,ko)=>{
+    const img=new Image();
+    img.onload=()=>{
+      const w=img.naturalWidth||img.width, h=img.naturalHeight||img.height;
+      const k=Math.min(1, maxLato/Math.max(w,h));
+      const c=document.createElement('canvas');
+      c.width=Math.round(w*k); c.height=Math.round(h*k);
+      c.getContext('2d').drawImage(img,0,0,c.width,c.height);
+      c.toBlob(b=>b?ok(b):ko(new Error('compressione non riuscita')),'image/jpeg',qualita);
+    };
+    img.onerror=()=>ko(new Error('immagine non leggibile'));
+    img.src=src;
+  });
+}
+function _blobToDataUrl(b){ return new Promise((ok,ko)=>{ const r=new FileReader(); r.onload=()=>ok(r.result); r.onerror=ko; r.readAsDataURL(b); }); }
+// Restituisce cosa salvare nel campo foto: riferimento allo Storage, oppure (senza rete) la foto compressa
+async function _fotoSalva(id){
+  if(!_fotoBase64) return null;
+  let blob=_fotoCompressa;
+  if(!blob){ try{ blob=await _fotoComprimi(_fotoBase64); }catch(_){ return _fotoBase64; } }
+  const path=String(id).replace(/[^\w.-]/g,'_')+'.jpg';
+  try{
+    const r=await fetch(`${SB_URL}/storage/v1/object/scontrini-foto/${path}`,{method:'POST',
+      headers:{apikey:SB_KEY,Authorization:'Bearer '+SB_KEY,'Content-Type':'image/jpeg','x-upsert':'true'},body:blob});
+    if(r.ok) return 'sb:scontrini-foto/'+path;
+  }catch(_){}
+  return await _blobToDataUrl(blob);   // ripiego: compressa nel blob, il Gestionale la sposterà poi nello Storage
+}
 function onFoto(ev){
   const f=ev.target.files[0]; if(!f) return;
   const r=new FileReader();
   r.onload=e=>{
-    _fotoBase64=e.target.result;
+    _fotoBase64=e.target.result; _fotoCompressa=null;
     const prev=document.getElementById('foto-preview');
     prev.src=_fotoBase64; prev.style.display='block';
+    _fotoComprimi(_fotoBase64).then(b=>{ _fotoCompressa=b; }).catch(()=>{});
   };
   r.readAsDataURL(f);
 }
@@ -2263,7 +2362,9 @@ async function salvaSpesa(){
   const cantiere=document.getElementById('sp-cant').value;
   // statoRic: 'da_riconciliare' → registrata al volo, la fattura arriverà (o no);
   // in fase di allineamento fatture serve a NON duplicarla. Vedi riconciliaSpesa().
-  const spesa={id:uid(),data:document.getElementById('sp-data').value||today(),importo:imp,fornitore:document.getElementById('sp-forn').value,categoria:document.getElementById('sp-cat').value,cantiere,note:document.getElementById('sp-note').value,foto:_fotoBase64,fonte:'mobile',statoRic:'da_riconciliare',fattura:''};
+  const sid=uid();
+  const foto=await _fotoSalva(sid);
+  const spesa={id:sid,data:document.getElementById('sp-data').value||today(),importo:imp,fornitore:document.getElementById('sp-forn').value,categoria:document.getElementById('sp-cat').value,cantiere,note:document.getElementById('sp-note').value,foto,fonte:'mobile',statoRic:'da_riconciliare',fattura:''};
   if(!DB.scontrini) DB.scontrini=[];
   DB.scontrini.push(spesa);
   if(cantiere){
@@ -2274,7 +2375,7 @@ async function salvaSpesa(){
   document.getElementById('sp-forn').value='';
   document.getElementById('sp-note').value='';
   document.getElementById('foto-preview').style.display='none';
-  _fotoBase64=null;
+  _fotoBase64=null; _fotoCompressa=null;
   toast(`Spesa di ${fm(imp)} registrata ✓`);
   await salvaCloud(true);
 }
@@ -2641,14 +2742,16 @@ async function archiviaCantiere(id){
   const c=(DB.cantieri||[]).find(x=>x.id===id);
   if(!c) return;
   if(!(await sheetConfirm('Archiviare "'+c.nome+'"?',{ok:'Archivia'}))) return;
-  if(!DB._cantieriArchiviati) DB._cantieriArchiviati=[];
-  if(!DB._cantieriArchiviati.includes(id)) DB._cantieriArchiviati.push(id);
-  salvaCloud(false); renderCantieri(); toast('Archiviato ✓');
+  const ok=await mobPatchDati(D=>{
+    if(!Array.isArray(D._cantieriArchiviati)) D._cantieriArchiviati=[];
+    if(!D._cantieriArchiviati.includes(id)) D._cantieriArchiviati.push(id);
+  });
+  renderCantieri(); toast(ok?'Archiviato ✓':'⚠ Non salvato: controlla la connessione e riprova');
 }
 
-function ripristinaCantiere(id){
-  DB._cantieriArchiviati=(DB._cantieriArchiviati||[]).filter(x=>x!==id);
-  salvaCloud(false); renderCantieri(); toast('Ripristinato ✓');
+async function ripristinaCantiere(id){
+  const ok=await mobPatchDati(D=>{ D._cantieriArchiviati=(D._cantieriArchiviati||[]).filter(x=>x!==id); });
+  renderCantieri(); toast(ok?'Ripristinato ✓':'⚠ Non salvato: controlla la connessione e riprova');
 }
 
 async function cambiaStatoCantiere(id){
@@ -2663,11 +2766,14 @@ async function cambiaStatoCantiere(id){
     {label:'Perso / Rifiutato',emoji:'❌',danger:true}
   ]);
   if(idx===null) return;
-  c.stato=stati[idx];
-  // scelta manuale: nessuna chiusura automatica la sovrascrive (concluso/perso la riattivano)
-  c._statoManuale = !['concluso','perso'].includes(c.stato);
-  if(c.stato!=='concluso') c._autoChiuso=false;
-  salvaCloud(false); renderCantieri(); toast('Stato aggiornato: '+nomi[idx]);
+  const ok=await mobPatchDati(D=>{
+    const cc=(D.cantieri||[]).find(x=>x.id===id); if(!cc) return;
+    cc.stato=stati[idx];
+    // scelta manuale: nessuna chiusura automatica la sovrascrive (concluso/perso la riattivano)
+    cc._statoManuale = !['concluso','perso'].includes(cc.stato);
+    if(cc.stato!=='concluso') cc._autoChiuso=false;
+  });
+  renderCantieri(); toast(ok?('Stato aggiornato: '+nomi[idx]):'⚠ Non salvato: controlla la connessione e riprova');
 }
 
 // Dettaglio giornaliero cantiere sul mobile
@@ -3277,7 +3383,7 @@ document.getElementById('pag-data').value=today();
 document.getElementById('sp-data').value=today();
 
 // Carica dal cloud all'avvio
-loadCloud().then(()=>caricaRifornimentiCloud().then(()=>{ if(typeof renderCant==='function' && document.getElementById('pg-cant')?.classList.contains('active')) renderCant(); }));
+loadCloud().then(()=>caricaRifornimentiCloud().then(()=>{ if(typeof renderCantieri==='function' && document.getElementById('pg-cant')?.classList.contains('active')) renderCantieri(); }));
 
 // ═══════════════════════ DIARIO DI BORDO ═══════════════════════
 // Motore: Edge Function diario-parse (Claude). L'anteprima aggancia i nomi
@@ -3364,14 +3470,18 @@ function diarioRenderAgenda(){
   diarioAgBadge();
 }
 async function diarioTogglePromemoria(id){ const p=(DB.promemoria||[]).find(x=>x.id===id); if(!p)return; p.fatto=!p.fatto; diarioRenderAgenda(); await diarioSalvaAgenda(); }
-async function diarioDelPromemoria(id){ if(!(await sheetConfirm('Eliminare questo promemoria?',{ok:'Elimina',danger:true}))) return; try{ await _gcalElimina((DB.promemoria||[]).find(x=>x.id===id)); }catch(e){} DB.promemoria=(DB.promemoria||[]).filter(x=>x.id!==id); diarioRenderAgenda(); await diarioSalvaAgenda(); }
+async function diarioDelPromemoria(id){ if(!(await sheetConfirm('Eliminare questo promemoria?',{ok:'Elimina',danger:true}))) return; try{ await _gcalElimina((DB.promemoria||[]).find(x=>x.id===id)); }catch(e){} _promEliminati.add(id); DB.promemoria=(DB.promemoria||[]).filter(x=>x.id!==id); diarioRenderAgenda(); await diarioSalvaAgenda(); }
+const _promEliminati=new Set();   // eliminati in questa sessione: la fusione non li riprende dal cloud
 async function diarioSalvaAgenda(){
   setStatus(null,'Salvataggio…');
   for(let t=1;t<=6;t++){
     const row=await sbGet(); const D=(row&&row.dati)?row.dati:{};
-    D.promemoria=DB.promemoria||[];
+    // fusione per id: si tengono i promemoria aggiunti altrove, vince la versione locale di quelli toccati qui
+    const loc=DB.promemoria||[], idsLoc=new Set(loc.map(x=>x.id));
+    D.promemoria=[...loc, ...(D.promemoria||[]).filter(x=>!idsLoc.has(x.id) && !_promEliminati.has(x.id))];
+    _mobPortaModificheLocali(D);
     const saved=await sbSet(D,(row&&row.versione!=null)?row.versione:null);
-    if(saved){ Object.assign(DB,D); if(saved.versione!=null)_mobUltimaVersione=saved.versione; setStatus(true,'Sincronizzato ✓'); return true; }
+    if(saved){ Object.assign(DB,D); _mobSnapshotBase(); if(saved.versione!=null)_mobUltimaVersione=saved.versione; setStatus(true,'Sincronizzato ✓'); return true; }
     await _mobSleep(200*t);
   }
   setStatus(false,'Conflitto'); toast('⚠ Riprova tra poco'); return false;
@@ -3446,7 +3556,14 @@ function diarioNorm(a,i){
 
 // ── Handlers anteprima ──
 window.diarioToggle=i=>{DIARIO_AZIONI[i].on=!DIARIO_AZIONI[i].on;const el=document.getElementById('dia-act-'+i);if(el)el.classList.toggle('off',!DIARIO_AZIONI[i].on);diarioUpdCount();};
-window.diarioSet=(i,f,v)=>{DIARIO_AZIONI[i][f]=v;};
+// "120,50" · "1.234,50" · "120.50" → numero (la tastiera italiana dell'iPhone mette la virgola:
+// prima "120,50" diventava 120)
+function _numIt(v){
+  let t=String(v??'').trim().replace(/\s|€/g,'');
+  if(t.includes(',')) t=t.replace(/\./g,'').replace(',','.');
+  const n=parseFloat(t); return isNaN(n)?0:n;
+}
+window.diarioSet=(i,f,v)=>{ if(/^(importo|imp)$/.test(f)) v=_numIt(v); DIARIO_AZIONI[i][f]=v; };
 window.diarioSetDip=(i,v)=>{DIARIO_AZIONI[i].dipId=v;diarioRenderPreview();};
 window.diarioSetCant=(i,v)=>{DIARIO_AZIONI[i].cantMatch=(DB.cantieri||[]).find(c=>c.id===v)||null;DIARIO_AZIONI[i].cantRaw=DIARIO_AZIONI[i].cantMatch?DIARIO_AZIONI[i].cantMatch.nome:'';diarioRenderPreview();};
 window.diarioSetCantMode=(i,m)=>{DIARIO_AZIONI[i].cantMode=m;diarioRenderPreview();};
@@ -3611,8 +3728,9 @@ async function diarioSalvaTutto(list){
     D.presenze=D.presenze||{};
     ['personale','cantieri','anticipi','pagamenti','scontrini','speseCantiere','addebiti','incassi','promemoria'].forEach(k=>{ if(!D[k])D[k]=[]; });
     list.forEach(a=>diarioApply(a,D));
+    _mobPortaModificheLocali(D);
     const saved=await sbSet(D,(row&&row.versione!=null)?row.versione:null);
-    if(saved){ Object.assign(DB,D); if(saved.versione!=null)_mobUltimaVersione=saved.versione;
+    if(saved){ Object.assign(DB,D); _mobSnapshotBase(); if(saved.versione!=null)_mobUltimaVersione=saved.versione;
       ricalcolaSaldi(); renderAll(); setStatus(true,'Sincronizzato ✓'); return true; }
     setStatus(null,'Dati cambiati — riprovo…');
     await _mobSleep(200*t);
