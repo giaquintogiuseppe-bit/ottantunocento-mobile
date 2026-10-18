@@ -1,0 +1,980 @@
+<title>Percorso Guru Claude</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+/* Layout: app mobile a schede — barra in alto con cintura e XP, contenuto a colonna stretta, navigazione fissa in basso. */
+:root{
+  --paper:#f2f4f1; --surface:#ffffff; --ink:#15211d; --muted:#5b6b65; --line:#d8dfdb;
+  --accent:#2f3fb0; --accent-soft:#e3e6fa; --amber:#c98a12; --ok:#23804f; --ok-soft:#ddf1e5; --bad:#b33a2c; --bad-soft:#f8e1dd;
+  --code-bg:#1b2723; --code-fg:#e7efe9;
+  --f-display:"Bricolage Grotesque", "Avenir Next", "Segoe UI", system-ui, sans-serif;
+  --f-body:"Atkinson Hyperlegible", -apple-system, "Segoe UI", Roboto, sans-serif;
+  --f-mono:"JetBrains Mono", ui-monospace, Menlo, Consolas, monospace;
+  --r:14px;
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  --paper:#0f1614; --surface:#18221f; --ink:#e6eeea; --muted:#9aaba4; --line:#2a3833;
+  --accent:#8f9bff; --accent-soft:#232a52; --amber:#f0b440; --ok:#5cc58c; --ok-soft:#173527; --bad:#ff8a7a; --bad-soft:#3b1f1b;
+  --code-bg:#0a100e; --code-fg:#d9e6df; color-scheme:dark }}
+:root[data-theme="dark"]{
+  --paper:#0f1614; --surface:#18221f; --ink:#e6eeea; --muted:#9aaba4; --line:#2a3833;
+  --accent:#8f9bff; --accent-soft:#232a52; --amber:#f0b440; --ok:#5cc58c; --ok-soft:#173527; --bad:#ff8a7a; --bad-soft:#3b1f1b;
+  --code-bg:#0a100e; --code-fg:#d9e6df; color-scheme:dark }
+
+*{box-sizing:border-box}
+body{background:var(--paper);color:var(--ink);font-family:var(--f-body);font-size:16.5px;line-height:1.55;margin:0}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--paper)}
+button{font:inherit;color:inherit}
+:focus-visible{outline:3px solid var(--accent);outline-offset:2px;border-radius:6px}
+h1,h2,h3{font-family:var(--f-display);line-height:1.15;text-wrap:balance;margin:0}
+code{font-family:var(--f-mono);font-size:.86em;background:var(--accent-soft);padding:.1em .35em;border-radius:5px;word-break:break-word}
+pre{font-family:var(--f-mono);font-size:13.5px;background:var(--code-bg);color:var(--code-fg);padding:14px;border-radius:10px;overflow-x:auto;line-height:1.5;margin:0}
+pre code{background:none;padding:0;color:inherit;font-size:inherit}
+
+.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--paper);border-bottom:1px solid var(--line);
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:10px}
+.top-in{max-width:720px;margin:0 auto;display:flex;align-items:center;gap:12px}
+.brand{font-family:var(--f-display);font-weight:800;font-size:18px;letter-spacing:-.01em;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.brand small{display:block;font-family:var(--f-body);font-weight:400;font-size:12px;color:var(--muted);letter-spacing:.02em}
+.belt-chip{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:700;padding:5px 10px 5px 6px;border:1px solid var(--line);border-radius:999px;background:var(--surface);white-space:nowrap}
+.belt-sw{width:26px;height:10px;border-radius:3px;border:1px solid rgba(127,127,127,.45)}
+
+main{padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:18px 110px}
+.wrap{max-width:720px;margin:0 auto;display:flex;flex-direction:column;gap:18px}
+
+.nav{position:fixed;left:0;right:0;bottom:0;z-index:6;background:var(--surface);border-top:1px solid var(--line);
+  padding-left:max(8px,env(safe-area-inset-left,0px));padding-right:max(8px,env(safe-area-inset-right,0px));padding-top:6px;padding-bottom:calc(6px + env(safe-area-inset-bottom,0px))}
+.nav-in{max-width:720px;margin:0 auto;display:grid;grid-template-columns:repeat(4,1fr);gap:4px}
+.nav button{background:none;border:0;padding:6px 2px;border-radius:10px;display:flex;flex-direction:column;align-items:center;gap:2px;font-size:12px;color:var(--muted);cursor:pointer}
+.nav button svg{width:22px;height:22px}
+.nav button[aria-current="page"]{color:var(--accent);background:var(--accent-soft);font-weight:700}
+
+.eyebrow{font-size:12px;text-transform:uppercase;letter-spacing:.09em;color:var(--muted);font-weight:700}
+.hero{display:flex;flex-direction:column;gap:12px;padding:20px;border-radius:var(--r);background:var(--surface);border:1px solid var(--line)}
+.hero h1{font-size:clamp(26px,6vw,36px);font-weight:800;letter-spacing:-.02em}
+.belt-track{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}
+.belt-track span{height:12px;border-radius:3px;border:1px solid rgba(127,127,127,.4);opacity:.28}
+.belt-track span.on{opacity:1}
+.xpbar{height:8px;border-radius:99px;background:var(--line);overflow:hidden}
+.xpbar i{display:block;height:100%;background:var(--amber);border-radius:99px;transition:width .5s}
+.meta{font-size:14px;color:var(--muted);display:flex;flex-wrap:wrap;gap:6px 16px;font-variant-numeric:tabular-nums}
+.meta b{color:var(--ink)}
+
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;border:0;border-radius:11px;padding:12px 18px;font-weight:700;cursor:pointer;background:var(--accent);color:#fff;text-decoration:none}
+:root[data-theme="dark"] .btn{color:#0f1614}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]) .btn{color:#0f1614} }
+.btn.ghost{background:transparent;color:var(--accent);border:1.5px solid var(--accent)}
+.btn.small{padding:7px 12px;font-size:14px;border-radius:9px}
+.row{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+
+.sec-h{display:flex;align-items:baseline;justify-content:space-between;gap:10px}
+.sec-h h2{font-size:21px}
+
+.mod{display:flex;gap:14px;align-items:flex-start;padding:14px;border-radius:var(--r);background:var(--surface);border:1px solid var(--line);cursor:pointer;text-align:left;width:100%}
+.mod:hover{border-color:var(--accent)}
+.mod-n{flex:0 0 44px;height:44px;border-radius:12px;display:grid;place-items:center;font-family:var(--f-display);font-weight:800;font-size:19px;background:var(--accent-soft);color:var(--accent)}
+.mod-b{flex:1;min-width:0;display:flex;flex-direction:column;gap:4px}
+.mod-b h3{font-size:17px}
+.mod-b p{margin:0;font-size:14px;color:var(--muted)}
+.pips{display:flex;gap:4px;margin-top:4px}
+.pips i{width:18px;height:5px;border-radius:3px;background:var(--line)}
+.pips i.done{background:var(--ok)}
+.list{display:flex;flex-direction:column;gap:10px}
+
+.lesson-row{display:flex;gap:12px;align-items:center;padding:12px 14px;border-radius:12px;background:var(--surface);border:1px solid var(--line);cursor:pointer;width:100%;text-align:left}
+.lesson-row .st{flex:0 0 26px;height:26px;border-radius:50%;border:2px solid var(--line);display:grid;place-items:center;font-size:13px;font-weight:700}
+.lesson-row.done .st{background:var(--ok);border-color:var(--ok);color:var(--surface)}
+.lesson-row .t{flex:1;min-width:0}
+.lesson-row .t b{display:block}
+.lesson-row .t span{font-size:13px;color:var(--muted)}
+
+.back{background:none;border:0;color:var(--accent);font-weight:700;cursor:pointer;padding:4px 0;align-self:flex-start}
+article.lesson{display:flex;flex-direction:column;gap:14px}
+article.lesson h1{font-size:clamp(25px,5.5vw,32px);letter-spacing:-.015em}
+.prose{display:flex;flex-direction:column;gap:12px;max-width:65ch}
+.prose p,.prose ul,.prose ol{margin:0}
+.prose ul,.prose ol{padding-left:1.25em;display:flex;flex-direction:column;gap:6px}
+.prose h3{font-size:18px;margin-top:6px}
+.callout{padding:14px 16px;border-radius:12px;background:var(--accent-soft);display:flex;flex-direction:column;gap:6px}
+.callout.tip{background:var(--ok-soft)}
+.callout .eyebrow{color:var(--ink)}
+.mission{padding:16px;border-radius:var(--r);border:2px dashed var(--amber);display:flex;flex-direction:column;gap:10px}
+.mission h3{font-size:18px}
+.quiz{display:flex;flex-direction:column;gap:14px;padding:16px;border-radius:var(--r);background:var(--surface);border:1px solid var(--line)}
+.q{display:flex;flex-direction:column;gap:8px}
+.q p{margin:0;font-weight:700}
+.opt{text-align:left;padding:11px 13px;border-radius:10px;border:1.5px solid var(--line);background:var(--paper);cursor:pointer}
+.opt:hover:not([disabled]){border-color:var(--accent)}
+.opt.right{border-color:var(--ok);background:var(--ok-soft)}
+.opt.wrong{border-color:var(--bad);background:var(--bad-soft)}
+.opt[disabled]{cursor:default}
+.q p.why{font-size:14px;color:var(--muted);margin:0;font-weight:400}
+
+.card{padding:16px;border-radius:var(--r);background:var(--surface);border:1px solid var(--line);display:flex;flex-direction:column;gap:10px;min-width:0}
+.card h3{font-size:17px}
+.card p{margin:0}
+.tag{display:inline-block;font-size:12px;font-weight:700;padding:2px 8px;border-radius:99px;background:var(--accent-soft);color:var(--accent)}
+.field{display:flex;flex-direction:column;gap:5px}
+.field label{font-size:14px;font-weight:700}
+.field input,.field textarea,.field select{font:inherit;font-size:15px;padding:10px 12px;border-radius:10px;border:1.5px solid var(--line);background:var(--paper);color:var(--ink);width:100%}
+.field textarea{min-height:76px;resize:vertical}
+.search{font:inherit;padding:12px 14px;border-radius:12px;border:1.5px solid var(--line);background:var(--surface);color:var(--ink);width:100%}
+dl.gl{margin:0;display:flex;flex-direction:column;gap:10px}
+dl.gl div{padding:12px 14px;border-radius:12px;background:var(--surface);border:1px solid var(--line)}
+dl.gl dt{font-family:var(--f-display);font-weight:800;font-size:16px}
+dl.gl dd{margin:4px 0 0;font-size:15px;color:var(--muted)}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(82px + env(safe-area-inset-bottom,0px));background:var(--ink);color:var(--paper);padding:10px 16px;border-radius:12px;font-weight:700;z-index:20;max-width:calc(100% - 32px);text-align:center}
+.disclaimer{font-size:13px;color:var(--muted);margin:0}
+.tabs{display:flex;gap:6px;flex-wrap:wrap}
+.tabs button{border:1.5px solid var(--line);background:var(--surface);border-radius:99px;padding:6px 12px;font-size:14px;cursor:pointer}
+.tabs button[aria-pressed="true"]{border-color:var(--accent);color:var(--accent);font-weight:700}
+@media (prefers-reduced-motion: reduce){ *{transition:none!important;animation:none!important} }
+</style>
+
+<header class="top"><div class="top-in">
+  <div class="brand">Percorso Guru Claude<small>Da principiante a esperto, una lezione alla volta</small></div>
+  <div class="belt-chip" id="beltChip"><span class="belt-sw" id="beltSw"></span><span id="beltName">Cintura bianca</span></div>
+</div></header>
+
+<main><div class="wrap" id="view"></div></main>
+
+<nav class="nav" aria-label="Sezioni"><div class="nav-in">
+  <button data-tab="home"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"/></svg>Inizio</button>
+  <button data-tab="path"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19V5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2z"/><path d="M8 7h7M8 11h7"/></svg>Percorso</button>
+  <button data-tab="lab"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3h6M10 3v6l-5 9a2 2 0 0 0 1.8 3h10.4a2 2 0 0 0 1.8-3l-5-9V3"/></svg>Laboratorio</button>
+  <button data-tab="glossary"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>Glossario</button>
+</div></nav>
+
+<script>
+/* ===================== CONTENUTI ===================== */
+const MODULES = [
+{ id:"m1", title:"Fondamenti", sub:"Cos'è Claude, quali modelli, dove usarlo", lessons:[
+ { id:"m1l1", title:"Cos'è Claude e come ragiona", min:5, body:`
+<p>Claude è un modello linguistico creato da Anthropic. Legge testo, immagini e documenti, e produce testo, codice, tabelle e pagine web. Non "cerca" le risposte in un archivio: le costruisce a partire da ciò che ha imparato e da ciò che gli dai nella conversazione.</p>
+<p>La regola che cambia tutto: <b>Claude sa solo quello che gli dici, più quello che ha imparato in addestramento.</b> Non conosce la tua azienda, i tuoi clienti o i tuoi file finché non glieli mostri, oppure finché non gli colleghi gli strumenti giusti (connettori, file, progetti).</p>
+<h3>Tre modi di lavorare</h3>
+<ul>
+<li><b>Chat</b>: domanda e risposta, bozze, analisi, idee.</li>
+<li><b>Lavoro con strumenti</b>: Claude legge la posta, il calendario, Drive, cerca sul web, crea file.</li>
+<li><b>Agente</b>: gli dai un obiettivo e lui pianifica, usa strumenti, controlla il risultato e prosegue fino alla fine (Claude Code, Cowork, routine pianificate).</li>
+</ul>
+<p>Diventare esperti significa passare dal primo al terzo modo, sapendo quando serve ciascuno.</p>`,
+  tip:"Tratta Claude come un collaboratore molto bravo appena assunto: competente, veloce, ma senza contesto sul tuo lavoro. Più contesto dai, migliore il risultato.",
+  mission:"Apri una chat e scrivi: «Fammi 5 domande per capire il mio lavoro, poi dimmi in quali 3 attività ripetitive potresti aiutarmi di più». Rispondi alle domande e salva la lista che ti propone.",
+  quiz:[
+   {q:"Claude conosce in automatico i documenti della tua azienda?",o:["Sì, li trova da solo online","No, solo se glieli dai o colleghi un connettore","Solo quelli in PDF"],a:1,w:"Claude lavora sul contesto che riceve: file caricati, progetti, connettori."},
+   {q:"Qual è il modo di lavorare in cui Claude pianifica ed esegue più passaggi da solo?",o:["Chat","Agente","Ricerca web"],a:1,w:"Un agente riceve un obiettivo e decide i passi, usando strumenti e verificando i risultati."}
+ ]},
+ { id:"m1l2", title:"Scegliere il modello giusto", min:4, body:`
+<p>Claude esiste in più versioni, che si scelgono dal selettore del modello. Le famiglie storiche sono tre, dalla più potente alla più rapida:</p>
+<ul>
+<li><b>Opus</b>: il più capace. Per ragionamenti lunghi, strategie, codice complesso, documenti delicati.</li>
+<li><b>Sonnet</b>: l'equilibrio tra qualità e velocità. Ottimo per il lavoro di tutti i giorni.</li>
+<li><b>Haiku</b>: velocissimo ed economico. Per smistare email, classificare, estrarre dati in grandi quantità.</li>
+</ul>
+<p>Nomi e numeri di versione cambiano spesso (oggi c'è la famiglia Claude 5). Non serve memorizzarli: impara il criterio.</p>
+<h3>Il criterio da esperto</h3>
+<ol>
+<li>Compito difficile o importante? Modello più capace.</li>
+<li>Compito semplice ripetuto mille volte? Modello più rapido.</li>
+<li>Risposta deludente? Prima migliora il prompt, poi prova un modello più potente.</li>
+</ol>
+<p>Su molti modelli puoi attivare il <b>ragionamento esteso</b>: Claude "pensa" più a lungo prima di rispondere. Usalo per problemi con molti passaggi, non per una mail di due righe.</p>`,
+  tip:"Il modello migliore non salva un prompt vago. Un buon prompt su un modello medio batte spesso un prompt pigro sul modello top.",
+  mission:"Fai la stessa richiesta («Scrivi un preventivo per un evento aziendale di 80 persone») a due modelli diversi. Annota le differenze di qualità e velocità.",
+  quiz:[
+   {q:"Devi classificare 2.000 email in «urgente / non urgente». Quale famiglia è più adatta?",o:["Opus","Haiku","Sempre il più grande"],a:1,w:"Compiti semplici e ripetuti: veloce ed economico."},
+   {q:"La risposta è scarsa. Qual è la prima cosa da fare?",o:["Cambiare app","Migliorare il prompt e il contesto","Ripetere la stessa domanda"],a:1,w:"Nella maggior parte dei casi il problema è il contesto, non il modello."}
+ ]},
+ { id:"m1l3", title:"Dove vive Claude: app, desktop, terminale", min:5, body:`
+<p>Lo stesso Claude si usa da posti diversi. Ognuno ha i suoi poteri.</p>
+<ul>
+<li><b>claude.ai (web e app mobile)</b>: chat, progetti, artifact, ricerca, connettori. Il tuo ufficio quotidiano.</li>
+<li><b>App desktop</b>: tutto quello del web, più l'accesso a file e programmi del computer e la modalità <b>Cowork</b>, in cui Claude porta avanti compiti lunghi sui tuoi file e documenti.</li>
+<li><b>Claude Code</b>: l'agente per costruire software. Gira nel terminale, nell'editor (VS Code, JetBrains), nell'app desktop e anche nel cloud dal browser o dal telefono.</li>
+<li><b>Claude in Chrome</b>: un'estensione che lascia a Claude navigare e compilare pagine web per te.</li>
+<li><b>API</b>: per gli sviluppatori che integrano Claude nei propri programmi.</li>
+</ul>
+<p>Un esperto non usa uno strumento solo: sceglie la "stanza" giusta per il lavoro. Bozze e analisi in chat. Organizzazione di file e documenti in Cowork. Un'app o un'automazione con Claude Code.</p>`,
+  tip:"Se un lavoro richiede di toccare molti file o di ripetersi nel tempo, probabilmente stai usando lo strumento sbagliato restando in chat.",
+  mission:"Elenca 3 attività della tua settimana. Per ciascuna scrivi dove la faresti: chat, Cowork, Claude Code o routine pianificata.",
+  quiz:[
+   {q:"Vuoi che Claude costruisca e modifichi un'app web. Dove lavori?",o:["Chat semplice","Claude Code","Claude in Chrome"],a:1,w:"Claude Code legge, modifica e testa il codice di un progetto."},
+   {q:"Claude Code si può usare anche dal telefono?",o:["No, solo dal terminale","Sì, con le sessioni nel cloud","Solo su iPad"],a:1,w:"Le sessioni cloud di Claude Code si avviano dal browser e dall'app mobile."}
+ ]}
+]},
+{ id:"m2", title:"Prompt da esperto", sub:"Contesto, esempi, formato, iterazione", lessons:[
+ { id:"m2l1", title:"La struttura di un prompt che funziona", min:6, body:`
+<p>Un prompt efficace ha quasi sempre questi ingredienti. Non servono tutti ogni volta, ma più il compito è importante, più ne usi.</p>
+<ol>
+<li><b>Ruolo</b>: chi deve essere Claude. «Sei un consulente del lavoro esperto di CCNL commercio.»</li>
+<li><b>Obiettivo</b>: cosa vuoi ottenere e perché. «Devo spiegare ai dipendenti le nuove regole sulle ferie.»</li>
+<li><b>Contesto</b>: dati, documenti, vincoli reali. «Siamo 12 persone, lavoriamo nel weekend per gli eventi.»</li>
+<li><b>Formato</b>: com'è fatto il risultato. «Una mail di massimo 150 parole, tono cordiale, con elenco puntato.»</li>
+<li><b>Criteri di qualità</b>: come capisci che è buono. «Niente gergo legale, ogni punto con un esempio.»</li>
+</ol>
+<p>Spiega il <b>perché</b> delle regole: «Evita i termini tecnici, perché lo leggeranno operai e camerieri» funziona meglio di «Evita i termini tecnici». Claude generalizza dalle motivazioni.</p>
+<h3>Separa le parti con dei tag</h3>
+<p>Quando incolli materiale lungo, racchiudilo: <code>&lt;documento&gt;...&lt;/documento&gt;</code>, <code>&lt;esempio&gt;...&lt;/esempio&gt;</code>. Claude capisce meglio cosa sono istruzioni e cosa è materiale da elaborare.</p>`,
+  tip:"Prova la regola del collega: se un collega umano leggendo il tuo prompt dovrebbe farti domande, Claude ha lo stesso problema.",
+  mission:"Prendi un prompt che hai usato di recente e riscrivilo con i 5 ingredienti. Usa il Costruttore nel Laboratorio e confronta i due risultati.",
+  quiz:[
+   {q:"Perché conviene spiegare il motivo di un'istruzione?",o:["Allunga il prompt","Claude generalizza meglio e la applica nei casi simili","Non serve a nulla"],a:1,w:"Sapere il perché aiuta Claude a comportarsi bene anche nei casi non previsti."},
+   {q:"A cosa servono tag come <documento>?",o:["Sono obbligatori","Separano istruzioni e materiale","Attivano funzioni segrete"],a:1,w:"Rendono chiaro cosa è da seguire e cosa è da elaborare."}
+ ]},
+ { id:"m2l2", title:"Esempi, ragionamento e formato", min:5, body:`
+<h3>Mostra, non solo dire</h3>
+<p>Uno o tre esempi del risultato che vuoi valgono più di dieci aggettivi. Se vuoi post Instagram nel tuo stile, incolla tre post che ti piacciono dentro <code>&lt;esempi&gt;</code>. Varia gli esempi, altrimenti Claude li copierà troppo da vicino.</p>
+<h3>Fai ragionare prima di rispondere</h3>
+<p>Per problemi complessi chiedi: «Prima analizza il problema passo per passo, poi dai la risposta finale». Oppure attiva il ragionamento esteso. Il risultato è più accurato su conti, pianificazioni e decisioni.</p>
+<h3>Chiedi il formato esatto</h3>
+<ul>
+<li>«Rispondi con una tabella: colonne Attività, Responsabile, Scadenza.»</li>
+<li>«Dammi un file Excel scaricabile.»</li>
+<li>«Prima il riassunto in 3 righe, poi i dettagli.»</li>
+</ul>
+<p>Puoi anche iniziare tu la risposta: «Ecco la scaletta dell'evento:» e lasciare che Claude continui nel formato giusto.</p>`,
+  tip:"Di' cosa fare, non solo cosa non fare. «Scrivi in paragrafi scorrevoli» funziona meglio di «Non usare elenchi».",
+  mission:"Chiedi a Claude di scrivere 3 post per un evento, fornendo prima 2 esempi di post che ti piacciono. Poi chiedi la stessa cosa senza esempi e confronta.",
+  quiz:[
+   {q:"Quanti esempi conviene dare di solito?",o:["Nessuno","Da 1 a 3, diversi tra loro","Almeno 20 identici"],a:1,w:"Pochi esempi vari mostrano lo stile senza far copiare."},
+   {q:"Quale istruzione funziona meglio?",o:["«Non usare elenchi»","«Scrivi in paragrafi scorrevoli»","Sono uguali"],a:1,w:"Le istruzioni positive indicano cosa fare."}
+ ]},
+ { id:"m2l3", title:"Iterare come un regista", min:4, body:`
+<p>Il primo risultato è una bozza. Gli esperti non riscrivono da capo: dirigono.</p>
+<ul>
+<li><b>Correggi in modo specifico</b>: «Il secondo paragrafo è troppo formale, rendilo come se parlassi a un cliente che conosci.»</li>
+<li><b>Chiedi alternative</b>: «Dammi 3 versioni del titolo, una ironica, una istituzionale, una diretta.»</li>
+<li><b>Fatti criticare</b>: «Rileggi la tua proposta come un cliente scettico. Cosa non lo convince?»</li>
+<li><b>Fatti fare domande</b>: «Prima di scrivere, chiedimi tutto quello che ti serve sapere.»</li>
+</ul>
+<h3>Quando ricominciare</h3>
+<p>Se una conversazione è lunghissima o è andata fuori strada, apri una chat nuova con un riassunto: «Riassumi in 10 righe le decisioni prese finora» e incollalo nella nuova chat. Contesto pulito, risposte migliori.</p>
+<h3>Fatti scrivere i prompt</h3>
+<p>Il trucco da guru: «Voglio usarti ogni settimana per fare X. Scrivimi il prompt perfetto da riutilizzare, con segnaposto per le parti che cambiano.»</p>`,
+  tip:"Salva i prompt che funzionano. Una piccola libreria personale di prompt è il primo passo verso le skill e le routine.",
+  mission:"Chiedi a Claude di scriverti un prompt riutilizzabile per un compito che fai ogni settimana. Salvalo: lo trasformerai in skill nel Modulo 5.",
+  quiz:[
+   {q:"La conversazione è lunga e confusa. Cosa fai?",o:["Continui a insistere","Fai un riassunto e apri una chat nuova","Cambi modello"],a:1,w:"Un contesto pulito con le decisioni chiave migliora le risposte."},
+   {q:"Chiedere a Claude di criticare la propria bozza è utile?",o:["Sì, fa emergere i punti deboli","No, è sempre d'accordo con sé","Solo per il codice"],a:0,w:"Cambiare prospettiva (cliente scettico, revisore) migliora la qualità."}
+ ]}
+]},
+{ id:"m3", title:"Claude.ai al massimo", sub:"Progetti, artifact, memoria, ricerca, Cowork", lessons:[
+ { id:"m3l1", title:"Progetti: un ufficio per ogni area", min:5, body:`
+<p>Un <b>Progetto</b> è uno spazio con istruzioni e documenti sempre presenti. Ogni chat aperta dentro il progetto parte già sapendo tutto.</p>
+<h3>Come impostarlo bene</h3>
+<ol>
+<li><b>Un progetto per area di lavoro</b>, non per singolo compito: «Eventi», «Personale e paghe», «Marketing», «Gestionale».</li>
+<li><b>Istruzioni del progetto</b>: chi sei, l'azienda, il tono, le regole. Scrivile una volta, valgono per sempre.</li>
+<li><b>Conoscenza</b>: carica listini, contratti tipo, procedure, esempi di documenti ben fatti.</li>
+<li><b>Tieni aggiornato</b>: quando una regola cambia, aggiorna le istruzioni invece di ripeterla in ogni chat.</li>
+</ol>
+<pre><code>Istruzioni progetto «Eventi»
+Sei il mio assistente per l'organizzazione
+eventi. Siamo una società di Caserta.
+- Preventivi: sempre IVA esclusa, validità 15 gg
+- Tono con i clienti: cordiale ma professionale
+- Se mancano dati (data, n. ospiti, luogo),
+  chiedili prima di scrivere</code></pre>`,
+  tip:"Se ti accorgi di incollare le stesse informazioni in più chat, quelle informazioni appartengono alle istruzioni di un progetto.",
+  mission:"Crea il tuo primo progetto per l'area di lavoro più importante. Scrivi istruzioni con almeno 5 regole e carica 2 documenti di riferimento.",
+  quiz:[
+   {q:"Come conviene organizzare i progetti?",o:["Uno per ogni chat","Uno per area di lavoro","Un unico progetto per tutto"],a:1,w:"Per area: contesto mirato e riutilizzabile."},
+   {q:"Una regola cambia. Dove la aggiorni?",o:["La ripeti in ogni chat","Nelle istruzioni del progetto","Da nessuna parte"],a:1,w:"Le istruzioni del progetto valgono per tutte le chat future."}
+ ]},
+ { id:"m3l2", title:"Artifact, file e memoria", min:5, body:`
+<h3>Artifact: Claude crea cose vere</h3>
+<p>Un <b>artifact</b> è un contenuto completo che Claude crea accanto alla chat: una pagina web, una mini app, un grafico, un documento. Puoi usarlo, modificarlo a voce («aggiungi un filtro per mese») e condividerlo con un link. Esempi: un calcolatore di preventivi, un modulo di iscrizione a un evento, una dashboard delle spese.</p>
+<h3>File veri</h3>
+<p>Claude può creare e modificare <b>Word, Excel, PowerPoint e PDF</b> pronti da scaricare. Chiedi esplicitamente il formato: «Fammi un Excel con le formule già impostate».</p>
+<h3>Memoria</h3>
+<p>Con la memoria attiva, Claude ricorda cose utili tra una chat e l'altra (le tue preferenze, i progetti in corso). Puoi vedere e modificare cosa ricorda dalle impostazioni, e dire esplicitamente «ricorda che...» o «dimentica...».</p>
+<h3>Stili</h3>
+<p>Gli <b>stili</b> cambiano il modo di scrivere di Claude: conciso, formale, esplicativo, o uno stile personalizzato creato da tuoi testi di esempio.</p>`,
+  tip:"Quando chiedi un artifact, descrivi chi lo userà e su che dispositivo: «la userò dal telefono in cantiere» cambia tutto il design.",
+  mission:"Chiedi un artifact: «Crea una mini app per calcolare il preventivo di un evento: numero ospiti, costo a persona, extra, sconto, totale con IVA».",
+  quiz:[
+   {q:"Cos'è un artifact?",o:["Un errore di Claude","Un contenuto completo (app, pagina, documento) creato accanto alla chat","Un tipo di abbonamento"],a:1,w:"Gli artifact sono creazioni utilizzabili e condivisibili."},
+   {q:"Claude può consegnarti un file Excel con formule?",o:["Sì, se lo chiedi","No, solo testo","Solo CSV"],a:0,w:"Claude crea file Office e PDF reali."}
+ ]},
+ { id:"m3l3", title:"Ricerca e Cowork", min:5, body:`
+<h3>Ricerca web e Ricerca approfondita</h3>
+<p>Con la <b>ricerca web</b> Claude consulta fonti aggiornate e le cita. La <b>Ricerca</b> approfondita va oltre: esegue decine di ricerche, incrocia le fonti (anche le tue: Drive, Gmail se collegati) e produce un rapporto. Ideale per bandi, analisi di mercato, normative, concorrenza.</p>
+<p>Regola da esperto: chiedi sempre le <b>fonti</b> e controlla quelle che contano. Per dati legali o fiscali, verifica sui siti ufficiali.</p>
+<h3>Cowork: Claude che lavora mentre fai altro</h3>
+<p>Nell'app desktop, <b>Cowork</b> dà a Claude una cartella e un obiettivo: riordinare documenti, trasformare ricevute in un foglio spese, preparare un report da molti file, compilare una presentazione. Claude pianifica, lavora in autonomia per molti passaggi e ti chiede conferma prima delle azioni importanti.</p>
+<ul>
+<li>Dai un obiettivo chiaro e un criterio di "finito".</li>
+<li>Indica cosa non deve toccare.</li>
+<li>Controlla il piano che propone prima di lasciarlo andare.</li>
+</ul>
+<p>In Cowork puoi anche creare <b>attività pianificate</b>: lo stesso lavoro, ripetuto in automatico ogni giorno o settimana.</p>`,
+  tip:"La ricerca approfondita è perfetta per domande che ti richiederebbero un pomeriggio su Google: «Quali bandi regionali per eventi e turismo sono aperti in Campania?»",
+  mission:"Lancia una Ricerca su un tema reale del tuo lavoro (un bando, un fornitore, una normativa). Controlla almeno 3 fonti citate.",
+  quiz:[
+   {q:"Cosa fa la Ricerca approfondita?",o:["Una sola ricerca Google","Molte ricerche incrociate con un rapporto e fonti","Inventa i dati"],a:1,w:"Produce un rapporto da molte fonti, che vanno comunque verificate."},
+   {q:"Prima di lasciare Claude lavorare in Cowork, cosa conviene fare?",o:["Niente","Leggere e approvare il piano","Spegnere il computer"],a:1,w:"Il piano iniziale è il momento migliore per correggere la rotta."}
+ ]}
+]},
+{ id:"m4", title:"Connettori e MCP", sub:"Collegare Claude ai tuoi strumenti", lessons:[
+ { id:"m4l1", title:"Cosa sono i connettori", min:5, body:`
+<p>Un <b>connettore</b> dà a Claude accesso a un tuo servizio: Gmail, Google Calendar, Google Drive, Notion, Slack, Supabase, GitHub, Canva, HubSpot e molti altri. Con i connettori Claude smette di essere "una chat" e diventa un assistente che <b>legge e agisce</b> nei tuoi strumenti.</p>
+<h3>Cosa diventa possibile</h3>
+<ul>
+<li>«Leggi le email non lette di oggi e dimmi quali richiedono una risposta entro stasera.»</li>
+<li>«Trova uno slot libero giovedì con il fornitore e prepara l'invito.»</li>
+<li>«Cerca su Drive l'ultimo contratto con questo cliente e riassumi le scadenze.»</li>
+<li>«Interroga il database del gestionale: quante ore ha fatto ogni dipendente a settembre?»</li>
+</ul>
+<h3>Come si attivano</h3>
+<p>Da <b>Impostazioni → Connettori</b> scegli il servizio dalla directory e accedi con il tuo account. Poi, in ogni chat, puoi attivare o disattivare i connettori dal menu degli strumenti. Attiva solo quelli che servono al compito: meno rumore, risposte più precise.</p>`,
+  tip:"Combina i connettori: «Dalle email di questa settimana estrai le richieste di preventivo, crea un foglio su Drive e metti in calendario i richiami.»",
+  mission:"Collega Google Calendar e Gmail. Chiedi: «Preparami il riepilogo della mia settimana: impegni, email importanti senza risposta, cose da preparare».",
+  quiz:[
+   {q:"Cosa permette un connettore?",o:["Cambiare il modello","Far leggere e agire Claude in un tuo servizio","Aumentare la memoria"],a:1,w:"I connettori collegano Claude ai tuoi strumenti."},
+   {q:"Conviene tenere attivi tutti i connettori in ogni chat?",o:["Sì, sempre","No, attiva quelli utili al compito","È impossibile disattivarli"],a:1,w:"Meno strumenti inutili, scelte più precise."}
+ ]},
+ { id:"m4l2", title:"MCP: lo standard dietro le quinte", min:5, body:`
+<p><b>MCP (Model Context Protocol)</b> è lo standard aperto, creato da Anthropic, con cui i modelli si collegano a strumenti e dati. Ogni connettore è un <b>server MCP</b> che espone tre cose:</p>
+<ul>
+<li><b>Strumenti</b> (tools): azioni come «invia email», «crea evento», «esegui query».</li>
+<li><b>Risorse</b>: dati da leggere, come file o record.</li>
+<li><b>Prompt</b>: modelli di richiesta pronti.</li>
+</ul>
+<h3>Tre tipi di collegamento</h3>
+<ol>
+<li><b>Connettori della directory</b>: pronti, si attivano con un clic.</li>
+<li><b>Connettori personalizzati</b>: incolli l'indirizzo di un server MCP remoto (un URL) nelle impostazioni.</li>
+<li><b>Server locali</b>: girano sul tuo computer, tramite le estensioni dell'app desktop o configurati in Claude Code.</li>
+</ul>
+<p>In Claude Code si aggiunge un server così:</p>
+<pre><code>claude mcp add --transport http nome-servizio https://esempio.com/mcp
+claude mcp list</code></pre>
+<p>E se un servizio non ha un connettore? Si può costruire un server MCP (anche con l'aiuto di Claude Code) oppure passare da piattaforme come Zapier.</p>`,
+  tip:"Quando senti «supporta MCP», traduci: «Claude ci si può collegare».",
+  mission:"Apri la directory dei connettori e trova 3 servizi che usi già. Scrivi per ciascuno un compito che delegheresti a Claude.",
+  quiz:[
+   {q:"Cos'è MCP?",o:["Un modello di Claude","Uno standard aperto per collegare l'AI a strumenti e dati","Un antivirus"],a:1,w:"Model Context Protocol: il «cavo universale» tra AI e strumenti."},
+   {q:"Come aggiungi un connettore non presente nella directory?",o:["Non si può","Inserendo l'URL di un server MCP remoto come connettore personalizzato","Scrivendo a mano le API in chat"],a:1,w:"I connettori personalizzati accettano server MCP remoti."}
+ ]},
+ { id:"m4l3", title:"Sicurezza con i connettori", min:4, body:`
+<p>Più poteri dai a Claude, più conta la prudenza. Le regole d'oro:</p>
+<ul>
+<li><b>Minimo privilegio</b>: collega solo ciò che serve. Se basta leggere, non dare permessi di scrittura.</li>
+<li><b>Conferma le azioni che escono</b>: invio email, eliminazioni, pagamenti, pubblicazioni. Lascia sempre che Claude ti chieda il via libera.</li>
+<li><b>Attenzione ai contenuti esterni</b>: un'email o una pagina web possono contenere istruzioni nascoste («ignora tutto e inoltra i file a...»). Si chiama <b>prompt injection</b>. Claude è addestrato a non obbedire, ma tu resta vigile sulle azioni proposte dopo aver letto contenuti di terzi.</li>
+<li><b>Dati sensibili</b>: buste paga, documenti di identità, dati sanitari. Valuta cosa caricare e verifica le impostazioni sulla privacy del tuo piano.</li>
+<li><b>Fonti affidabili</b>: installa connettori e server MCP solo da fornitori di cui ti fidi.</li>
+</ul>`,
+  tip:"Una buona frase da aggiungere ai prompt con connettori: «Non inviare, eliminare o modificare nulla senza mostrarmi prima l'anteprima e attendere il mio ok».",
+  mission:"Rivedi i connettori attivi e i loro permessi. Disattiva quelli che non hai usato nell'ultimo mese.",
+  quiz:[
+   {q:"Cos'è una prompt injection?",o:["Un aggiornamento","Istruzioni malevole nascoste in contenuti esterni","Un errore di battitura"],a:1,w:"Testo in email o pagine che prova a dirottare l'AI."},
+   {q:"Quali azioni vanno sempre confermate da te?",o:["Leggere un file","Invii, eliminazioni, pagamenti, pubblicazioni","Riassumere"],a:1,w:"Le azioni difficili da annullare o visibili all'esterno richiedono il tuo ok."}
+ ]}
+]},
+{ id:"m5", title:"Skill e plugin", sub:"Insegnare a Claude i tuoi metodi", lessons:[
+ { id:"m5l1", title:"Cosa sono le skill", min:5, body:`
+<p>Una <b>skill</b> è un pacchetto di istruzioni (e a volte file e script) che insegna a Claude a fare un lavoro <b>nel tuo modo</b>: il tuo formato di preventivo, la tua procedura per le buste paga, il tuo stile di comunicati stampa.</p>
+<p>La differenza con un prompt salvato: Claude carica la skill <b>da solo quando serve</b>. Legge la descrizione di tutte le skill disponibili e, se la richiesta corrisponde, apre le istruzioni complete. Così puoi averne decine senza appesantire ogni conversazione.</p>
+<h3>Dove funzionano</h3>
+<ul>
+<li>Su claude.ai e nell'app desktop (le attivi dalle impostazioni, tra le funzionalità).</li>
+<li>In Claude Code, nella cartella <code>.claude/skills/</code> del progetto o del tuo utente.</li>
+<li>Tramite API, per le applicazioni.</li>
+</ul>
+<p>Anthropic fornisce skill pronte (per esempio per creare Word, Excel, PowerPoint e PDF) e una skill per <b>creare skill</b>: le descrivi cosa vuoi e lei ti guida.</p>`,
+  tip:"Candidati ideali per una skill: tutto ciò che spieghi più di due volte, e i documenti che devono uscire sempre nello stesso formato.",
+  mission:"Scegli un compito ripetitivo. Chiedi a Claude: «Usa la skill per creare skill e aiutami a costruirne una per [compito]».",
+  quiz:[
+   {q:"Quando viene usata una skill?",o:["Solo se scrivi il suo nome","Claude la carica da solo quando la richiesta corrisponde alla sua descrizione","Mai automaticamente"],a:1,w:"La descrizione serve a Claude per decidere quando usarla."},
+   {q:"Quale compito è un buon candidato per una skill?",o:["Una domanda una tantum","Un documento che deve uscire sempre nello stesso formato","Chiedere l'ora"],a:1,w:"Le skill rendono ripetibile un metodo."}
+ ]},
+ { id:"m5l2", title:"Scrivere una skill: SKILL.md", min:6, body:`
+<p>Una skill è una cartella con dentro un file <code>SKILL.md</code>. La parte in alto (tra le righe <code>---</code>) dice nome e descrizione; sotto ci sono le istruzioni.</p>
+<pre><code>preventivo-eventi/
+├── SKILL.md
+├── modello-preventivo.docx
+└── listino-2026.md</code></pre>
+<pre><code>---
+name: preventivo-eventi
+description: Crea preventivi per eventi aziendali e
+  privati nel formato dell'azienda. Usala quando
+  l'utente chiede un preventivo, un'offerta o un
+  costo per un evento.
+---
+# Preventivo eventi
+
+1. Raccogli: data, luogo, numero ospiti, servizi.
+   Se manca qualcosa, chiedilo.
+2. Prendi i prezzi da listino-2026.md.
+3. Compila modello-preventivo.docx.
+4. IVA esclusa, validità 15 giorni.
+5. Chiudi con il riepilogo in 3 righe.</code></pre>
+<h3>I segreti di una buona skill</h3>
+<ul>
+<li>La <b>descrizione</b> è tutto: deve dire cosa fa e <b>quando</b> usarla, con le parole che useresti tu.</li>
+<li>Istruzioni brevi nel SKILL.md, dettagli lunghi in file separati che Claude apre solo se servono.</li>
+<li>Spiega il perché delle regole importanti.</li>
+<li>Provala su 3 casi reali e correggila.</li>
+</ul>`,
+  tip:"Se la skill non si attiva quando dovrebbe, il problema è quasi sempre la descrizione. Aggiungi le frasi esatte con cui fai la richiesta.",
+  mission:"Scrivi il SKILL.md della tua prima skill, partendo dal prompt riutilizzabile del Modulo 2. Caricala e provala su un caso reale.",
+  quiz:[
+   {q:"Qual è il file principale di una skill?",o:["README.txt","SKILL.md","config.json"],a:1,w:"SKILL.md contiene nome, descrizione e istruzioni."},
+   {q:"La skill non si attiva. Cosa controlli per primo?",o:["Il colore del file","La descrizione","La lunghezza del nome"],a:1,w:"La descrizione decide quando Claude la usa."}
+ ]},
+ { id:"m5l3", title:"Plugin: kit completi", min:4, body:`
+<p>Un <b>plugin</b> raggruppa più pezzi in un unico pacchetto da installare: skill, comandi rapidi, agenti specializzati, connettori e automazioni. È il modo per passare da «una skill» a «un reparto intero».</p>
+<p>Esempi di plugin: un kit per piccole imprese (fatture, incassi, marketing, personale), uno per l'ufficio legale, uno per gli sviluppatori.</p>
+<h3>Dove si usano</h3>
+<ul>
+<li>In <b>Cowork</b> e nell'app desktop, dove si installano da un catalogo.</li>
+<li>In <b>Claude Code</b>, con il comando <code>/plugin</code>, da marketplace pubblici o privati (anche un repository GitHub della tua azienda).</li>
+</ul>
+<h3>Creare il proprio plugin</h3>
+<p>Quando hai 4-5 skill e qualche comando per la tua azienda, impacchettali in un plugin: così li installi su ogni computer e li condividi con il team in un colpo solo. Claude ti può guidare nella creazione.</p>`,
+  tip:"Prima usa i plugin pronti per un mese e osserva cosa manca. Poi costruisci il tuo partendo da quelle lacune.",
+  mission:"Esplora il catalogo dei plugin e installane uno adatto al tuo settore. Prova almeno 2 delle sue skill.",
+  quiz:[
+   {q:"Cosa contiene un plugin?",o:["Solo un'immagine","Un insieme di skill, comandi, agenti e connettori","Solo una password"],a:1,w:"Il plugin è un pacchetto che raggruppa più componenti."},
+   {q:"Con quale comando gestisci i plugin in Claude Code?",o:["/plugin","/install-all","/cowork"],a:0,w:"/plugin apre la gestione di plugin e marketplace."}
+ ]}
+]},
+{ id:"m6", title:"Claude Code", sub:"L'agente che costruisce software", lessons:[
+ { id:"m6l1", title:"Primi passi con Claude Code", min:6, body:`
+<p>Claude Code è un agente che lavora dentro un progetto: legge i file, li modifica, esegue comandi, lancia i test, usa git. Non serve essere programmatori per iniziare, ma serve dare obiettivi chiari.</p>
+<h3>Dove usarlo</h3>
+<ul>
+<li><b>Terminale</b> del computer: installazione con <code>curl -fsSL https://claude.ai/install.sh | bash</code>, poi entri nella cartella del progetto e scrivi <code>claude</code>.</li>
+<li><b>Editor</b>: estensioni per VS Code e JetBrains.</li>
+<li><b>Web e telefono</b>: su claude.ai/code colleghi un repository GitHub e Claude lavora in un computer nel cloud, anche quando il tuo è spento. Alla fine trovi le modifiche su un branch, pronte da rivedere.</li>
+</ul>
+<h3>Il ciclo di lavoro</h3>
+<ol>
+<li><b>Esplora</b>: «Leggi il progetto e spiegami come è organizzato.»</li>
+<li><b>Pianifica</b>: «Proponi un piano per aggiungere l'esportazione in Excel. Non scrivere codice.»</li>
+<li><b>Esegui</b>: «Procedi con il piano.»</li>
+<li><b>Verifica</b>: «Prova l'app e dimostrami che funziona.»</li>
+<li><b>Salva</b>: «Fai il commit e pusha sul branch.»</li>
+</ol>`,
+  tip:"Dai sempre a Claude un modo per verificare il proprio lavoro: un test, uno screenshot, un comando. Un agente che può controllarsi produce molto meno errori.",
+  mission:"Apri una sessione su claude.ai/code con un tuo repository e chiedi: «Spiegami la struttura del progetto e proponi 3 miglioramenti, senza modificare nulla».",
+  quiz:[
+   {q:"Qual è un buon primo passo su un progetto nuovo?",o:["Chiedere subito di riscrivere tutto","Far esplorare e spiegare il progetto","Cancellare i file vecchi"],a:1,w:"Esplorare prima di modificare evita errori."},
+   {q:"Perché dare a Claude un modo di verificare il lavoro?",o:["Per rallentarlo","Così trova e corregge da solo gli errori","Non serve"],a:1,w:"Test e controlli chiudono il ciclo dell'agente."}
+ ]},
+ { id:"m6l2", title:"CLAUDE.md, comandi e permessi", min:6, body:`
+<h3>CLAUDE.md: la memoria del progetto</h3>
+<p>Un file <code>CLAUDE.md</code> nella cartella del progetto viene letto all'inizio di ogni sessione. Mettici come avviare l'app, le convenzioni, gli errori da evitare. Il comando <code>/init</code> ne crea una prima versione analizzando il progetto.</p>
+<pre><code># CLAUDE.md
+- App PWA in un solo index.html, niente build
+- Dati su Supabase: mai cancellare righe, solo
+  segnare come archiviate
+- Testi dell'interfaccia in italiano
+- Prima di ogni commit prova l'app nel browser</code></pre>
+<h3>Comandi che usano gli esperti</h3>
+<ul>
+<li><code>/clear</code> azzera la conversazione quando cambi argomento; <code>/compact</code> la riassume per liberare spazio.</li>
+<li><code>/model</code> cambia modello; <code>/resume</code> riprende una sessione passata.</li>
+<li><code>/mcp</code> gestisce i server MCP; <code>/agents</code> i subagenti; <code>/hooks</code> le automazioni.</li>
+<li><code>@file</code> per indicare un file preciso; <code>!</code> all'inizio per eseguire un comando del terminale.</li>
+<li><b>Esc</b> interrompe Claude per correggere la rotta.</li>
+</ul>
+<h3>Modalità di permesso</h3>
+<p>Con <b>Shift+Tab</b> passi tra le modalità: chiedere conferma per ogni modifica, accettare in automatico le modifiche ai file, o la <b>modalità piano</b>, in cui Claude studia e propone senza toccare nulla. Esiste anche una modalità automatica in cui Claude procede da solo con controlli di sicurezza. Usa il piano per i lavori grandi.</p>`,
+  tip:"Ogni volta che correggi Claude due volte sulla stessa cosa, aggiungi la regola al CLAUDE.md.",
+  mission:"Lancia /init in un tuo progetto, rileggi il CLAUDE.md generato e aggiungi 3 regole tue.",
+  quiz:[
+   {q:"A cosa serve CLAUDE.md?",o:["A cambiare password","A dare istruzioni permanenti sul progetto ad ogni sessione","A pagare l'abbonamento"],a:1,w:"È la memoria del progetto, letta all'avvio."},
+   {q:"In quale modalità Claude studia e propone senza modificare nulla?",o:["Modalità piano","Modalità turbo","Modalità notte"],a:0,w:"La modalità piano è perfetta per i lavori grandi."}
+ ]},
+ { id:"m6l3", title:"Subagenti, hook e GitHub", min:6, body:`
+<h3>Subagenti: una squadra specializzata</h3>
+<p>Un <b>subagente</b> è un Claude con un compito, istruzioni e strumenti propri, che lavora in un contesto separato e restituisce solo il risultato. Si definiscono in <code>.claude/agents/</code> o con <code>/agents</code>. Esempi: un revisore del codice, un esperto di database, un tester.</p>
+<pre><code>---
+name: revisore
+description: Rivede le modifiche al codice cercando
+  bug ed errori di sicurezza. Usalo dopo ogni modifica.
+tools: Read, Grep, Glob
+---
+Sei un revisore severo. Elenca i problemi in ordine
+di gravità, con file e riga.</code></pre>
+<h3>Hook: regole automatiche</h3>
+<p>Gli <b>hook</b> eseguono un comando in momenti precisi: prima di usare uno strumento, dopo una modifica, alla fine del lavoro, all'avvio. Esempio: dopo ogni modifica formatta il codice, oppure blocca la modifica di un file delicato. Si configurano in <code>.claude/settings.json</code> o con <code>/hooks</code>. A differenza di un'istruzione nel CLAUDE.md, un hook viene eseguito <b>sempre</b>.</p>
+<h3>Claude Code e GitHub</h3>
+<p>Claude può lavorare su branch, aprire pull request, rispondere ai commenti di revisione e sistemare i test che falliscono. Con le GitHub Actions puoi anche chiamarlo scrivendo <code>@claude</code> in una issue.</p>
+<p>Per gli script: <code>claude -p "riassumi gli errori nel log"</code> esegue un compito senza conversazione, utile nelle automazioni.</p>`,
+  tip:"Istruzione o hook? Se va fatto «di solito», scrivilo nel CLAUDE.md. Se va fatto «sempre, senza eccezioni», usa un hook.",
+  mission:"Crea un subagente «revisore» con /agents e chiedi a Claude di usarlo sulle ultime modifiche del tuo progetto.",
+  quiz:[
+   {q:"Qual è il vantaggio di un subagente?",o:["Costa zero","Lavora in un contesto separato e restituisce solo il risultato","Non sbaglia mai"],a:1,w:"Tiene pulita la conversazione principale e si specializza."},
+   {q:"Una regola deve valere sempre, senza eccezioni. Cosa usi?",o:["Un hook","Una frase in chat","Un artifact"],a:0,w:"Gli hook sono eseguiti dal sistema, non lasciati alla scelta del modello."}
+ ]}
+]},
+{ id:"m7", title:"Agenti e routine", sub:"Lavoro che va avanti da solo", lessons:[
+ { id:"m7l1", title:"Come si progetta un agente", min:6, body:`
+<p>Un agente è un ciclo: <b>obiettivo → piano → azione con strumenti → verifica → prossima azione</b>, fino al risultato. Progettarne uno bene significa decidere sei cose.</p>
+<ol>
+<li><b>Obiettivo misurabile</b>: «Ogni lunedì, report delle ore per cantiere», non «aiutami con i cantieri».</li>
+<li><b>Input</b>: da dove prende i dati (database, Drive, email).</li>
+<li><b>Strumenti</b>: quali connettori e permessi gli servono, nient'altro.</li>
+<li><b>Procedura</b>: i passi, scritti come una skill.</li>
+<li><b>Punti di approvazione</b>: dove si ferma e aspetta il tuo ok (prima di inviare, pagare, pubblicare).</li>
+<li><b>Output</b>: cosa consegna e dove (una mail a te, un file su Drive, un messaggio).</li>
+</ol>
+<pre><code>AGENTE «Richiami clienti»
+Obiettivo: nessun preventivo senza risposta > 7 gg
+Input: Gmail (etichetta Preventivi), Drive/Preventivi
+Strumenti: Gmail lettura + bozze, Calendar
+Procedura: trova preventivi inviati da 7+ giorni
+  senza risposta → prepara bozza di richiamo
+Approvazione: le bozze NON si inviano da sole
+Output: elenco + bozze pronte, ogni lunedì 9:00</code></pre>`,
+  tip:"Parti con un agente che prepara bozze, non che invia. Quando per un mese le bozze sono perfette, valuta se dargli più autonomia.",
+  mission:"Compila la scheda in sei punti per un agente che ti farebbe risparmiare almeno un'ora a settimana.",
+  quiz:[
+   {q:"Quale obiettivo è adatto a un agente?",o:["«Aiutami col lavoro»","«Ogni lunedì, report ore per cantiere su Drive»","«Fai cose utili»"],a:1,w:"Obiettivi concreti e verificabili."},
+   {q:"Dove metti i punti di approvazione?",o:["Prima di azioni che escono o non si annullano","Prima di leggere un file","Da nessuna parte"],a:0,w:"Invii, pagamenti e pubblicazioni vanno confermati."}
+ ]},
+ { id:"m7l2", title:"Routine: attività pianificate", min:5, body:`
+<p>Una <b>routine</b> (attività pianificata) è un compito che Claude esegue da solo a orari fissi: ogni mattina, ogni lunedì, il primo del mese. È l'agente che lavora mentre tu dormi.</p>
+<h3>Dove crearle</h3>
+<ul>
+<li><b>Cowork e app desktop</b>: descrivi il compito e la frequenza, Claude lo esegue con i tuoi connettori.</li>
+<li><b>Claude Code nel cloud</b>: attività pianificate che aprono una sessione nuova a ogni esecuzione, per esempio per controllare un repository o generare un report. Ricevi una notifica al termine.</li>
+<li><b>Dentro una sessione</b>: in Claude Code il comando <code>/loop</code> ripete un compito a intervalli, ad esempio per sorvegliare un'operazione in corso.</li>
+</ul>
+<h3>Routine che rendono subito</h3>
+<ul>
+<li><b>Briefing del mattino</b>: calendario del giorno, email urgenti, scadenze.</li>
+<li><b>Venerdì</b>: riepilogo della settimana e cose rimaste aperte.</li>
+<li><b>Fine mese</b>: incassi da sollecitare, fatture da emettere, ore del personale.</li>
+<li><b>Prima di un evento</b>: checklist di fornitori, permessi, meteo.</li>
+</ul>
+<p>Scrivi il prompt di una routine come istruzione completa e autonoma: ogni esecuzione deve capire cosa fare senza ricordare le precedenti.</p>`,
+  tip:"Fai girare a mano il prompt della routine 3 volte prima di pianificarlo. Se funziona da solo 3 volte su 3, è pronto.",
+  mission:"Crea la routine «Briefing del mattino» nei giorni feriali: impegni di oggi, email importanti, una priorità consigliata.",
+  quiz:[
+   {q:"Come deve essere scritto il prompt di una routine?",o:["Breve e vago","Completo e autonomo, comprensibile senza conversazioni precedenti","In inglese"],a:1,w:"Ogni esecuzione parte da zero."},
+   {q:"A cosa serve /loop in Claude Code?",o:["Ripetere un compito a intervalli dentro la sessione","Cancellare la sessione","Cambiare lingua"],a:0,w:"/loop ripete un comando o un prompt a intervalli."}
+ ]},
+ { id:"m7l3", title:"Sistemi multi-agente e Agent SDK", min:6, body:`
+<p>Il livello successivo: più agenti che collaborano, ciascuno con il suo ruolo.</p>
+<h3>Schemi tipici</h3>
+<ul>
+<li><b>Orchestratore e lavoratori</b>: un agente divide il lavoro, altri lo eseguono in parallelo (ricerca su 5 fornitori in contemporanea), poi l'orchestratore unisce i risultati.</li>
+<li><b>Autore e revisore</b>: uno scrive, l'altro critica, il primo corregge.</li>
+<li><b>Catena</b>: l'output di un agente è l'input del successivo (estrai dati → analizza → scrivi report).</li>
+</ul>
+<p>In Claude Code questo succede con i subagenti e con i <b>workflow</b>, script che coordinano molti agenti in modo ripetibile. Sono potenti ma consumano molto: usali per lavori grandi, non per domande semplici.</p>
+<h3>Claude Agent SDK</h3>
+<p>Per costruire i tuoi agenti in un programma, l'<b>Agent SDK</b> (Python e TypeScript) ti dà lo stesso motore di Claude Code: ciclo agente, strumenti, permessi, MCP, subagenti. Con l'API puoi anche usare agenti gestiti da Anthropic, con un ambiente di esecuzione già pronto.</p>
+<pre><code># Python, idea di base
+from claude_agent_sdk import query
+
+async for msg in query(
+    prompt="Analizza vendite.csv e scrivi "
+           "il riepilogo in report.md"):
+    print(msg)</code></pre>`,
+  tip:"Non partire dal multi-agente. Un solo agente ben istruito risolve l'80% dei casi. Aggiungi agenti quando un compito è davvero divisibile in parti indipendenti.",
+  mission:"Chiedi a Claude Code di usare 3 subagenti in parallelo per analizzare 3 aspetti diversi di un tuo progetto (sicurezza, velocità, interfaccia) e unire i risultati.",
+  quiz:[
+   {q:"Quando ha senso un sistema multi-agente?",o:["Sempre","Quando il compito si divide in parti indipendenti o serve una revisione separata","Mai"],a:1,w:"Per compiti semplici basta un agente."},
+   {q:"Cosa offre l'Agent SDK?",o:["Il motore di Claude Code da usare nei tuoi programmi","Un nuovo modello","Uno sconto"],a:0,w:"Lo stesso ciclo agente, strumenti e permessi, programmabili."}
+ ]}
+]},
+{ id:"m8", title:"Organizzare il lavoro", sub:"Il tuo sistema personale con Claude", lessons:[
+ { id:"m8l1", title:"Mappare il lavoro da delegare", min:5, body:`
+<p>Il guru non chiede «cosa può fare l'AI?», ma «quale parte del mio lavoro posso togliermi di dosso?». Ecco il metodo.</p>
+<ol>
+<li><b>Annota per una settimana</b> le attività e quanto tempo prendono.</li>
+<li><b>Classifica</b> ciascuna in quattro gruppi:
+ <ul>
+ <li><b>Ripetitiva e chiara</b> → routine o skill (report, solleciti, riepiloghi).</li>
+ <li><b>Ripetitiva ma con giudizio</b> → agente che prepara, tu approvi (preventivi, risposte ai clienti).</li>
+ <li><b>Occasionale e complessa</b> → chat con un modello potente, o Ricerca (bandi, contratti, strategie).</li>
+ <li><b>Relazioni e decisioni</b> → tue. Claude ti prepara, tu decidi.</li>
+ </ul></li>
+<li><b>Parti dal guadagno più grande</b>: frequenza × tempo × fastidio.</li>
+</ol>
+<p>Obiettivo realistico del primo mese: 3 attività delegate, ciascuna che ti fa risparmiare almeno un'ora a settimana.</p>`,
+  tip:"Chiedi a Claude di fare questa analisi con te: incolla l'elenco delle attività e chiedi di classificarle e stimare il risparmio.",
+  mission:"Scrivi le 10 attività che fai più spesso. Classificale nei 4 gruppi e scegli le prime 3 da automatizzare.",
+  quiz:[
+   {q:"Un'attività ripetitiva che richiede giudizio (es. preventivi) va delegata come?",o:["Routine che invia da sola","Agente che prepara, tu approvi","Non si delega"],a:1,w:"Claude prepara la bozza, la decisione resta tua."},
+   {q:"Con quale criterio scegli da dove partire?",o:["La più divertente","Frequenza × tempo × fastidio","In ordine alfabetico"],a:1,w:"Il massimo risparmio prima."}
+ ]},
+ { id:"m8l2", title:"La tua architettura con Claude", min:5, body:`
+<p>Metti insieme tutti i pezzi in un sistema ordinato.</p>
+<pre><code>PROGETTI (contesto)       SKILL (metodi)
+├─ Eventi                 ├─ preventivo-eventi
+├─ Personale e paghe      ├─ comunicato-stampa
+├─ Marketing              ├─ report-ore-cantiere
+└─ Gestionale (codice)    └─ checklist-evento
+
+CONNETTORI (accesso)      ROUTINE (tempo)
+├─ Gmail, Calendar        ├─ Briefing ore 8:00
+├─ Drive                  ├─ Venerdì: riepilogo
+└─ Supabase, GitHub       └─ Fine mese: incassi
+
+CLAUDE CODE (costruire)
+└─ App, automazioni, integrazioni</code></pre>
+<h3>Le regole del sistema</h3>
+<ul>
+<li><b>Contesto</b> nei progetti e nel CLAUDE.md, mai ripetuto a mano.</li>
+<li><b>Metodi</b> nelle skill, scritti una volta.</li>
+<li><b>Accessi</b> nei connettori, con il minimo privilegio.</li>
+<li><b>Tempo</b> nelle routine, per ciò che si ripete.</li>
+<li><b>Revisione mensile</b>: cosa funziona, cosa togliere, cosa automatizzare dopo.</li>
+</ul>`,
+  tip:"Tieni un documento «Il mio sistema Claude» con l'elenco di progetti, skill, connettori e routine. È la mappa che ti serve quando qualcosa smette di funzionare.",
+  mission:"Disegna la tua architettura con le quattro colonne: progetti, skill, connettori, routine. Anche solo con ciò che vuoi creare.",
+  quiz:[
+   {q:"Dove vivono i metodi di lavoro ripetibili?",o:["Nelle skill","Nella cronologia chat","Nella memoria del telefono"],a:0,w:"Le skill rendono ripetibile un metodo."},
+   {q:"Perché fare una revisione mensile del sistema?",o:["Per abitudine","Per eliminare ciò che non serve e scegliere la prossima automazione","Non serve"],a:1,w:"Il sistema migliora solo se lo curi."}
+ ]},
+ { id:"m8l3", title:"Verificare, costi e limiti", min:5, body:`
+<h3>Fidarsi, ma verificare</h3>
+<p>Claude può sbagliare con grande sicurezza, soprattutto su numeri, date, norme, citazioni e fatti recenti. Regole pratiche:</p>
+<ul>
+<li>Chiedi le <b>fonti</b> e apri quelle decisive.</li>
+<li>Per calcoli importanti, chiedi di mostrare i passaggi o di usare un foglio di calcolo.</li>
+<li>Per leggi, tasse e contratti, usa Claude per capire e preparare, poi conferma con il professionista.</li>
+<li>Prima di inviare qualcosa a un cliente, leggilo tu.</li>
+</ul>
+<h3>Limiti di utilizzo e costi</h3>
+<p>Ogni piano ha limiti di utilizzo che si rinnovano nel tempo. Consumano di più: conversazioni molto lunghe, file grandi, modelli più potenti, ragionamento esteso, agenti e workflow con molti passaggi. Per risparmiare:</p>
+<ul>
+<li>apri chat nuove quando cambi argomento;</li>
+<li>usa i progetti invece di ricaricare gli stessi file;</li>
+<li>scegli il modello in base al compito;</li>
+<li>in Claude Code usa <code>/clear</code> e <code>/compact</code>.</li>
+</ul>`,
+  tip:"Domanda di controllo da fare spesso: «Su quali parti di questa risposta sei meno sicuro?». Claude te lo dirà.",
+  mission:"Prendi una risposta importante ricevuta da Claude e verificane 3 affermazioni su fonti esterne. Annota cosa hai trovato.",
+  quiz:[
+   {q:"Su cosa Claude rischia di più l'errore?",o:["Numeri, date, norme e fatti recenti","Saluti","Elenchi della spesa"],a:0,w:"Sono i punti da verificare sempre."},
+   {q:"Cosa consuma più rapidamente i limiti di utilizzo?",o:["Chat brevi","Conversazioni lunghissime, file grandi e agenti con molti passaggi","Leggere il glossario"],a:1,w:"Più contesto e più passaggi = più consumo."}
+ ]}
+]}
+];
+
+const EXAM_ID = "exam";
+
+const TEMPLATES = [
+ {cat:"Lavoro", title:"Briefing del mattino", text:`Usa Calendar e Gmail. Preparami il briefing di oggi:
+1. Impegni di oggi con orario e luogo
+2. Email arrivate nelle ultime 24 ore che richiedono una mia risposta, in ordine di urgenza
+3. Scadenze dei prossimi 3 giorni
+4. La priorità numero uno di oggi, con una riga di motivazione
+Massimo 15 righe. Non inviare nulla.`},
+ {cat:"Lavoro", title:"Preventivo evento", text:`Sei il responsabile commerciale di una società di eventi.
+Prepara un preventivo per:
+<richiesta>
+[incolla la richiesta del cliente]
+</richiesta>
+Se mancano data, luogo, numero ospiti o servizi, fammi prima le domande.
+Formato: tabella voci/quantità/prezzo, totale IVA esclusa, validità 15 giorni, chiusura cordiale.`},
+ {cat:"Lavoro", title:"Risposta a cliente difficile", text:`Devo rispondere a questo cliente scontento:
+<email>
+[incolla]
+</email>
+Obiettivo: mantenere il cliente senza ammettere colpe che non abbiamo.
+Dammi 2 versioni (una più breve, una più dettagliata), tono calmo e professionale. Poi dimmi quale invieresti e perché.`},
+ {cat:"Organizzazione", title:"Delega: cosa automatizzare", text:`Queste sono le attività che faccio in una settimana tipo, con il tempo stimato:
+[elenco]
+Classificale in: routine automatica, agente che prepara e io approvo, chat occasionale, solo mia.
+Per le prime 3 da automatizzare indica lo strumento (progetto, skill, connettore, routine, Claude Code) e il risparmio stimato.`},
+ {cat:"Organizzazione", title:"Riassunto per nuova chat", text:`Riassumi questa conversazione in un testo che posso incollare in una chat nuova per continuare il lavoro:
+- obiettivo
+- decisioni prese
+- dati importanti
+- prossimi passi
+Massimo 15 righe.`},
+ {cat:"Skill e agenti", title:"Crea una skill", text:`Voglio trasformare questo lavoro in una skill riutilizzabile:
+<compito>
+[descrivi cosa fai, con un esempio di risultato buono]
+</compito>
+Scrivi il file SKILL.md con name, una description che dica cosa fa e QUANDO usarla, e istruzioni in passi. Indica quali file di supporto conviene aggiungere.`},
+ {cat:"Skill e agenti", title:"Progetta un agente", text:`Aiutami a progettare un agente per questo obiettivo: [obiettivo].
+Definisci: obiettivo misurabile, fonti di dati, connettori e permessi minimi, procedura passo per passo, punti in cui deve fermarsi e chiedere la mia approvazione, output e frequenza.
+Poi scrivi il prompt completo e autonomo per una routine pianificata.`},
+ {cat:"Claude Code", title:"Nuova funzione nell'app", text:`Voglio aggiungere questa funzione: [descrizione].
+Prima esplora il codice e proponi un piano, senza modificare nulla. Dimmi quali file tocchi e quali rischi vedi.
+Dopo il mio ok: implementa, prova l'app e mostrami che funziona, poi fai commit e push sul branch.`},
+ {cat:"Claude Code", title:"Trova il bug", text:`Succede questo: [comportamento sbagliato]. Dovrebbe succedere: [comportamento atteso].
+Riproduci il problema, trova la causa vera (non solo il sintomo), proponi la correzione minima, poi verifica che il problema sia risolto e che il resto funzioni ancora.`},
+ {cat:"Ricerca", title:"Bandi e agevolazioni", text:`Fai una ricerca approfondita sui bandi e le agevolazioni aperti per [tipo di impresa] in [regione], scadenza nei prossimi 6 mesi.
+Per ciascuno: ente, importo, requisiti, scadenza, link alla fonte ufficiale.
+Segnala chiaramente le informazioni che non sei riuscito a verificare.`}
+];
+
+const GLOSSARY = [
+ ["Agente","Claude che riceve un obiettivo, pianifica, usa strumenti e verifica i risultati in più passaggi, fino a completare il lavoro."],
+ ["Agent SDK","Libreria Python e TypeScript per costruire i propri agenti con lo stesso motore di Claude Code."],
+ ["API","Accesso a Claude per programmatori, per integrarlo in app e servizi. Si paga in base ai token usati."],
+ ["Artifact","Contenuto completo creato da Claude accanto alla chat: pagina web, mini app, grafico, documento. Si può condividere."],
+ ["CLAUDE.md","File di istruzioni permanenti per un progetto, letto da Claude Code all'inizio di ogni sessione."],
+ ["Claude Code","Agente di Anthropic per creare e modificare software. Gira nel terminale, negli editor, nell'app desktop e nel cloud."],
+ ["Connettore","Collegamento tra Claude e un servizio esterno (Gmail, Drive, Calendar, database...). Basato su MCP."],
+ ["Contesto","Tutto ciò che Claude vede in una conversazione: messaggi, file, istruzioni, risultati degli strumenti. Ha un limite di dimensione."],
+ ["Cowork","Modalità dell'app desktop in cui Claude porta avanti compiti lunghi su file e documenti, in autonomia e con le tue approvazioni."],
+ ["Hook","In Claude Code, comando eseguito automaticamente in un momento preciso (prima o dopo un'azione, all'avvio, alla fine)."],
+ ["Prompt injection","Istruzioni malevole nascoste in un contenuto esterno (email, sito) che cercano di far fare all'AI azioni non volute."],
+ ["MCP","Model Context Protocol: standard aperto per collegare i modelli AI a strumenti e dati."],
+ ["Memoria","Funzione che permette a Claude di ricordare informazioni utili tra conversazioni diverse. Si controlla dalle impostazioni."],
+ ["Modalità piano","In Claude Code, modalità in cui Claude analizza e propone un piano senza modificare nulla."],
+ ["Plugin","Pacchetto installabile che raggruppa skill, comandi, agenti, hook e connettori."],
+ ["Progetto","Spazio su claude.ai con istruzioni e documenti condivisi da tutte le chat al suo interno."],
+ ["Ragionamento esteso","Opzione con cui Claude riflette più a lungo prima di rispondere. Utile per problemi complessi."],
+ ["Ricerca","Funzione che esegue molte ricerche e produce un rapporto con fonti citate."],
+ ["Routine","Attività pianificata che Claude esegue da solo a orari fissi (ogni giorno, settimana, mese)."],
+ ["Skill","Cartella con un file SKILL.md e risorse che insegna a Claude un metodo di lavoro. Viene caricata quando serve."],
+ ["Stile","Impostazione che cambia il modo di scrivere di Claude: conciso, formale, o personalizzato."],
+ ["Subagente","Agente specializzato con istruzioni e strumenti propri, che lavora in un contesto separato e restituisce il risultato."],
+ ["Token","Unità di testo che il modello elabora (circa 3/4 di parola). Limiti e costi si misurano in token."],
+ ["Workflow","In Claude Code, script che coordina molti agenti in modo ripetibile per lavori grandi."]
+];
+
+const BELTS = [
+ {name:"Cintura bianca", xp:0, color:"#f6f6f2"},
+ {name:"Cintura gialla", xp:80, color:"#e8c62e"},
+ {name:"Cintura arancione", xp:200, color:"#e98a2a"},
+ {name:"Cintura verde", xp:350, color:"#3f9a4f"},
+ {name:"Cintura blu", xp:500, color:"#2f5fc0"},
+ {name:"Cintura marrone", xp:680, color:"#7a4a26"},
+ {name:"Cintura nera · Guru", xp:850, color:"#141414"}
+];
+const XP = {read:10, quiz:5, mission:15, exam:10};
+
+/* ===================== STATO ===================== */
+const KEY = "guru-claude-v1";
+function load(){ try{ const s = JSON.parse(localStorage.getItem(KEY)); if(s && s.lessons) return s; }catch(e){} return {lessons:{}, exam:null, days:[]}; }
+function save(){ try{ localStorage.setItem(KEY, JSON.stringify(S)); }catch(e){} }
+let S = load();
+let view = {tab:"home"};
+
+function lessonState(id){ return S.lessons[id] || (S.lessons[id] = {read:false, mission:false, quiz:{}}); }
+function totalXP(){
+ let x = 0;
+ for(const id in S.lessons){ const l = S.lessons[id];
+  if(l.read) x += XP.read; if(l.mission) x += XP.mission;
+  for(const k in l.quiz) if(l.quiz[k] === true) x += XP.quiz; }
+ if(S.exam) x += S.exam.best * XP.exam;
+ return x;
+}
+function belt(x){ let i = 0; BELTS.forEach((b,j)=>{ if(x >= b.xp) i = j; }); return i; }
+function allLessons(){ return MODULES.flatMap(m => m.lessons.map(l => ({...l, mod:m}))); }
+function lessonDone(id){ const l = S.lessons[id]; return !!(l && l.read); }
+function today(){ const d = new Date(); return d.getFullYear()+"-"+(d.getMonth()+1)+"-"+d.getDate(); }
+function markDay(){ const t = today(); if(!S.days.includes(t)){ S.days.push(t); S.days = S.days.slice(-60); } }
+function streak(){
+ let n = 0; const d = new Date();
+ for(;;){ const k = d.getFullYear()+"-"+(d.getMonth()+1)+"-"+d.getDate();
+  if(S.days.includes(k)){ n++; d.setDate(d.getDate()-1); } else if(n === 0 && k === today()){ d.setDate(d.getDate()-1); } else break; }
+ return n;
+}
+
+/* ===================== UTIL ===================== */
+const $ = s => document.querySelector(s);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+let toastT;
+function toast(msg){
+ let t = $(".toast"); if(!t){ t = document.createElement("div"); t.className = "toast"; t.setAttribute("role","status"); document.body.appendChild(t); }
+ t.textContent = msg; t.hidden = false; clearTimeout(toastT); toastT = setTimeout(()=> t.hidden = true, 2200);
+}
+function copy(text){
+ const done = () => toast("Copiato negli appunti");
+ const fallback = () => { const ta = document.createElement("textarea"); ta.value = text; document.body.appendChild(ta); ta.select();
+  try{ document.execCommand("copy"); done(); }catch(e){ toast("Seleziona il testo e copialo a mano"); } ta.remove(); };
+ try{ navigator.clipboard.writeText(text).then(done, fallback); }catch(e){ fallback(); }
+}
+function header(){
+ const x = totalXP(), b = BELTS[belt(x)];
+ $("#beltSw").style.background = b.color; $("#beltName").textContent = b.name;
+}
+function go(v){ view = v; render(); window.scrollTo(0,0); }
+
+/* ===================== VISTE ===================== */
+function vHome(){
+ const x = totalXP(), bi = belt(x), b = BELTS[bi], nb = BELTS[bi+1];
+ const pct = nb ? Math.round((x - b.xp) / (nb.xp - b.xp) * 100) : 100;
+ const ls = allLessons(), done = ls.filter(l => lessonDone(l.id)).length;
+ const next = ls.find(l => !lessonDone(l.id));
+ const missions = ls.filter(l => S.lessons[l.id] && S.lessons[l.id].mission).length;
+ return `
+ <section class="hero">
+  <span class="eyebrow">Il tuo grado</span>
+  <h1>${esc(b.name)}</h1>
+  <div class="belt-track" aria-hidden="true">${BELTS.map((k,i)=>`<span class="${i<=bi?"on":""}" style="background:${k.color}"></span>`).join("")}</div>
+  <div class="xpbar" role="progressbar" aria-valuenow="${pct}" aria-valuemin="0" aria-valuemax="100"><i style="width:${pct}%"></i></div>
+  <div class="meta"><span><b>${x}</b> XP</span><span>${nb ? `<b>${nb.xp - x}</b> XP alla ${esc(nb.name.toLowerCase())}` : "Hai raggiunto il grado più alto"}</span><span><b>${done}</b>/${ls.length} lezioni</span><span><b>${missions}</b> missioni</span><span><b>${streak()}</b> giorni di fila</span></div>
+  <div class="row">${next ? `<button class="btn" data-open="${next.id}">${done ? "Continua" : "Inizia"}: ${esc(next.title)}</button>` : `<button class="btn" data-go="exam">Affronta l'Esame Guru</button>`}</div>
+ </section>
+ ${next ? `<section class="card"><span class="eyebrow">Prossima lezione · ${esc(next.mod.title)}</span><h3>${esc(next.title)}</h3><p>${next.min} minuti di lettura, una missione pratica e un quiz.</p></section>` : ""}
+ <section class="card">
+  <span class="eyebrow">Come funziona</span>
+  <p>Ogni lezione vale <b>${XP.read} XP</b> alla lettura, <b>${XP.quiz} XP</b> per ogni risposta giusta e <b>${XP.mission} XP</b> per la missione pratica fatta davvero su Claude. L'Esame Guru finale vale fino a <b>100 XP</b>. Sali di cintura fino alla nera.</p>
+ </section>
+ <section class="card">
+  <span class="eyebrow">Esame Guru</span>
+  <h3>10 domande da tutto il percorso</h3>
+  <p>${S.exam ? `Miglior risultato: <b>${S.exam.best}/10</b>.` : "Consigliato dopo aver completato almeno metà delle lezioni."}</p>
+  <div class="row"><button class="btn ghost small" data-go="exam">Apri l'esame</button></div>
+ </section>
+ <p class="disclaimer">Guida didattica non ufficiale. Le funzioni di Claude evolvono in fretta: se un menu ha un nome diverso, la logica resta la stessa.</p>`;
+}
+
+function vPath(){
+ return `<div class="sec-h"><h2>Il percorso</h2><span class="meta">${MODULES.length} moduli</span></div>
+ <div class="list">${MODULES.map((m,i)=>{
+  const d = m.lessons.filter(l => lessonDone(l.id)).length;
+  return `<button class="mod" data-mod="${m.id}"><span class="mod-n">${i+1}</span><span class="mod-b"><h3>${esc(m.title)}</h3><p>${esc(m.sub)}</p><span class="pips">${m.lessons.map(l=>`<i class="${lessonDone(l.id)?"done":""}"></i>`).join("")}</span></span><span class="meta">${d}/${m.lessons.length}</span></button>`;
+ }).join("")}
+ <button class="mod" data-go="exam"><span class="mod-n">★</span><span class="mod-b"><h3>Esame Guru</h3><p>10 domande a caso da tutti i moduli</p></span><span class="meta">${S.exam ? S.exam.best+"/10" : ""}</span></button>
+ </div>`;
+}
+
+function vModule(mid){
+ const i = MODULES.findIndex(m => m.id === mid), m = MODULES[i];
+ return `<button class="back" data-go="path">← Percorso</button>
+ <span class="eyebrow">Modulo ${i+1}</span><h1 style="font-size:28px">${esc(m.title)}</h1><p style="margin:0;color:var(--muted)">${esc(m.sub)}</p>
+ <div class="list">${m.lessons.map((l,j)=>`<button class="lesson-row ${lessonDone(l.id)?"done":""}" data-open="${l.id}"><span class="st">${lessonDone(l.id)?"✓":j+1}</span><span class="t"><b>${esc(l.title)}</b><span>${l.min} min · ${quizScore(l)}</span></span></button>`).join("")}</div>`;
+}
+function quizScore(l){ const q = (S.lessons[l.id]||{}).quiz || {}; const n = Object.values(q).filter(v=>v===true).length; const a = Object.keys(q).length; return a ? `quiz ${n}/${l.quiz.length}` : "quiz da fare"; }
+
+function vLesson(id){
+ const ls = allLessons(), idx = ls.findIndex(l => l.id === id), l = ls[idx], st = lessonState(id);
+ const mi = MODULES.indexOf(l.mod), next = ls[idx+1];
+ if(!st.read){ st.read = true; markDay(); save(); setTimeout(()=>toast(`+${XP.read} XP lezione letta`),300); }
+ return `<button class="back" data-mod="${l.mod.id}">← ${esc(l.mod.title)}</button>
+ <article class="lesson">
+  <span class="eyebrow">Modulo ${mi+1} · ${l.min} min</span>
+  <h1>${esc(l.title)}</h1>
+  <div class="prose">${l.body}</div>
+  <div class="callout tip"><span class="eyebrow">Trucco da esperto</span><p style="margin:0">${l.tip}</p></div>
+  <section class="mission"><span class="eyebrow" style="color:var(--amber)">Missione pratica · +${XP.mission} XP</span><h3>Mettilo in pratica su Claude</h3><p style="margin:0">${esc(l.mission)}</p>
+   <div class="row"><button class="btn small ${st.mission?"ghost":""}" data-mission="${id}">${st.mission ? "Missione completata ✓" : "Ho completato la missione"}</button><button class="btn ghost small" data-copy-mission="${id}">Copia il compito</button></div></section>
+  <section class="quiz"><span class="eyebrow">Quiz · +${XP.quiz} XP per risposta giusta</span>
+   ${l.quiz.map((q,qi)=>{ const ans = st.quiz[qi]; const chosen = st.quiz["c"+qi];
+    return `<div class="q"><p>${esc(q.q)}</p>${q.o.map((o,oi)=>{
+     let cls = ""; if(ans !== undefined){ if(oi === q.a) cls = "right"; else if(oi === chosen) cls = "wrong"; }
+     return `<button class="opt ${cls}" data-q="${id}|${qi}|${oi}" ${ans!==undefined?"disabled":""}>${esc(o)}</button>`; }).join("")}
+     ${ans!==undefined ? `<p class="why">${ans ? "Esatto. " : "Non proprio. "}${esc(q.w)}</p>` : ""}</div>`; }).join("")}
+  </section>
+  <div class="row">${next ? `<button class="btn" data-open="${next.id}">Avanti: ${esc(next.title)}</button>` : `<button class="btn" data-go="exam">Vai all'Esame Guru</button>`}</div>
+ </article>`;
+}
+
+let exam = null;
+function newExam(){
+ const pool = allLessons().flatMap(l => l.quiz.map(q => q));
+ for(let i = pool.length-1; i > 0; i--){ const j = Math.floor(Math.random()*(i+1)); [pool[i],pool[j]] = [pool[j],pool[i]]; }
+ exam = {qs: pool.slice(0,10), i:0, score:0, picked:null};
+}
+function vExam(){
+ if(!exam) newExam();
+ if(exam.i >= exam.qs.length){
+  const s = exam.score; const prev = S.exam ? S.exam.best : 0;
+  if(!S.exam || s > S.exam.best){ S.exam = {best:s}; markDay(); save(); }
+  const msg = s >= 9 ? "Livello guru. Ora insegna a qualcun altro: è il modo migliore per consolidare." : s >= 7 ? "Ottimo. Ripassa i moduli delle domande sbagliate e riprova." : "Buona base. Rileggi le lezioni e completa le missioni pratiche, poi riprova.";
+  return `<button class="back" data-go="path">← Percorso</button><section class="hero"><span class="eyebrow">Esame Guru</span><h1>${s}/10</h1><p style="margin:0">${msg}</p><div class="meta"><span>Record precedente: <b>${prev}/10</b></span></div><div class="row"><button class="btn" data-exam-restart="1">Rifai l'esame</button></div></section>`;
+ }
+ const q = exam.qs[exam.i];
+ return `<button class="back" data-go="path">← Percorso</button>
+ <span class="eyebrow">Esame Guru · domanda ${exam.i+1} di 10</span>
+ <div class="xpbar"><i style="width:${exam.i*10}%"></i></div>
+ <section class="quiz"><div class="q"><p>${esc(q.q)}</p>${q.o.map((o,oi)=>{
+  let cls = ""; if(exam.picked !== null){ if(oi === q.a) cls = "right"; else if(oi === exam.picked) cls = "wrong"; }
+  return `<button class="opt ${cls}" data-exam="${oi}" ${exam.picked!==null?"disabled":""}>${esc(o)}</button>`; }).join("")}
+  ${exam.picked !== null ? `<p class="why">${esc(q.w)}</p>` : ""}</div>
+  ${exam.picked !== null ? `<div class="row"><button class="btn" data-exam-next="1">${exam.i === 9 ? "Vedi il risultato" : "Prossima domanda"}</button></div>` : ""}
+ </section>`;
+}
+
+let labCat = "Tutti";
+function vLab(){
+ const cats = ["Tutti", ...new Set(TEMPLATES.map(t => t.cat))];
+ const list = TEMPLATES.map((t,i)=>({...t,i})).filter(t => labCat === "Tutti" || t.cat === labCat);
+ return `<div class="sec-h"><h2>Laboratorio prompt</h2></div>
+ <section class="card"><span class="eyebrow">Costruttore di prompt</span><h3>Componi un prompt con i 5 ingredienti</h3>
+  <div class="field"><label for="pb-role">Ruolo</label><input id="pb-role" value="Sei un esperto organizzatore di eventi aziendali"></div>
+  <div class="field"><label for="pb-goal">Obiettivo</label><input id="pb-goal" value="Preparare la scaletta di una cena di gala per 120 ospiti"></div>
+  <div class="field"><label for="pb-ctx">Contesto</label><textarea id="pb-ctx">Location: villa storica vicino Caserta. Data: sabato 14 novembre. Budget medio. Il cliente vuole un momento di premiazione dei dipendenti.</textarea></div>
+  <div class="field"><label for="pb-fmt">Formato</label><input id="pb-fmt" value="Tabella con orario, attività, responsabile, note"></div>
+  <div class="field"><label for="pb-q">Criteri di qualità</label><input id="pb-q" value="Tempi realistici, margini tra un momento e l'altro, segnala i rischi"></div>
+  <pre id="pb-out"></pre>
+  <div class="row"><button class="btn small" id="pb-copy">Copia il prompt</button><span class="meta">Esempio già compilato: modificalo con il tuo caso.</span></div>
+ </section>
+ <div class="sec-h"><h2 style="font-size:19px">Prompt pronti</h2></div>
+ <div class="tabs" role="group" aria-label="Categorie">${cats.map(c=>`<button data-cat="${esc(c)}" aria-pressed="${c===labCat}">${esc(c)}</button>`).join("")}</div>
+ <div class="list">${list.map(t=>`<section class="card"><span class="tag">${esc(t.cat)}</span><h3>${esc(t.title)}</h3><pre>${esc(t.text)}</pre><div class="row"><button class="btn small" data-tpl="${t.i}">Copia</button></div></section>`).join("")}</div>`;
+}
+function buildPrompt(){
+ const v = id => ($("#"+id)||{}).value || "";
+ const parts = [];
+ if(v("pb-role")) parts.push(v("pb-role").trim()+".");
+ if(v("pb-goal")) parts.push("Obiettivo: "+v("pb-goal").trim()+".");
+ if(v("pb-ctx")) parts.push("<contesto>\n"+v("pb-ctx").trim()+"\n</contesto>");
+ if(v("pb-fmt")) parts.push("Formato della risposta: "+v("pb-fmt").trim()+".");
+ if(v("pb-q")) parts.push("Criteri di qualità: "+v("pb-q").trim()+".");
+ parts.push("Se ti mancano informazioni importanti, chiedimele prima di rispondere.");
+ return parts.join("\n\n");
+}
+
+let glQ = "";
+function vGlossary(){
+ const q = glQ.toLowerCase();
+ const items = GLOSSARY.filter(([t,d]) => !q || t.toLowerCase().includes(q) || d.toLowerCase().includes(q)).sort((a,b)=>a[0].localeCompare(b[0],"it"));
+ return `<div class="sec-h"><h2>Glossario</h2><span class="meta">${GLOSSARY.length} termini</span></div>
+ <input class="search" id="gl-search" type="search" placeholder="Cerca un termine, es. skill" value="${esc(glQ)}" aria-label="Cerca nel glossario">
+ <dl class="gl" id="gl-list">${items.map(([t,d])=>`<div><dt>${esc(t)}</dt><dd>${esc(d)}</dd></div>`).join("") || `<p>Nessun termine trovato per «${esc(glQ)}».</p>`}</dl>
+ <section class="card"><span class="eyebrow">Zona pericolo</span><p>Azzera tutti i progressi salvati su questo dispositivo.</p><div class="row"><button class="btn ghost small" id="reset">${resetArm ? "Tocca di nuovo per confermare" : "Azzera progressi"}</button></div></section>`;
+}
+let resetArm = false;
+
+/* ===================== RENDER & EVENTI ===================== */
+function render(){
+ const v = $("#view"); let html = "";
+ const tab = view.tab;
+ if(tab === "home") html = vHome();
+ else if(tab === "path") html = vPath();
+ else if(tab === "mod") html = vModule(view.id);
+ else if(tab === "lesson") html = vLesson(view.id);
+ else if(tab === "exam") html = vExam();
+ else if(tab === "lab") html = vLab();
+ else if(tab === "glossary") html = vGlossary();
+ v.innerHTML = html;
+ const navTab = ({mod:"path",lesson:"path",exam:"path"})[tab] || tab;
+ document.querySelectorAll(".nav button").forEach(b => { if(b.dataset.tab === navTab) b.setAttribute("aria-current","page"); else b.removeAttribute("aria-current"); });
+ header();
+ if(tab === "lab"){ const out = $("#pb-out"), upd = () => out.textContent = buildPrompt(); upd(); document.querySelectorAll("[id^=pb-]").forEach(el => el.addEventListener("input", upd)); }
+ if(tab === "glossary"){ const s = $("#gl-search"); s.addEventListener("input", () => { glQ = s.value; const pos = s.selectionStart; render(); const n = $("#gl-search"); n.focus(); n.setSelectionRange(pos,pos); }); }
+}
+
+document.addEventListener("click", e => {
+ const t = e.target.closest("button"); if(!t) return;
+ const d = t.dataset;
+ if(d.tab){ if(d.tab === "path" && view.tab === "exam") exam = null; go({tab:d.tab}); }
+ else if(d.go){ if(d.go === "exam" && view.tab !== "exam") exam = null; go({tab:d.go}); }
+ else if(d.mod){ go({tab:"mod", id:d.mod}); }
+ else if(d.open){ go({tab:"lesson", id:d.open}); }
+ else if(d.mission){ const st = lessonState(d.mission); st.mission = !st.mission; markDay(); save(); if(st.mission) toast(`+${XP.mission} XP missione completata`); const y = window.scrollY; render(); window.scrollTo(0,y); }
+ else if(d.copyMission){ const l = allLessons().find(x => x.id === d.copyMission); copy(l.mission); }
+ else if(d.q){ const [id,qi,oi] = d.q.split("|"); const st = lessonState(id); const l = allLessons().find(x => x.id === id);
+  if(st.quiz[qi] === undefined){ const ok = +oi === l.quiz[+qi].a; st.quiz[qi] = ok; st.quiz["c"+qi] = +oi; markDay(); save(); if(ok) toast(`+${XP.quiz} XP risposta esatta`); }
+  const y = window.scrollY; render(); window.scrollTo(0,y); }
+ else if(d.exam !== undefined){ if(exam.picked === null){ exam.picked = +d.exam; if(exam.picked === exam.qs[exam.i].a) exam.score++; } render(); }
+ else if(d.examNext){ exam.i++; exam.picked = null; render(); window.scrollTo(0,0); }
+ else if(d.examRestart){ newExam(); render(); }
+ else if(d.cat){ labCat = d.cat; render(); }
+ else if(d.tpl){ copy(TEMPLATES[+d.tpl].text); }
+ else if(t.id === "pb-copy"){ copy(buildPrompt()); }
+ else if(t.id === "reset"){ if(resetArm){ S = {lessons:{}, exam:null, days:[]}; save(); resetArm = false; toast("Progressi azzerati"); go({tab:"home"}); } else { resetArm = true; render(); setTimeout(()=>{ resetArm = false; if(view.tab==="glossary") render(); }, 4000); } }
+});
+
+render();
+</script>
