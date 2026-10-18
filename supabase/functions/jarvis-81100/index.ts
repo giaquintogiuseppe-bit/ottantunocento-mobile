@@ -3,6 +3,7 @@
 // (/brief /timbra /pianifica /pagata /spesa /richiesta, foto distinte, vocali);
 // le richieste in linguaggio libero passano all'agente Jarvis (in fondo al file),
 // che legge i dati e PROPONE le scritture: nulla viene salvato senza il ✅ su Telegram.
+// Cantieri, lavorazioni, presenze e preventivi passano dal motore condiviso agente_* (vedi migrations/20261018_agente_81100.sql).
 // Segreti: SOLO da Supabase → Edge Functions → Secrets (mai scritti nel codice).
 import { createClient } from "npm:@supabase/supabase-js@2";
 import Anthropic from "npm:@anthropic-ai/sdk@0.128.0";
@@ -782,7 +783,9 @@ COME LAVORI
 - Un messaggio può contenere più richieste ("sposta Roberto su Gaeta martedì e segna pagata la 143"): gestiscile tutte.
 - Per SCRIVERE usa gli strumenti proponi_*: creano una PROPOSTA che Giuseppe conferma con un bottone. Non dire mai che hai già registrato/salvato qualcosa: di' che hai preparato la proposta da confermare. Prima di proporre verifica i dati (fattura giusta, cantiere giusto, persona libera).
 - Se uno strumento restituisce un errore o più candidati, non tirare a indovinare: chiedi a Giuseppe quale intende.
-- Cose che NON puoi fare (per ora): modificare ricavi/budget dei cantieri, cancellare dati, fatture fornitori, preventivi, contratti sponsor. Per queste indica l'app giusta (Gestionale, Preventivi, Contratti JC21) oppure di lavorarci con Claude.
+- Per mettere giornate di lavoro in agenda usa proponi_lavorazione (le scrive subito nel cantiere); proponi_pianificazione solo se Giuseppe chiede espressamente di passare dal Planning.
+- Puoi anche CREARE CANTIERI (proponi_cantiere), aggiungere GIORNATE DI LAVORO a un cantiere (proponi_lavorazione), registrare PRESENZE fatte (proponi_presenza) e preparare PREVENTIVI in bozza (proponi_preventivo). Per le presenze chiedi l'importo se Giuseppe non lo dice. Per pianificare giornate future usa proponi_lavorazione, non le presenze.
+- Cose che NON puoi fare (per ora): modificare ricavi/budget di cantieri esistenti, cancellare dati, fatture fornitori, inviare preventivi, contratti sponsor. Per queste indica l'app giusta (Gestionale, Preventivi, Contratti JC21) oppure di lavorarci con Claude.
 - Se ti chiede lettere, email, diffide, comunicati o consigli (legali, marketing, lavoro, fisco): rispondi da consulente esperto con i dati aziendali, in modo pratico; per documenti lunghi o contratti completi proponi di prepararli con Claude.
 
 FORMATO (Telegram HTML)
@@ -798,6 +801,18 @@ REGOLE D'ORO DEI DATI
 
 ` + SCHEMA.split("\n").filter((r) => !r.startsWith("SCRITTURE:") && !r.startsWith("Sei l'Assistente")).join("\n");
 
+const GIORNATA_TG = {
+  type: "object",
+  properties: {
+    data: { type: "string", description: "YYYY-MM-DD" },
+    ora_inizio: { type: ["string", "null"], description: "HH:MM (null = 08:00)" },
+    ora_fine: { type: ["string", "null"], description: "HH:MM (null = 18:00)" },
+    descrizione: { type: ["string", "null"] },
+    squadra: { type: "array", items: { type: "string" }, description: "nomi delle persone" },
+  },
+  required: ["data", "ora_inizio", "ora_fine", "descrizione", "squadra"],
+  additionalProperties: false,
+};
 // strict: true → gli input rispettano sempre lo schema (tutti i campi required, null se assenti)
 const JARVIS_TOOLS: Anthropic.Tool[] = [
   {
@@ -893,6 +908,91 @@ const JARVIS_TOOLS: Anthropic.Tool[] = [
     },
     strict: true,
   },
+  // ── scritture sul motore condiviso agente_* (stesse regole del connettore Claude) ──
+  {
+    name: "proponi_cantiere",
+    description: "Prepara la creazione di un NUOVO cantiere/commessa (codice COM automatico, controllo doppioni, cliente cercato in anagrafica), con eventuali giornate di lavoro già note.",
+    input_schema: {
+      type: "object",
+      properties: {
+        nome: { type: "string" },
+        cliente: { type: ["string", "null"] },
+        luogo: { type: ["string", "null"] },
+        data_inizio: { type: ["string", "null"], description: "YYYY-MM-DD" },
+        data_fine: { type: ["string", "null"], description: "YYYY-MM-DD" },
+        tipo_cant: { type: ["array", "null"], items: { type: "string", enum: ["evento", "noleggio", "fornitura", "servizio", "interno"] } },
+        stato: { type: ["string", "null"], enum: ["da confermare", "in corso", "fermo", null] },
+        note: { type: ["string", "null"] },
+        ricavo_previsto: { type: ["number", "null"] },
+        preventivo: { type: ["string", "null"], description: "numero PREV-… da collegare" },
+        giornate: { type: "array", items: GIORNATA_TG },
+        forza_doppione: { type: "boolean", description: "true SOLO se Giuseppe conferma che è diverso da un cantiere omonimo" },
+      },
+      required: ["nome", "cliente", "luogo", "data_inizio", "data_fine", "tipo_cant", "stato", "note", "ricavo_previsto", "preventivo", "giornate", "forza_doppione"],
+      additionalProperties: false,
+    },
+    strict: true,
+  },
+  {
+    name: "proponi_lavorazione",
+    description: "Prepara una o più giornate di lavoro (data, orario, squadra, descrizione) su un cantiere ESISTENTE, scritte direttamente nel cantiere. Avvisa se qualcuno è già impegnato altrove.",
+    input_schema: {
+      type: "object",
+      properties: {
+        cantiere: { type: "string", description: "nome (anche parziale), codice COM-… o id" },
+        giornate: { type: "array", items: GIORNATA_TG },
+      },
+      required: ["cantiere", "giornate"],
+      additionalProperties: false,
+    },
+    strict: true,
+  },
+  {
+    name: "proponi_presenza",
+    description: "Prepara la registrazione delle presenze (giornate GIÀ lavorate) di una o più persone su un cantiere in una data, con orario e importo in €.",
+    input_schema: {
+      type: "object",
+      properties: {
+        data: { type: ["string", "null"], description: "YYYY-MM-DD; null = oggi" },
+        cantiere: { type: "string" },
+        persone: {
+          type: "array",
+          items: { type: "object", properties: { nome: { type: "string" }, importo: { type: ["number", "null"] } }, required: ["nome", "importo"], additionalProperties: false },
+        },
+        importo: { type: ["number", "null"], description: "€ a testa se uguale per tutti" },
+        ora_inizio: { type: ["string", "null"], description: "HH:MM" },
+        ora_fine: { type: ["string", "null"], description: "HH:MM" },
+        note: { type: ["string", "null"] },
+        forza_doppione: { type: "boolean", description: "true solo per un secondo turno sullo stesso cantiere e giorno" },
+      },
+      required: ["data", "cantiere", "persone", "importo", "ora_inizio", "ora_fine", "note", "forza_doppione"],
+      additionalProperties: false,
+    },
+    strict: true,
+  },
+  {
+    name: "proponi_preventivo",
+    description: "Prepara un preventivo in BOZZA (numero PREV automatico, IVA 22%, dati cliente dalle anagrafiche). Giuseppe lo rivede e lo invia dall'app Preventivi.",
+    input_schema: {
+      type: "object",
+      properties: {
+        cliente: { type: "string" },
+        oggetto: { type: "string" },
+        righe: {
+          type: "array",
+          items: { type: "object", properties: { descrizione: { type: "string" }, qta: { type: "number" }, prezzo: { type: "number" } }, required: ["descrizione", "qta", "prezzo"], additionalProperties: false },
+        },
+        iva_tipo: { type: "string", enum: ["normale", "split", "art7quater"], description: "split = enti pubblici" },
+        cliente_riferimento: { type: ["string", "null"] },
+        rif_richiesta: { type: ["string", "null"] },
+        note_finali: { type: ["string", "null"] },
+        cantiere: { type: ["string", "null"], description: "cantiere esistente da collegare" },
+      },
+      required: ["cliente", "oggetto", "righe", "iva_tipo", "cliente_riferimento", "rif_richiesta", "note_finali", "cantiere"],
+      additionalProperties: false,
+    },
+    strict: true,
+  },
 ];
 
 // ─── risoluzione nomi (persone, cantieri, fatture) ───
@@ -939,8 +1039,34 @@ async function trovaFattura(numero: string): Promise<{ ok: any } | { err: string
 const isoOk = (s: string | null) => !s || /^\d{4}-\d{2}-\d{2}$/.test(s);
 const oraOk = (s: string | null) => !s || /^([01]?\d|2[0-3]):[0-5]\d$/.test(s);
 
+// ─── motore condiviso agente_* (anche il connettore Claude usa queste funzioni SQL) ───
+const MOTORE: Record<string, { fn: string; tipo: string; icona: string }> = {
+  proponi_cantiere: { fn: "agente_crea_cantiere", tipo: "cantiere", icona: "🏗" },
+  proponi_lavorazione: { fn: "agente_aggiungi_lavorazione", tipo: "lavorazione", icona: "📅" },
+  proponi_presenza: { fn: "agente_aggiungi_presenza", tipo: "presenza", icona: "👷" },
+  proponi_preventivo: { fn: "agente_crea_preventivo", tipo: "preventivo", icona: "📄" },
+};
+const MOTORE_PER_TIPO: Record<string, string> = Object.fromEntries(Object.values(MOTORE).map((m) => [m.tipo, m.fn]));
+const escH = (s: any) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+// toglie i null (lo schema strict li impone per i campi assenti): le funzioni SQL usano i loro default
+function senzaNull(v: any): any {
+  if (Array.isArray(v)) return v.map(senzaNull);
+  if (v && typeof v === "object") return Object.fromEntries(Object.entries(v).filter(([, x]) => x !== null).map(([k, x]) => [k, senzaNull(x)]));
+  return v;
+}
+function riepilogoMotore(icona: string, r: any): string {
+  const avv: string[] = Array.isArray(r?.avvisi) ? r.avvisi : [];
+  return `${icona} <b>${escH(r?.riepilogo)}</b>` + (avv.length ? "\n⚠️ " + avv.map(escH).join("\n⚠️ ") : "");
+}
+
 // ─── costruzione delle proposte (validano, NON scrivono sui dati) ───
 async function preparaAzione(nome: string, inp: any): Promise<{ tipo: string; payload: any; riepilogo: string } | { err: string }> {
+  if (MOTORE[nome]) {
+    const p = senzaNull(inp);
+    const { data, error } = await sb.rpc(MOTORE[nome].fn, { p, conferma: false, canale: "telegram" });
+    if (error) return { err: error.message };
+    return { tipo: MOTORE[nome].tipo, payload: p, riepilogo: riepilogoMotore(MOTORE[nome].icona, data) };
+  }
   if (nome === "proponi_pagamento") {
     if (!isoOk(inp.data)) return { err: "data non valida (YYYY-MM-DD)" };
     const r = await trovaFattura(String(inp.numero_fattura || ""));
@@ -1041,6 +1167,11 @@ async function preparaAzione(nome: string, inp: any): Promise<{ tipo: string; pa
 // ─── esecuzione di una proposta confermata ───
 async function eseguiAzione(az: any, da: string): Promise<string> {
   const p = az.payload || {};
+  if (MOTORE_PER_TIPO[az.tipo]) {
+    const { data, error } = await sb.rpc(MOTORE_PER_TIPO[az.tipo], { p, conferma: true, canale: "telegram · " + da });
+    if (error) throw new Error(error.message);
+    return "✅ " + riepilogoMotore("", data).replace(/^ /, "") + (az.tipo === "preventivo" ? "\n<i>Bozza pronta: rivedila e inviala da Preventivi.</i>" : "");
+  }
   if (az.tipo === "pagamento") {
     const { data: f } = await sb.from("fatture").select("stato,acconti,importo").eq("id", p.fattura_id).single();
     if (!f || f.stato !== "emessa") throw new Error("la fattura non è più aperta (stato: " + (f?.stato || "?") + ")");
