@@ -1233,8 +1233,12 @@ function ricalcolaSaldi(){
     const pag=(DB.pagamenti||[]).filter(pg=>pg.dipId===p.id).reduce((a,x)=>a+parseFloat(x.pagato||0),0);
     const scalAppl=totaleScalatureApplicate(p.id);
     const addebiti=residuoAddebitiMob(p.id);
-    const saldo=mat-ant-pag-scalAppl;
-    return {dipId:p.id,nome:p.nome,maturato:mat,anticipi:ant,pagamenti:pag,scalature:scalAppl,addebiti,saldo};
+    // Apertura/pregresso + rettifiche storiche datate (stesse del Gestionale): PRIMA la mobile le
+    // ignorava e ricalcolava un saldo diverso, risovrascrivendo quello corretto del Gestionale.
+    const apertura = parseFloat((DB.saldiApertura||{})[p.id]||0)
+      + (DB.rettificheDip||[]).filter(r=>r.dipId===p.id).reduce((a,r)=>a+parseFloat(r.importo||0),0);
+    const saldo=mat+apertura-ant-pag-scalAppl;
+    return {dipId:p.id,nome:p.nome,maturato:mat,anticipi:ant,pagamenti:pag,scalature:scalAppl,addebiti,apertura,saldo};
   });
 }
 
