@@ -36,7 +36,7 @@ html,body{height:100%;background:var(--navy);color:var(--text);font-family:'IBM 
 .nav-btn{flex:1;padding:10px 4px 8px;display:flex;flex-direction:column;align-items:center;gap:3px;cursor:pointer;border:none;background:transparent;color:var(--text2);font-size:11px;font-weight:600;letter-spacing:.5px;text-transform:uppercase;transition:color .2s;min-height:44px}
 .nav-btn .ni{font-size:22px}
 .risf{display:block;font-size:12px;font-weight:600;color:var(--text2);margin-bottom:10px}
-.risf select,.risf input{display:block;width:100%;margin-top:4px;padding:11px 12px;border:1px solid var(--brd);border-radius:10px;font-size:15px;font-family:inherit;background:var(--card);color:var(--text)}
+.risf select,.risf input{display:block;width:100%;margin-top:4px;padding:10px 12px;border:1px solid var(--brd);border-radius:10px;font-size:16px;font-family:inherit;background:var(--card);color:var(--text)}
 .risf select:focus,.risf input:focus{outline:2px solid var(--teal);border-color:var(--teal)}
 .ct-chip{flex-shrink:0;font-size:13px;font-weight:600;padding:6px 12px;border-radius:20px;border:1px solid var(--brd);background:var(--navy2);color:var(--text2);cursor:pointer;white-space:nowrap;font-family:inherit}
 .ct-chip.on{background:var(--teal);color:#fff;border-color:var(--teal)}
@@ -95,7 +95,7 @@ html,body{height:100%;background:var(--navy);color:var(--text);font-family:'IBM 
 .pres-toggle.on::after{left:21px}
 .pres-toggle.off::after{left:3px}
 .pres-fields{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}
-.ie{background:var(--navy);border:1px solid var(--brd);border-radius:8px;color:var(--text);font-size:14px;padding:8px 10px;width:100%;outline:none;-webkit-appearance:none}
+.ie{background:var(--navy);border:1px solid var(--brd);border-radius:8px;color:var(--text);font-size:16px;padding:7px 10px;width:100%;outline:none;-webkit-appearance:none}
 .ie:focus{border-color:var(--teal)}
 /* SEZIONE LABEL */
 .sec-lbl{font-size:12px;letter-spacing:1.2px;text-transform:uppercase;color:var(--text2);font-weight:700;margin:16px 0 8px;padding-left:2px}
@@ -447,7 +447,7 @@ button{touch-action:manipulation}
   <div class="pg" id="pg-pres">
     <div class="field">
       <label>Data</label>
-      <input type="date" id="pres-data" onchange="loadPres();aggiornInfoPlanning()">
+      <input type="date" id="pres-data" onchange="loadPres()">
     </div>
     <!-- Box importa da Planning -->
     <div style="background:rgba(14,124,102,.06);border:1px solid rgba(14,124,102,.2);border-radius:10px;padding:12px 14px;margin-bottom:12px">
@@ -504,7 +504,7 @@ button{touch-action:manipulation}
   <!-- ANTICIPI SETTIMANALI PER DIPENDENTE -->
   <div class="pg" id="pg-antsett">
     <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
-      <button onclick="goTo('saldi',document.querySelector('.nav-btn[onclick*=saldi]'))" style="background:var(--navy2);border:1px solid var(--brd);border-radius:10px;padding:9px 13px;color:var(--text);font-size:15px;cursor:pointer">←</button>
+      <button onclick="goTo('saldi',_navBtn('saldi'))" style="background:var(--navy2);border:1px solid var(--brd);border-radius:10px;padding:9px 13px;color:var(--text);font-size:15px;cursor:pointer">←</button>
       <div style="font-size:17px;font-weight:800">💸 Anticipi settimanali</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px">
@@ -550,7 +550,7 @@ button{touch-action:manipulation}
       <div class="field"><label>Importo pagato (€)</label><input type="number" id="pag-imp" inputmode="decimal" step="0.01" placeholder="0.00"></div>
       <div class="field"><label>Data pagamento</label><input type="date" id="pag-data"></div>
       <div class="field"><label>Note</label><input type="text" id="pag-note" placeholder="es. Fine settimana 1-7 giu"></div>
-      <div id="pag-danno-hint" style="display:none;font-size:12px;color:var(--text2);margin-bottom:14px;display:flex;align-items:center;gap:6px" onclick="goTo('danni',document.querySelector('[onclick*=danni]'))">
+      <div id="pag-danno-hint" style="display:none;font-size:12px;color:var(--text2);margin-bottom:14px;align-items:center;gap:6px" onclick="goTo('danni',null)">
         <span style="color:var(--red)">⚠️</span> <span id="pag-danno-hint-txt"></span> <span style="color:var(--teal);text-decoration:underline">gestisci →</span>
       </div>
       <button class="btn btn-teal" onclick="conBlocco(this,salvaPagamento)">💰 Registra pagamento</button>
@@ -598,7 +598,7 @@ button{touch-action:manipulation}
     <div class="kpi-row" id="cant-kpi"></div>
     <div style="display:flex;gap:8px;align-items:center;margin-bottom:14px;flex-wrap:wrap">
       <input type="text" placeholder="🔍 Cerca cantiere..." id="cant-search" oninput="renderCantieri()"
-        style="flex:1;background:var(--navy2);border:1px solid var(--brd);border-radius:10px;color:var(--text);font-size:14px;padding:11px 14px;outline:none;min-width:140px">
+        style="flex:1;background:var(--navy2);border:1px solid var(--brd);border-radius:10px;color:var(--text);font-size:16px;padding:10px 14px;outline:none;min-width:140px">
       <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text2);white-space:nowrap;cursor:pointer">
         <input type="checkbox" id="cant-mostra-arch" onchange="renderCantieri()" style="accent-color:var(--teal)"> 🗄 Archivio
       </label>
@@ -617,7 +617,7 @@ button{touch-action:manipulation}
 
   <!-- DETTAGLIO CANTIERE -->
   <div class="pg" id="pg-dett">
-    <button onclick="goTo('cant',document.querySelector('.nav-btn:last-child'))" style="background:var(--navy2);border:1px solid var(--brd);border-radius:8px;padding:8px 14px;color:var(--text);font-size:13px;font-weight:700;margin-bottom:14px;cursor:pointer">← Cantieri</button>
+    <button onclick="goTo('cant',_navBtn('cant'))" style="background:var(--navy2);border:1px solid var(--brd);border-radius:8px;padding:8px 14px;color:var(--text);font-size:13px;font-weight:700;margin-bottom:14px;cursor:pointer">← Cantieri</button>
     <div style="font-size:18px;font-weight:800;margin-bottom:12px" id="dett-nome"></div>
 
     <!-- Budget inline -->
@@ -691,9 +691,9 @@ button{touch-action:manipulation}
     <!-- Filtro periodo -->
     <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap">
       <div style="flex:1"><label style="font-size:12px;color:var(--text2);font-weight:700;text-transform:uppercase;display:block;margin-bottom:3px">Da</label>
-        <input type="date" id="dett-da" onchange="renderDett()" style="background:var(--navy2);border:1px solid var(--brd);border-radius:8px;color:var(--text);font-family:'IBM Plex Mono',monospace;font-size:13px;padding:8px 10px;width:100%;outline:none"></div>
+        <input type="date" id="dett-da" onchange="renderDett()" style="background:var(--navy2);border:1px solid var(--brd);border-radius:8px;color:var(--text);font-family:'IBM Plex Mono',monospace;font-size:16px;padding:7px 8px;width:100%;outline:none"></div>
       <div style="flex:1"><label style="font-size:12px;color:var(--text2);font-weight:700;text-transform:uppercase;display:block;margin-bottom:3px">A</label>
-        <input type="date" id="dett-al" onchange="renderDett()" style="background:var(--navy2);border:1px solid var(--brd);border-radius:8px;color:var(--text);font-family:'IBM Plex Mono',monospace;font-size:13px;padding:8px 10px;width:100%;outline:none"></div>
+        <input type="date" id="dett-al" onchange="renderDett()" style="background:var(--navy2);border:1px solid var(--brd);border-radius:8px;color:var(--text);font-family:'IBM Plex Mono',monospace;font-size:16px;padding:7px 8px;width:100%;outline:none"></div>
       <button onclick="document.getElementById('dett-da').value='';document.getElementById('dett-al').value='';renderDett()" style="background:var(--navy2);border:1px solid var(--brd);border-radius:8px;padding:8px 12px;color:var(--text2);font-size:12px;margin-top:19px;cursor:pointer">Tutto</button>
     </div>
     <div id="dett-body"></div>
@@ -763,7 +763,7 @@ button{touch-action:manipulation}
   .dia-f{display:flex;flex-direction:column;gap:4px}
   .dia-f.full{grid-column:1/-1}
   .dia-f label{font-size:10.5px;text-transform:uppercase;letter-spacing:.5px;color:var(--text2);font-weight:700;padding-left:2px}
-  .dia-f input,.dia-f select{background:var(--navy);border:1px solid var(--brd);border-radius:9px;color:var(--text);font-family:inherit;font-size:13.5px;padding:9px 10px;outline:none;width:100%;-webkit-appearance:none}
+  .dia-f input,.dia-f select{background:var(--navy);border:1px solid var(--brd);border-radius:9px;color:var(--text);font-family:inherit;font-size:16px;padding:8px 9px;outline:none;width:100%;-webkit-appearance:none}
   .dia-f input:focus,.dia-f select:focus{border-color:var(--teal)}
   .dia-f.eur input{font-family:'IBM Plex Mono',monospace;color:var(--gold)}
   select.dia-ok{border-color:rgba(75,232,122,.45)}
@@ -826,7 +826,7 @@ button{touch-action:manipulation}
       <div id="dia-done-count" style="font-size:13.5px;color:var(--text2);margin-bottom:18px"></div>
       <div class="dia-recap" id="dia-recap" style="text-align:left;background:var(--card);border:1px solid var(--brd);border-radius:13px;padding:4px 14px;margin-bottom:18px"></div>
       <button class="btn btn-teal" onclick="diarioReset()">📓 Scrivi un'altra cosa</button>
-      <button class="btn btn-ghost" onclick="goTo('dash',document.querySelector('.nav-btn'))">Torna alla Home</button>
+      <button class="btn btn-ghost" onclick="goTo('dash',_navBtn('dash'))">Torna alla Home</button>
     </div>
 
     <!-- PROGRAMMA LAVORI -->
@@ -851,7 +851,7 @@ button{touch-action:manipulation}
 
   <!-- RISORSE & DEPOSITI (campo) -->
   <div class="pg" id="pg-risorse">
-    <button onclick="goTo('dash',document.querySelector('.nav-btn'))" style="background:var(--navy2);border:1px solid var(--brd);border-radius:8px;padding:8px 14px;color:var(--text);font-size:13px;font-weight:700;margin-bottom:14px;cursor:pointer">← Home</button>
+    <button onclick="goTo('dash',_navBtn('dash'))" style="background:var(--navy2);border:1px solid var(--brd);border-radius:8px;padding:8px 14px;color:var(--text);font-size:13px;font-weight:700;margin-bottom:14px;cursor:pointer">← Home</button>
     <div id="risorse-body"><div style="text-align:center;color:var(--text2);padding:30px">Carico le risorse…</div></div>
   </div>
 </div><!-- /content -->
@@ -956,7 +956,26 @@ function _mobPortaModificheLocali(D){
   MERGE_FLAT.forEach(k=>{ D[k]=_merge3Arr(_mobBase && _mobBase[k], DB[k], D[k]); });
   D.presenze=_merge3Pres(_mobBase && _mobBase.presenze, DB.presenze, D.presenze);
 }
-async function mobPatchDati(mutator){
+// ── Barra persistente "NON salvato": resta visibile finché un salvataggio non va a buon fine
+// (il toast sparisce dopo 2 secondi e l'errore passava inosservato).
+function _mobBarraNonSalvato(on){
+  let b=document.getElementById('l81-nonsalvato');
+  if(!on){ if(b) b.style.display='none'; return; }
+  if(!b){
+    b=document.createElement('div'); b.id='l81-nonsalvato';
+    b.style.cssText='position:fixed;top:0;left:0;right:0;z-index:9998;background:#c62828;color:#fff;display:flex;align-items:center;justify-content:center;gap:10px;padding:calc(env(safe-area-inset-top,0px) + 8px) 12px 8px;font-size:14px;font-weight:700;box-shadow:0 2px 8px rgba(0,0,0,.3)';
+    b.innerHTML='<span>⚠ Modifiche NON salvate sul cloud</span><button type="button" onclick="salvaCloud(false)" style="background:#fff;color:#c62828;border:none;border-radius:6px;padding:5px 12px;font-size:14px;font-weight:800;cursor:pointer">Riprova</button>';
+    document.body.appendChild(b);
+  }
+  b.style.display='flex';
+}
+// Esegue un salvataggio puntuale e aggiorna la barra in base all'esito (true/false o eccezione)
+async function _mobTracciaSalvataggio(fn){
+  try{ const ok=await fn(); _mobBarraNonSalvato(!ok); return ok; }
+  catch(e){ _mobBarraNonSalvato(true); throw e; }
+}
+async function mobPatchDati(mutator){ return _mobTracciaSalvataggio(()=>_mobPatchDatiRaw(mutator)); }
+async function _mobPatchDatiRaw(mutator){
   for(let tentativo=1; tentativo<=6; tentativo++){
     const row=await sbGet();
     const D=(row&&row.dati)?row.dati:{};
@@ -1164,12 +1183,14 @@ async function salvaCloud(silenzioso){
     if(savedRow.versione != null) _mobUltimaVersione = savedRow.versione;   // versione dal PATCH: niente GET extra
 
     setStatus(true,'Sincronizzato ✓');
+    _mobBarraNonSalvato(false);
     if(!silenzioso) toast('Salvato ✓');
     return true;
   } catch(err){
     setStatus(false,'Errore sync — riprova');
     // Un salvataggio fallito va sempre segnalato, anche in background: altrimenti sembra "salvato" ma non lo è.
     toast('⚠ Non salvato sul cloud: '+String(err.message||err).slice(0,50)+' — tocca 🔄 Sync');
+    _mobBarraNonSalvato(true);
     console.error('salvaCloud error:', err);
     return false;
   }
@@ -1303,7 +1324,7 @@ function ricalcolaSaldi(){
     Object.keys(DB.presenze||{}).forEach(d=>{
       getTurniRaw(d,p.id).forEach(t=>{ mat+=parseFloat(t.importo||0); });
     });
-    const ant=(DB.anticipi||[]).filter(a=>a.dipId===p.id&&a.metodo!=='Anticipo da pagamento').reduce((a,x)=>a+x.importo,0);
+    const ant=(DB.anticipi||[]).filter(a=>a.dipId===p.id&&a.metodo!=='Anticipo da pagamento').reduce((a,x)=>a+(Number(x.importo)||0),0);
     const pag=(DB.pagamenti||[]).filter(pg=>pg.dipId===p.id).reduce((a,x)=>a+parseFloat(x.pagato||0),0);
     const scalAppl=totaleScalatureApplicate(p.id);
     const addebiti=residuoAddebitiMob(p.id);
@@ -1318,7 +1339,7 @@ function ricalcolaSaldi(){
 
 function residuoDanniDip(dipId){
   return (DB.addebiti||[]).filter(a=>a.dipId===dipId&&!a.chiuso).reduce((tot,a)=>{
-    const sc=(a.scalature||[]).reduce((s,x)=>s+x.importo,0);
+    const sc=(a.scalature||[]).reduce((s,x)=>s+(Number(x.importo)||0),0);
     return tot+Math.max(0,a.importo-sc);
   },0);
 }
@@ -1365,8 +1386,8 @@ function renderIncassiMob(){
     const pct=ricavo>0?Math.min(100,(totaleInc/ricavo)*100):0;
     html+=`<div class="card" style="margin-bottom:12px">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">
-        <div><div style="font-weight:700;font-size:15px">${c.nome}</div>
-        ${c.committente?`<div style="font-size:12px;color:var(--text2)">${c.committente}</div>`:''}
+        <div><div style="font-weight:700;font-size:15px">${esc(c.nome)}</div>
+        ${c.committente?`<div style="font-size:12px;color:var(--text2)">${esc(c.committente)}</div>`:''}
         </div>
         <div style="text-align:right">
           <div style="font-size:13px;font-weight:700;color:${residuo>0?'var(--gold)':'var(--green)'};font-family:'IBM Plex Mono',monospace">${fm(totaleInc)}${ricavo?` / ${fm(ricavo)}`:''}</div>
@@ -1376,8 +1397,8 @@ function renderIncassiMob(){
       ${ricavo>0?`<div style="height:4px;background:var(--brd);border-radius:2px;margin-bottom:8px"><div style="height:100%;width:${pct}%;background:${pct>=100?'var(--green)':pct>50?'var(--teal)':'var(--gold)'};border-radius:2px"></div></div>`:''}
       ${incassiC.sort((a,b)=>b.data.localeCompare(a.data)).map(x=>`
         <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-top:1px solid var(--brd)">
-          <div><div style="font-size:12px;font-weight:600">${fd(x.data)} · ${x.metodo||''}</div>
-          ${x.fattura?`<div style="font-size:12px;color:var(--text2)">${x.fattura}</div>`:''}
+          <div><div style="font-size:12px;font-weight:600">${fd(x.data)} · ${esc(x.metodo||'')}</div>
+          ${x.fattura?`<div style="font-size:12px;color:var(--text2)">${esc(x.fattura)}</div>`:''}
           </div>
           <div style="display:flex;align-items:center;gap:8px">
             <span style="font-family:'IBM Plex Mono',monospace;font-weight:700;color:var(--green)">+${fm(x.importo)}</span>
@@ -1449,7 +1470,7 @@ function renderDash(){
   // cantieri
   document.getElementById('dash-cantieri').innerHTML=DB.cantieri.filter(c=>!c.archiviato).slice(0,4).map(c=>`
     <div class="card" style="padding:12px">
-      <div style="font-weight:700;font-size:14px">${c.nome}</div>
+      <div style="font-weight:700;font-size:14px">${esc(c.nome)}</div>
       <div style="font-size:12px;color:var(--text2);margin-top:2px">${periodoCantiere(c)}</div>
     </div>`).join('')||'<div style="color:var(--text2);font-size:13px">Nessun cantiere attivo</div>';
 }
@@ -1459,8 +1480,8 @@ function dipRow(s){
   const lbl=s.saldo<-0.01?'⊕ '+fm(Math.abs(s.saldo)):fm(Math.max(0,s.saldo));
   const init=s.nome.split(' ').map(x=>x[0]).join('').slice(0,2).toUpperCase();
   return `<div class="dip-row">
-    <div class="av">${init}</div>
-    <div class="dip-info"><div class="dip-nome">${s.nome}</div><div class="dip-sub">mat. ${fm(s.maturato)}</div></div>
+    <div class="av">${esc(init)}</div>
+    <div class="dip-info"><div class="dip-nome">${esc(s.nome)}</div><div class="dip-sub">mat. ${fm(s.maturato)}</div></div>
     <div class="dip-saldo" style="color:var(--${cls==='gn'?'green':cls==='go'?'gold':'teal'})">${lbl}</div>
   </div>`;
 }
@@ -1492,8 +1513,8 @@ function setMobImpSettimana(){
   const dow=oggi.getDay();                                  // 0=domenica (settimana Dom->Sab)
   const dm=new Date(oggi); dm.setDate(oggi.getDate()-dow);  // domenica
   const sb=new Date(dm);   sb.setDate(dm.getDate()+6);      // sabato
-  document.getElementById('mob-imp-da').value=dm.toISOString().slice(0,10);
-  document.getElementById('mob-imp-al').value=sb.toISOString().slice(0,10);
+  document.getElementById('mob-imp-da').value=isoLocale(dm);
+  document.getElementById('mob-imp-al').value=isoLocale(sb);
   aggiornaAnteprimaMob();
 }
 
@@ -1538,7 +1559,7 @@ function aggiornaAnteprimaMob(){
         </span>
       </div>
       ${turni.map(t=>`<div style="font-size:12px;padding:3px 0;color:${t.esiste?'var(--text2)':t.trovato?'var(--text)':'var(--gold)'}">
-        ${t.trovato?'':'⚠ '}${t.nome} · ${t.cantiere} · ${t.oraI}–${t.oraF}${t.esiste?' (già presente)':''}
+        ${t.trovato?'':'⚠ '}${esc(t.nome)} · ${esc(t.cantiere)} · ${t.oraI}–${t.oraF}${t.esiste?' (già presente)':''}
       </div>`).join('')}
     </div>`;
   });
@@ -1590,8 +1611,6 @@ async function confermImportaPlanningMob(){
   toast(msg);
 }
 
-function aggiornInfoPlanning(){}
-function importaDaPlanningMob(){}
 
 // ── PRESENZE ──────────────────────────────────────────────────────────────
 function loadPres(){
@@ -1624,7 +1643,7 @@ function loadPres(){
       <div class="pres-row">
         <div class="av" style="${presente?'background:rgba(14,124,102,.2);color:var(--teal)':''}">${init}</div>
         <div style="flex:1">
-          <div style="font-size:14px;font-weight:700">${p.nome}</div>
+          <div style="font-size:14px;font-weight:700">${esc(p.nome)}</div>
           ${presente?`<div style="font-size:12px;color:var(--teal);font-weight:700">${fm(totDip)}</div>`:''}
         </div>
         <button class="pres-toggle ${presente?'on':'off'}" id="tog-${p.id}" onclick="togglePres('${p.id}')"></button>
@@ -1635,20 +1654,20 @@ function loadPres(){
           <div style="background:${t.notturno?'rgba(100,150,255,.08)':'var(--navy)'};border:1px solid ${t.notturno?'rgba(100,150,255,.3)':'var(--brd)'};border-radius:10px;padding:10px;margin-bottom:8px">
             <div style="margin-bottom:6px">
               <label style="font-size:12px;color:var(--text2);font-weight:700;text-transform:uppercase;display:block;margin-bottom:3px">Cantiere</label>
-              <select style="width:100%;background:var(--navy2);border:1px solid var(--brd);border-radius:8px;color:var(--text);font-family:'IBM Plex Sans',sans-serif;font-size:13px;padding:8px;outline:none" data-sc="nome" data-sc-data="#pres-data" data-sc-persona="${_de(p.nome)}" onchange="updateTurnoM('${p.id}',${ti},'cantiere',this.value)">
+              <select style="width:100%;background:var(--navy2);border:1px solid var(--brd);border-radius:8px;color:var(--text);font-family:'IBM Plex Sans',sans-serif;font-size:16px;padding:7px 8px;outline:none" data-sc="nome" data-sc-data="#pres-data" data-sc-persona="${_de(p.nome)}" onchange="updateTurnoM('${p.id}',${ti},'cantiere',this.value)">
                 <option value="">— Nessun cantiere —</option>
                 ${cantOpzioni(t.cantiere||'')}
               </select>
             </div>
             <div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap">
               <div style="flex:1;min-width:80px"><label style="font-size:12px;color:var(--text2);font-weight:700;text-transform:uppercase;display:block;margin-bottom:3px">Da</label>
-                <input type="time" value="${t.oraI||'08:00'}" style="width:100%;background:var(--navy2);border:1px solid var(--brd);border-radius:8px;color:var(--text);font-size:14px;padding:8px;outline:none" onchange="updateTurnoM('${p.id}',${ti},'oraI',this.value)">
+                <input type="time" value="${t.oraI||'08:00'}" style="width:100%;background:var(--navy2);border:1px solid var(--brd);border-radius:8px;color:var(--text);font-size:16px;padding:7px 6px;outline:none" onchange="updateTurnoM('${p.id}',${ti},'oraI',this.value)">
               </div>
               <div style="flex:1;min-width:80px"><label style="font-size:12px;color:var(--text2);font-weight:700;text-transform:uppercase;display:block;margin-bottom:3px">A</label>
-                <input type="time" value="${t.oraF||'18:00'}" style="width:100%;background:var(--navy2);border:1px solid var(--brd);border-radius:8px;color:var(--text);font-size:14px;padding:8px;outline:none" onchange="updateTurnoM('${p.id}',${ti},'oraF',this.value)">
+                <input type="time" value="${t.oraF||'18:00'}" style="width:100%;background:var(--navy2);border:1px solid var(--brd);border-radius:8px;color:var(--text);font-size:16px;padding:7px 6px;outline:none" onchange="updateTurnoM('${p.id}',${ti},'oraF',this.value)">
               </div>
               <div style="flex:1;min-width:70px"><label style="font-size:12px;color:var(--text2);font-weight:700;text-transform:uppercase;display:block;margin-bottom:3px">€ Importo</label>
-                <input type="number" inputmode="decimal" value="${t.importo||''}" placeholder="0" style="width:100%;background:var(--navy2);border:1px solid var(--brd);border-radius:8px;color:var(--text);font-size:14px;padding:8px;outline:none" onchange="updateTurnoM('${p.id}',${ti},'importo',+this.value)">
+                <input type="number" inputmode="decimal" value="${t.importo||''}" placeholder="0" style="width:100%;background:var(--navy2);border:1px solid var(--brd);border-radius:8px;color:var(--text);font-size:16px;padding:7px 6px;outline:none" onchange="updateTurnoM('${p.id}',${ti},'importo',+this.value)">
               </div>
             </div>
             <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px">
@@ -1732,9 +1751,9 @@ async function salvaPres(){
 function presNav(delta){
   const di=document.getElementById('pres-data');
   if(!di.value) di.value=today();
-  const d=new Date(di.value);
+  const d=new Date(di.value+'T12:00:00');   // mezzogiorno locale: niente salti al cambio d'ora
   d.setDate(d.getDate()+delta);
-  di.value=d.toISOString().slice(0,10);
+  di.value=isoLocale(d);
   loadPres();
 }
 
@@ -1809,7 +1828,7 @@ function renderSaldi(){
     // Anticipo accordion per mese
     const antGruppi=groupByMonthMob(ants);
     const antHtml=antGruppi.map(([ym,items])=>{
-      const subtot=items.reduce((a,x)=>a+x.importo,0);
+      const subtot=items.reduce((a,x)=>a+(Number(x.importo)||0),0);
       const aperto=ym>=meseCorrente;
       const gid='ag'+s.dipId.slice(-4)+ym.replace('-','');
       return `<div style="margin-bottom:4px;border:1px solid var(--brd);border-radius:8px;overflow:hidden">
@@ -1818,7 +1837,7 @@ function renderSaldi(){
           <span style="font-size:12px;color:var(--red);font-weight:700">−${fm(subtot)}</span>
         </div>
         <div id="${gid}" style="display:${aperto?'block':'none'}">
-          ${items.map(a=>`<div class="dip-row" style="padding:8px 12px"><div class="dip-info"><div class="dip-nome" style="font-size:12px">📅 ${fd(a.data)} — ${a.metodo}</div>${a.note?`<div class="dip-sub">${a.note}</div>`:''}</div><div class="dip-saldo" style="color:var(--red);font-size:13px">−${fm(a.importo)}</div></div>`).join('')}
+          ${items.map(a=>`<div class="dip-row" style="padding:8px 12px"><div class="dip-info"><div class="dip-nome" style="font-size:12px">📅 ${fd(a.data)} — ${esc(a.metodo)}</div>${a.note?`<div class="dip-sub">${esc(a.note)}</div>`:''}</div><div class="dip-saldo" style="color:var(--red);font-size:13px">−${fm(a.importo)}</div></div>`).join('')}
         </div>
       </div>`;
     }).join('');
@@ -1835,7 +1854,7 @@ function renderSaldi(){
           <span style="font-size:12px;color:var(--green);font-weight:700">−${fm(subtot)}</span>
         </div>
         <div id="${gid}" style="display:${aperto?'block':'none'}">
-          ${items.map(p=>`<div class="dip-row" style="padding:8px 12px"><div class="dip-info"><div class="dip-nome" style="font-size:12px">💰 ${fd(p.data)}</div>${p.note?`<div class="dip-sub">${p.note}</div>`:''}</div><div class="dip-saldo" style="color:var(--green);font-size:13px">−${fm(p.pagato)}</div></div>`).join('')}
+          ${items.map(p=>`<div class="dip-row" style="padding:8px 12px"><div class="dip-info"><div class="dip-nome" style="font-size:12px">💰 ${fd(p.data)}</div>${p.note?`<div class="dip-sub">${esc(p.note)}</div>`:''}</div><div class="dip-saldo" style="color:var(--green);font-size:13px">−${fm(p.pagato)}</div></div>`).join('')}
         </div>
       </div>`;
     }).join('');
@@ -1843,7 +1862,7 @@ function renderSaldi(){
     return `<div class="card" style="${cr?'border-color:rgba(75,232,122,.3)':''}">
       <div class="card-h" onclick="toggleCard('sd-${s.dipId}')">
         <div class="av" style="${cr?'background:rgba(75,232,122,.15);color:var(--green)':go?'background:rgba(232,184,75,.15);color:var(--gold)':''}">${init}</div>
-        <div class="dip-info"><div class="dip-nome">${s.nome}</div><div class="dip-sub">mat. ${fm(s.maturato)}</div></div>
+        <div class="dip-info"><div class="dip-nome">${esc(s.nome)}</div><div class="dip-sub">mat. ${fm(s.maturato)}</div></div>
         <div style="text-align:right">
           <div style="font-size:16px;font-weight:800;color:${colore}">${saldoTxt}</div>
           <div style="font-size:12px;color:var(--text2)">${cr?'CREDITO':go?'DA PAGARE':'SALDATO'}</div>
@@ -1869,10 +1888,10 @@ function renderSaldi(){
 async function saldaOraMob(dipId){
   const s=DB.saldi.find(x=>x.dipId===dipId);
   if(!s||s.saldo<=0.009) return;
-  if(!(await sheetConfirm(`Registrare <b>${fm(s.saldo)}</b> a ${s.nome} in data odierna?`,{ok:'Registra pagamento'}))) return;
+  if(!(await sheetConfirm(`Registrare <b>${fm(s.saldo)}</b> a ${esc(s.nome)} in data odierna?`,{ok:'Registra pagamento'}))) return;
   if(!DB.pagamenti) DB.pagamenti=[];
   DB.pagamenti.push({id:uid(),data:today(),dipId:s.dipId,dipNome:s.nome,
-    pagato:s.saldo,periodoDa:'',periodoAl:today(),note:'Saldo a pareggio'});
+    pagato:Math.round(s.saldo*100)/100,periodoDa:'',periodoAl:today(),note:'Saldo a pareggio'});
   ricalcolaSaldi();
   await salvaCloud(true);
   renderSaldi();
@@ -1929,24 +1948,24 @@ function renderAntSett(){
     const init = r.nome.split(' ').map(x=>x[0]).join('').slice(0,2).toUpperCase();
     const bid = 'as-'+(r.dipId||r.nome).toString().slice(-6).replace(/[^a-zA-Z0-9]/g,'');
     const voci = r.items.sort((a,b)=>(b.data||'').localeCompare(a.data||'')).map(a=>
-      `<div class="dip-row" style="padding:8px 12px"><div class="dip-info"><div class="dip-nome" style="font-size:12px">📅 ${fd(a.data)} — ${a.metodo||'Contanti'}</div>${a.note?`<div class="dip-sub">${_de(a.note)}</div>`:''}</div><div class="dip-saldo" style="color:var(--red);font-size:13px">−${fm(a.importo)}</div></div>`
+      `<div class="dip-row" style="padding:8px 12px"><div class="dip-info"><div class="dip-nome" style="font-size:12px">📅 ${fd(a.data)} — ${esc(a.metodo||'Contanti')}</div>${a.note?`<div class="dip-sub">${_de(a.note)}</div>`:''}</div><div class="dip-saldo" style="color:var(--red);font-size:13px">−${fm(a.importo)}</div></div>`
     ).join('');
     return `<div class="card">
       <div class="card-h" onclick="toggleCard('${bid}')">
         <div class="av" style="background:rgba(232,184,75,.15);color:var(--gold)">${init}</div>
-        <div class="dip-info"><div class="dip-nome">${r.nome}</div><div class="dip-sub">${r.items.length} anticip${r.items.length>1?'i':'o'} questa settimana</div></div>
+        <div class="dip-info"><div class="dip-nome">${esc(r.nome)}</div><div class="dip-sub">${r.items.length} anticip${r.items.length>1?'i':'o'} questa settimana</div></div>
         <div style="text-align:right"><div style="font-size:16px;font-weight:800;color:var(--red)">−${fm(r.tot)}</div></div>
         <span style="color:var(--text2);font-size:14px;margin-left:6px">▾</span>
       </div>
       <div class="card-body" id="${bid}">
         ${voci}
-        ${r.dipId?`<button onclick="nuovoAnticipoPerMob('${r.dipId}','${al}')" style="width:100%;margin-top:10px;background:rgba(232,184,75,.1);border:1px solid var(--gold);border-radius:8px;padding:10px;color:var(--gold);font-size:13px;font-weight:700;cursor:pointer">💸 Aggiungi anticipo a ${r.nome.split(' ')[0]}</button>`:''}
+        ${r.dipId?`<button onclick="nuovoAnticipoPerMob('${r.dipId}','${al}')" style="width:100%;margin-top:10px;background:rgba(232,184,75,.1);border:1px solid var(--gold);border-radius:8px;padding:10px;color:var(--gold);font-size:13px;font-weight:700;cursor:pointer">💸 Aggiungi anticipo a ${esc(r.nome.split(' ')[0])}</button>`:''}
       </div>
     </div>`;
   }).join('') : `<div style="color:var(--text2);text-align:center;padding:30px;font-size:14px">Nessun anticipo in questa settimana.${corrente?'':'<br><span style="color:var(--teal);cursor:pointer" onclick="antSettShift(0)">torna a questa settimana</span>'}</div>`;
 }
 function nuovoAnticipoPerMob(dipId, data){
-  goTo('ops', document.querySelector('.nav-btn[onclick*="ops"]'));
+  goTo('ops', _navBtn('ops'));
   const chip = document.querySelector('#ops-tabs .chip');
   if(chip) setOpsTab('anticipo', chip);
   populateSelects();
@@ -2015,7 +2034,7 @@ function _cantieriOrdinati(){
 }
 
 function populateSelects(){
-  const opts=DB.personale.map(p=>`<option value="${p.id}">${p.nome}</option>`).join('');
+  const opts=DB.personale.map(p=>`<option value="${esc(p.id)}">${esc(p.nome)}</option>`).join('');
   ['ant-dip','pag-dip','dn-dip'].forEach(id=>{
     const el=document.getElementById(id);
     if(el) el.innerHTML='<option value="">Seleziona...</option>'+opts;
@@ -2170,7 +2189,7 @@ function renderDanni(){
   if(!DB.addebiti) DB.addebiti=[];
 
   const sel=document.getElementById('dn-dip');
-  if(sel) sel.innerHTML='<option value="">Seleziona...</option>'+DB.personale.map(p=>`<option value="${p.id}">${p.nome}</option>`).join('');
+  if(sel) sel.innerHTML='<option value="">Seleziona...</option>'+DB.personale.map(p=>`<option value="${esc(p.id)}">${esc(p.nome)}</option>`).join('');
   const di=document.getElementById('dn-data');
   if(di && !di.value) di.value=today();
 
@@ -2178,7 +2197,7 @@ function renderDanni(){
   const chiusi=DB.addebiti.filter(a=>a.chiuso);
 
   const totResiduo=attivi.reduce((tot,a)=>{
-    const sc=(a.scalature||[]).reduce((s,x)=>s+x.importo,0);
+    const sc=(a.scalature||[]).reduce((s,x)=>s+(Number(x.importo)||0),0);
     return tot+Math.max(0,a.importo-sc);
   },0);
   document.getElementById('danni-kpi').innerHTML=`
@@ -2202,15 +2221,15 @@ function renderDanni(){
 }
 
 function dannoCard(a, chiuso){
-  const scalato=(a.scalature||[]).reduce((s,x)=>s+x.importo,0);
+  const scalato=(a.scalature||[]).reduce((s,x)=>s+(Number(x.importo)||0),0);
   const residuo=Math.max(0,a.importo-scalato);
   const pct=Math.min(100,Math.round((scalato/a.importo)*100));
   return `<div class="card" style="border-color:${chiuso?'rgba(75,232,122,.3)':'rgba(232,75,75,.25)'};padding:12px;cursor:pointer" onclick="apriScalaDanno('${a.id}')">
     <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:4px">
-      <div style="font-weight:700;font-size:14px">${a.dipNome}</div>
+      <div style="font-weight:700;font-size:14px">${esc(a.dipNome)}</div>
       <span style="font-size:12px;font-weight:700;padding:3px 7px;border-radius:5px;background:${chiuso?'rgba(75,232,122,.15)':'rgba(232,75,75,.15)'};color:${chiuso?'var(--green)':'var(--red)'}">${chiuso?'✓ SALDATO':'ATTIVO'}</span>
     </div>
-    <div style="font-size:12px;color:var(--text2);margin-bottom:8px">${a.descrizione}${a.mezzo?' — '+a.mezzo:''}</div>
+    <div style="font-size:12px;color:var(--text2);margin-bottom:8px">${esc(a.descrizione)}${a.mezzo?' — '+esc(a.mezzo):''}</div>
     <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px">
       <span style="color:var(--text2)">Danno totale</span><span>${fm(a.importo)}</span>
     </div>
@@ -2240,7 +2259,7 @@ function apriScalaDanno(id){
   const a=(DB.addebiti||[]).find(x=>x.id===id);
   if(!a) return;
   const scalature=[...(a.scalature||[])].sort((x,y)=>x.data.localeCompare(y.data));
-  const totScalato=scalature.reduce((s,x)=>s+x.importo,0);
+  const totScalato=scalature.reduce((s,x)=>s+(Number(x.importo)||0),0);
   const residuo=Math.max(0,a.importo-totScalato);
 
   let overlay=document.getElementById('storico-overlay');
@@ -2258,11 +2277,11 @@ function apriScalaDanno(id){
   overlay.innerHTML = `
     <div style="background:var(--navy2);border-radius:18px 18px 0 0;width:100%;max-width:480px;padding:20px;padding-bottom:calc(env(safe-area-inset-bottom)+20px);max-height:85vh;overflow-y:auto">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
-        <div style="font-size:16px;font-weight:800;color:var(--teal)">⚠️ ${a.dipNome}</div>
+        <div style="font-size:16px;font-weight:800;color:var(--teal)">⚠️ ${esc(a.dipNome)}</div>
         <button onclick="document.getElementById('storico-overlay').remove()" style="background:var(--card);border:1px solid var(--brd);color:var(--text);width:30px;height:30px;border-radius:8px;font-size:16px">✕</button>
       </div>
       <div class="card" style="padding:14px;margin-bottom:16px">
-        <div style="font-size:13px;font-weight:700;margin-bottom:2px">${a.descrizione}${a.mezzo?' — '+a.mezzo:''}</div>
+        <div style="font-size:13px;font-weight:700;margin-bottom:2px">${esc(a.descrizione)}${a.mezzo?' — '+esc(a.mezzo):''}</div>
         <div style="font-size:12px;color:var(--text2);margin-bottom:12px">Evento del ${fd(a.data)}</div>
         <div class="dip-row"><div class="dip-info"><div class="dip-nome" style="font-size:13px">Danno totale</div></div><div class="dip-saldo" style="font-size:13px">${fm(a.importo)}</div></div>
         <div class="dip-row"><div class="dip-info"><div class="dip-nome" style="font-size:13px">Totale scalato</div></div><div class="dip-saldo" style="color:var(--red);font-size:13px">${fm(totScalato)}</div></div>
@@ -2289,13 +2308,13 @@ async function confermaScalaDanno(id){
   const importo=parseFloat(document.getElementById('scala-imp-input')?.value||0);
   if(!importo||importo<=0){toast('Inserisci un importo valido');return;}
 
-  const scalatoFin=(a.scalature||[]).reduce((s,x)=>s+x.importo,0);
+  const scalatoFin=(a.scalature||[]).reduce((s,x)=>s+(Number(x.importo)||0),0);
   const residuo=Math.max(0,a.importo-scalatoFin);
   const quotaReale=Math.min(importo,residuo);
 
   if(!a.scalature) a.scalature=[];
   a.scalature.push({id:uid(), importo:quotaReale, data:document.getElementById('scala-data-input')?.value||today()});
-  const totScalato=a.scalature.reduce((s,x)=>s+x.importo,0);
+  const totScalato=a.scalature.reduce((s,x)=>s+(Number(x.importo)||0),0);
   if(totScalato >= a.importo - 0.01) a.chiuso=true;
 
   document.getElementById('storico-overlay')?.remove();
@@ -2461,8 +2480,8 @@ function renderCantieri(){
       <div onclick="apriDettCantiere('${cid}')" style="cursor:pointer">
         <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px">
           <div style="flex:1;margin-right:8px">
-            <div style="font-weight:700;font-size:15px">${c.nome}${archiviato?' 🗄':''}</div>
-            <div style="font-size:12px;color:var(--text2);margin-top:2px">${periodoCantiere(c)}${!_mobCantPerCliente&&mobClienteDi(c)!=='— senza cliente —'?' · '+mobClienteDi(c):''}</div>
+            <div style="font-weight:700;font-size:15px">${esc(c.nome)}${archiviato?' 🗄':''}</div>
+            <div style="font-size:12px;color:var(--text2);margin-top:2px">${periodoCantiere(c)}${!_mobCantPerCliente&&mobClienteDi(c)!=='— senza cliente —'?' · '+esc(mobClienteDi(c)):''}</div>
             ${mobBadgeTipi(c)}
           </div>
           ${statoBadge(c)}
@@ -2495,7 +2514,7 @@ function renderCantieri(){
     html = Object.keys(groups).sort((a,b)=>a.localeCompare(b)).map(cli=>{
       const arr=groups[cli];
       const tot=arr.reduce((a,c)=>a+getBudget(c.id,c.nome),0);
-      return `<div class="cli-grp"><span>${cli} · ${arr.length}</span><span style="color:var(--gold);font-family:'IBM Plex Mono',monospace">${tot?fm(tot):''}</span></div>`+arr.map(c=>cardCantiere(c,false)).join('');
+      return `<div class="cli-grp"><span>${esc(cli)} · ${arr.length}</span><span style="color:var(--gold);font-family:'IBM Plex Mono',monospace">${tot?fm(tot):''}</span></div>`+arr.map(c=>cardCantiere(c,false)).join('');
     }).join('');
   } else {
     html = attiviF.map(c=>cardCantiere(c,false)).join('');
@@ -2508,8 +2527,8 @@ function renderCantieri(){
       const cid=c.id||c.nome.replace(/\s/g,'_');
       return `<div class="card" style="border-color:rgba(122,160,255,.3)" onclick="apriDettCantiere('${cid}')">
         <div style="display:flex;justify-content:space-between;align-items:flex-start">
-          <div><div style="font-weight:700;font-size:15px">${c.nome}</div>
-          ${c.luogo?`<div style="font-size:12px;color:var(--text2)">📍 ${c.luogo}</div>`:''}
+          <div><div style="font-weight:700;font-size:15px">${esc(c.nome)}</div>
+          ${c.luogo?`<div style="font-size:12px;color:var(--text2)">📍 ${esc(c.luogo)}</div>`:''}
           </div>${statoBadge(c)}
         </div>
         ${c.dataRitiro?`<div style="margin-top:8px;font-size:12px;font-weight:700;color:${gg!==null&&gg<=7?'var(--gold)':'var(--text2)'}">
@@ -2624,7 +2643,7 @@ function _spesaBadge(s){
 async function riconciliaSpesa(id){
   const s=(DB.speseCantiere||[]).find(x=>x.id===id);
   if(!s){ toast('Spesa non trovata'); return; }
-  const idx=await sheetChoice(`${(s.fornitore||'Spesa')} · ${fm(s.importo)}`,[
+  const idx=await sheetChoice(`${esc(s.fornitore||'Spesa')} · ${fm(s.importo)}`,[
     {label:'Collega fattura (riconcilia)',emoji:'🔗'},
     {label:'Nessuna fattura — tieni definitiva',emoji:'🔒'},
     {label:'Rimetti "da riconciliare"',emoji:'⏳'}
@@ -2741,7 +2760,7 @@ async function creaPrevFornitura(id){
 async function archiviaCantiere(id){
   const c=(DB.cantieri||[]).find(x=>x.id===id);
   if(!c) return;
-  if(!(await sheetConfirm('Archiviare "'+c.nome+'"?',{ok:'Archivia'}))) return;
+  if(!(await sheetConfirm('Archiviare "'+esc(c.nome)+'"?',{ok:'Archivia'}))) return;
   const ok=await mobPatchDati(D=>{
     if(!Array.isArray(D._cantieriArchiviati)) D._cantieriArchiviati=[];
     if(!D._cantieriArchiviati.includes(id)) D._cantieriArchiviati.push(id);
@@ -2759,7 +2778,7 @@ async function cambiaStatoCantiere(id){
   if(!c) return;
   const stati=['da confermare','in corso','concluso','perso'];
   const nomi=['Da confermare','In corso','Concluso','Perso/Rifiutato'];
-  const idx=await sheetChoice('Stato di "'+c.nome+'"',[
+  const idx=await sheetChoice('Stato di "'+esc(c.nome)+'"',[
     {label:'Da confermare',emoji:'📋'},
     {label:'In corso',emoji:'🔨'},
     {label:'Concluso',emoji:'✅'},
@@ -2827,7 +2846,7 @@ function renderDett(){
     if(c && c.preventivoRef){
       pb.innerHTML=`<div style="background:rgba(122,160,255,.08);border:1px solid rgba(122,160,255,.3);border-radius:12px;padding:12px 14px;display:flex;align-items:center;justify-content:space-between;gap:8px">
         <div><div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#3a52c4">🧾 Preventivo collegato</div>
-        <div style="font-size:15px;font-weight:800;margin-top:2px">${c.preventivoRef}</div></div>
+        <div style="font-size:15px;font-weight:800;margin-top:2px">${esc(c.preventivoRef)}</div></div>
         <span style="font-size:11px;color:var(--text2);text-align:right">completa<br>in Preventivi</span></div>`;
     } else if(c){
       pb.innerHTML=`<button onclick="creaPreventivoDaDett()" style="width:100%;background:rgba(122,160,255,.08);border:1.5px dashed rgba(122,160,255,.5);border-radius:12px;padding:12px;color:#3a52c4;font-size:14px;font-weight:700;cursor:pointer">🧾 Crea preventivo (bozza)</button>`;
@@ -2867,7 +2886,6 @@ function renderDett(){
   const al=document.getElementById('dett-al')?.value||'';
   const inPer=d=>(!da||d>=da)&&(!al||d<=al);
   const GG=['Dom','Lun','Mar','Mer','Gio','Ven','Sab'];
-  const fd=s=>{if(!s)return'—';const[y,m,d]=s.split('-');return d+'/'+m+'/'+y;};
   const fg=s=>s?GG[new Date(s+'T12:00:00').getDay()]:'';
 
   const gmap={};
@@ -2911,7 +2929,7 @@ function renderDett(){
       </div>
       <div id="${gid}" style="display:none;padding:10px 14px">
         ${g.p.map(x=>`<div style="padding:5px 0;border-bottom:1px solid var(--brd)">
-          <div style="display:flex;justify-content:space-between"><b style="font-size:13px">👷 ${x.nome}</b><span style="color:var(--gold);font-weight:700">${fm(x.tot)}</span></div>
+          <div style="display:flex;justify-content:space-between"><b style="font-size:13px">👷 ${esc(x.nome)}</b><span style="color:var(--gold);font-weight:700">${fm(x.tot)}</span></div>
           ${(x.turni||[]).map(t=>`<div style="font-size:12px;color:var(--text2);padding-left:12px;margin-top:2px">${t.oraI}–${t.oraF}${t.notturno?' 🌙':''} · ${fm(t.importo)}</div>`).join('')}
         </div>`).join('')}
         ${g.s.map(x=>`<div style="display:flex;justify-content:space-between;align-items:center;gap:6px;padding:5px 0;border-bottom:1px solid var(--brd)">
@@ -2924,7 +2942,7 @@ function renderDett(){
             <button onclick="eliminaMSpesa('${x.id}')" style="background:rgba(232,84,84,.15);border:1px solid var(--red);border-radius:6px;padding:3px 8px;color:var(--red);font-size:12px;cursor:pointer">✕</button>
           </div>
         </div>`).join('')}
-        ${g.cc.map(x=>`<div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--brd)"><span style="font-size:13px">⛽ ${x.prodotto||''} ${x.litri||''}L</span><span style="font-weight:700">${fm(x.totale)}</span></div>`).join('')}
+        ${g.cc.map(x=>`<div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--brd)"><span style="font-size:13px">⛽ ${esc(x.prodotto||'')} ${esc(x.litri||'')}L</span><span style="font-weight:700">${fm(x.totale)}</span></div>`).join('')}
       </div>
     </div>`;
   });
@@ -3028,18 +3046,20 @@ function sheetPrompt(title, initial, placeholder, opts){
 }
 
 // ── AZIONI RAPIDE HOME ────────────────────────────────────────────────────
-const _navBtn=i=>document.querySelectorAll('.nav-btn')[i];
+// Pulsante della barra in basso cercato per PAGINA di destinazione (non per indice:
+// gli indici si sfasavano ogni volta che si aggiungeva una scheda, es. Diario).
+const _navBtn=pg=>document.querySelector(`#nav-bar .nav-btn[onclick^="goTo('${pg}'"]`);
 function qaPresenzeOggi(){
   const d=document.getElementById('pres-data'); if(d) d.value=today();
-  goTo('pres',_navBtn(1)); loadPres();
+  goTo('pres',_navBtn('pres')); loadPres();
 }
 function qaSpesa(){
-  goTo('ops',_navBtn(3));
+  goTo('ops',_navBtn('ops'));
   const chip=document.querySelector('#ops-tabs .chip:nth-child(3)');
   if(chip) setOpsTab('spesa',chip);
 }
 function qaSaldi(){
-  goTo('saldi',_navBtn(2));
+  goTo('saldi',_navBtn('saldi'));
   setFiltroSaldi('pagare',document.querySelector('#saldi-filtri .chip[data-f="pagare"]'));
 }
 
@@ -3067,7 +3087,7 @@ function goTo(pg,el){
    al volo, mentre sei in giro, lo stato delle commesse aperte e cosa resta
    da fatturare. Non modifica nulla. */
 const REGIA={comm:[],inter:[],loaded:false};
-function regiaEsc(s){return (s==null?'':String(s)).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+function regiaEsc(s){return esc(s);}   // alias di esc()
 function regiaNum(n){n=Number(n)||0;return n.toLocaleString('it-IT',{maximumFractionDigits:0});}
 function regiaFmtD(iso){if(!iso)return '';const p=String(iso).slice(0,10).split('-');return p.length===3?p[2]+'/'+p[1]:iso;}
 async function regiaLoad(){
@@ -3127,7 +3147,7 @@ const _RICH_STATI={nuova:{l:'Nuova',c:'#4be87a'},in_lavorazione:{l:'In lavorazio
   preventivo:{l:'Preventivo',c:'#5b8def'},importata:{l:'Importata',c:'#5b8def'},confermata:{l:'Confermata',c:'#0e7c66'},
   persa:{l:'Persa',c:'#e0645f'},chiusa:{l:'Chiusa',c:'#8a95a3'}};
 const _RICH_URG={alta:{l:'🔴 Oggi',c:'#e0645f'},media:{l:'🟡 Settimana',c:'#e8b84b'},bassa:{l:'⚪ Quando capita',c:'#8a95a3'}};
-function richEsc(s){return (s==null?'':String(s)).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+function richEsc(s){return esc(s);}   // alias di esc()
 async function richLoad(){
   try{
     const H={headers:{apikey:SB_KEY,Authorization:`Bearer ${SB_KEY}`},cache:'no-cache'};
@@ -3197,7 +3217,7 @@ async function richSalva(btn){
    far uscire una risorsa e registrarne il rientro effettivo. */
 const RIS_APP_URL='https://giaquintogiuseppe-bit.github.io/ottantunocento-risorse/';
 const RISM={ris:[],mov:[],dep:[],ubi:[],loaded:false};
-function risEsc(s){return (s==null?'':String(s)).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+function risEsc(s){return esc(s);}   // alias di esc()
 function risNum(n){n=Number(n)||0;return n.toLocaleString('it-IT',{maximumFractionDigits:2});}
 function risFmtD(iso){if(!iso)return '—';const p=String(iso).slice(0,10).split('-');return p.length===3?p[2]+'/'+p[1]+'/'+p[0].slice(2):iso;}
 async function risLoad(){
@@ -3240,7 +3260,7 @@ async function renderRisorseMob(){
   let h=`<div style="display:flex;gap:8px;margin-bottom:14px">
     <button class="btn btn-teal" style="flex:1" onclick="risFormUscita()">📤 Fai uscire</button>
     <button class="btn btn-teal" style="flex:1;background:var(--green)" onclick="risFormRientro()">📥 Rientro</button></div>
-    <input id="ris-q" type="search" placeholder="Cerca una risorsa…" oninput="risCerca(this.value)" style="width:100%;padding:11px 13px;border:1px solid var(--brd);border-radius:10px;font-size:15px;margin-bottom:6px;background:var(--card)">
+    <input id="ris-q" type="search" placeholder="Cerca una risorsa…" oninput="risCerca(this.value)" style="width:100%;padding:11px 13px;border:1px solid var(--brd);border-radius:10px;font-size:16px;margin-bottom:6px;background:var(--card)">
     <div id="ris-cerca-res"></div>`;
   if(ritardo.length){
     h+=`<div class="sec-lbl" style="color:var(--red)">⚠️ Rientri scaduti (${ritardo.length})</div>`;
@@ -3360,7 +3380,9 @@ function toggleCard(id){
 }
 
 function uid(){return Math.random().toString(36).slice(2)+Date.now().toString(36);}
-function today(){ const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+// Data locale YYYY-MM-DD (toISOString usa l'UTC: di notte o al cambio d'ora sbaglia giorno)
+function isoLocale(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+function today(){ return isoLocale(new Date()); }
 // Compatibilità: cantieri Gestionale hanno "periodo" testuale, quelli creati
 // nel Planning hanno periodoInizio/periodoFine in formato data ISO.
 function periodoCantiere(c){
@@ -3373,6 +3395,9 @@ function periodoCantiere(c){
 }
 function fm(n){return parseFloat(n||0).toLocaleString('it-IT',{style:'currency',currency:'EUR'});}
 function fd(s){if(!s)return '—';const[y,m,d]=s.split('-');return`${d}/${m}/${y}`;}
+// Escape HTML UNICO dell'app (testo e attributi tra virgolette doppie o singole).
+// _de / regiaEsc / richEsc / risEsc sono alias di questa funzione.
+function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 function toast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('on');setTimeout(()=>t.classList.remove('on'),2200);}
 
 // ── INIT ──────────────────────────────────────────────────────────────────
@@ -3392,7 +3417,7 @@ loadCloud().then(()=>caricaRifornimentiCloud().then(()=>{ if(typeof renderCantie
 // così può creare anche interventi/cantieri senza perdere dati altrui.
 const DIARIO_FN = SB_URL + '/functions/v1/diario-parse';
 let DIARIO_AZIONI = [];
-const _de = s => String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const _de = esc;   // alias storico: usa l'escape unico (ora include anche l'apostrofo)
 
 const DIARIO_TPL = {
   planning:"Domani [chi] a [dove] dalle 8 alle 17 per [lavoro].",
@@ -3472,7 +3497,8 @@ function diarioRenderAgenda(){
 async function diarioTogglePromemoria(id){ const p=(DB.promemoria||[]).find(x=>x.id===id); if(!p)return; p.fatto=!p.fatto; diarioRenderAgenda(); await diarioSalvaAgenda(); }
 async function diarioDelPromemoria(id){ if(!(await sheetConfirm('Eliminare questo promemoria?',{ok:'Elimina',danger:true}))) return; try{ await _gcalElimina((DB.promemoria||[]).find(x=>x.id===id)); }catch(e){} _promEliminati.add(id); DB.promemoria=(DB.promemoria||[]).filter(x=>x.id!==id); diarioRenderAgenda(); await diarioSalvaAgenda(); }
 const _promEliminati=new Set();   // eliminati in questa sessione: la fusione non li riprende dal cloud
-async function diarioSalvaAgenda(){
+async function diarioSalvaAgenda(){ return _mobTracciaSalvataggio(_diarioSalvaAgendaRaw); }
+async function _diarioSalvaAgendaRaw(){
   setStatus(null,'Salvataggio…');
   for(let t=1;t<=6;t++){
     const row=await sbGet(); const D=(row&&row.dati)?row.dati:{};
@@ -3489,20 +3515,19 @@ async function diarioSalvaAgenda(){
 
 // ── Crea un preventivo BOZZA nell'app Preventivi, agganciato al cantiere ──
 async function diarioCreaPreventivo(cantId, nome, committente, righe){
-  const anno=new Date().getFullYear(); let nn=1;
-  try{
-    const r=await fetch(`${SB_URL}/rest/v1/preventivi?select=numero&numero=like.PREV-${anno}-*&order=numero.desc&limit=1`,{headers:{apikey:SB_KEY,Authorization:`Bearer ${SB_KEY}`}});
-    if(r.ok){ const rows=await r.json(); const m=rows&&rows[0]&&rows[0].numero&&rows[0].numero.match(/(\d+)\s*$/); if(m) nn=parseInt(m[1])+1; }
-  }catch(_){}
-  const numero=`PREV-${anno}-${String(nn).padStart(3,'0')}`;
+  // Il numero (PREV-AAAA-NNN) lo assegna il trigger del DB quando numero è null:
+  // niente più calcolo client-side (evita doppioni se due app creano insieme).
   // Righe dettate → calcolo imponibile, IVA 22%, totale
   const R=(Array.isArray(righe)?righe:[]).filter(r=>r&&(String(r.descrizione||'').trim()||r.prezzo)).map(r=>({qta:Number(r.qta)||1,prezzo:Number(r.prezzo)||0,descrizione:String(r.descrizione||'').trim()}));
   const imponibile=Math.round(R.reduce((s,r)=>s+r.qta*r.prezzo,0)*100)/100;
   const iva_importo=Math.round(imponibile*22)/100;
   const totale=Math.round((imponibile+iva_importo)*100)/100;
-  const body={ numero, data:today(), cliente_nome:committente||'', oggetto:`${nome}${R.length?'':' — da completare'} (creato dal Diario)`, stato:'bozza', modalita:'dettagliata', righe:R, elenco_materiali:[], imponibile, iva_perc:22, iva_importo, totale, cantiere_ref:cantId, cantiere_id:cantId };
-  const res=await fetch(`${SB_URL}/rest/v1/preventivi`,{method:'POST',headers:{apikey:SB_KEY,Authorization:`Bearer ${SB_KEY}`,'Content-Type':'application/json',Prefer:'return=minimal'},body:JSON.stringify(body)});
+  const body={ data:today(), cliente_nome:committente||'', oggetto:`${nome}${R.length?'':' — da completare'} (creato dal Diario)`, stato:'bozza', modalita:'dettagliata', righe:R, elenco_materiali:[], imponibile, iva_perc:22, iva_importo, totale, cantiere_ref:cantId, cantiere_id:cantId };
+  const res=await fetch(`${SB_URL}/rest/v1/preventivi?select=numero`,{method:'POST',headers:{apikey:SB_KEY,Authorization:`Bearer ${SB_KEY}`,'Content-Type':'application/json',Prefer:'return=representation'},body:JSON.stringify(body)});
   if(!res.ok){ let tx=''; try{tx=await res.text();}catch(_){} throw new Error(res.status+(tx?' '+tx.slice(0,80):'')); }
+  let numero='';
+  try{ const rows=await res.json(); const row=Array.isArray(rows)?rows[0]:rows; numero=(row&&row.numero)||''; }catch(_){}
+  if(!numero) throw new Error('preventivo creato ma numero non restituito');
   return numero;
 }
 
@@ -3720,7 +3745,8 @@ function diarioApply(a,D){
 }
 
 // ── Salvataggio atomico dell'intero blob con lock di versione + retry ──
-async function diarioSalvaTutto(list){
+async function diarioSalvaTutto(list){ return _mobTracciaSalvataggio(()=>_diarioSalvaTuttoRaw(list)); }
+async function _diarioSalvaTuttoRaw(list){
   setStatus(null,'Salvataggio…');
   for(let t=1;t<=6;t++){
     const row=await sbGet();
@@ -3811,7 +3837,7 @@ function _riapriSeChiusoAuto(c,data){
 function _progMin(h){ const m=/^(\d{1,2}):(\d{2})/.exec(h||''); return m?(+m[1])*60+(+m[2]):null; }
 function _progVoci(){
   const oggi=today(); const d0=new Date(); d0.setDate(d0.getDate()-7);
-  const da=PROG_PASSATI ? d0.toISOString().slice(0,10) : oggi;
+  const da=PROG_PASSATI ? isoLocale(d0) : oggi;
   const out=[];
   _progCantieri().forEach(c=>(c.interventi||[]).forEach((iv,i)=>{
     if(!iv || !iv.data || iv.data<da) return;
@@ -4151,9 +4177,9 @@ if('serviceWorker' in navigator){
 #sc-sheet .sc-row1{display:flex;align-items:center;gap:6px}
 #sc-sheet .sc-row1 h3{font-size:17px;flex:1;min-width:0;margin:0}
 #sc-sheet .sc-lnk{border:none;background:transparent;font:600 15px inherit;font-family:inherit;color:var(--teal,#0e7c66);cursor:pointer;min-height:44px;padding:0 6px}
-#sc-sheet input[type=search],#sc-sheet select{width:100%;font:16px inherit;font-family:inherit;padding:11px 12px;border:1px solid var(--brd,#e2e5ea);border-radius:10px;background:var(--navy2,#fff);color:var(--text,#1b2740);outline:none;-webkit-appearance:none;appearance:none}
+#sc-sheet input[type=search],#sc-sheet select{width:100%;font-size:16px;font-family:inherit;padding:11px 12px;border:1px solid var(--brd,#e2e5ea);border-radius:10px;background:var(--navy2,#fff);color:var(--text,#1b2740);outline:none;-webkit-appearance:none;appearance:none}
 #sc-sheet .sc-filt{display:grid;grid-template-columns:1fr 1fr;gap:8px}
-#sc-sheet .sc-filt select{font-size:15px;padding:9px 10px}
+#sc-sheet .sc-filt select{font-size:16px;padding:9px 10px}
 #sc-sheet .sc-ctx{font-size:12px;color:var(--text2,#5f6a7d)}
 #sc-sheet .sc-body{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:2px 16px calc(24px + env(safe-area-inset-bottom,0px))}
 #sc-sheet .sc-grp{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--text2,#5f6a7d);margin:16px 2px 8px;display:flex;justify-content:space-between;gap:8px}
@@ -4187,7 +4213,7 @@ if('serviceWorker' in navigator){
   const MESI=['gennaio','febbraio','marzo','aprile','maggio','giugno','luglio','agosto','settembre','ottobre','novembre','dicembre'];
   const MESI_B=['gen','feb','mar','apr','mag','giu','lug','ago','set','ott','nov','dic'];
   const norm=s=>String(s==null?'':s).normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase().replace(/[’`]/g,"'").replace(/\s+/g,' ').trim();
-  const esc=s=>String(s==null?'':s).replace(/[&<>"]/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[ch]));
+  // esc(): helper globale unico definito nello script principale
   const oggiISO=()=>{const d=new Date();return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,10);};
   const addG=(iso,n)=>{const d=new Date(iso+'T12:00:00');d.setDate(d.getDate()+n);return d.toISOString().slice(0,10);};
   const fmtD=iso=>{if(!iso)return '';const p=iso.split('-');return (+p[2])+' '+MESI_B[+p[1]-1];};
