@@ -2,23 +2,16 @@
 name: sala-operativa
 description: >-
   Sala operativa di Ottantunocento S.r.l.: Claude OPERA le app aziendali per
-  conto di Giuseppe (non ne sviluppa il codice — per quello c'è
-  guru-webapp-81100). Usala quando Giuseppe dà un ordine operativo sui dati:
-  creare un cantiere, fare un preventivo, aggiungere presenze o giornate di
-  lavoro (lavorazioni) su un cantiere, guardare cosa c'è nelle app (diario,
-  cantieri, presenze, fatture, preventivi),
-  registrare pagamenti/acconti e cambiare stato alle fatture, impostare o
-  ricollegare il ricavo dei cantieri, collegare preventivi, assegnare
-  squadra/mezzo/cantiere nel planning controllando disponibilità e
-  sovrapposizioni di personale, riconciliare banca Intesa, riconciliare i
-  movimenti Revolut con le fatture ricevute, riconciliare il carburante DKV,
-  importare fatture da Web Desk, pulire doppioni e ricavi fantasma. Si attiva
-  anche su richieste informali tipo "segna pagata la 143", "sposta Roberto su
-  Gaeta martedì", "chi è libero giovedì?", "questo bonifico a chi lo attacco?",
-  "carico l'estratto Revolut, riconcilia con le fatture ricevute", "crea il
-  cantiere Sagra di Marcianise", "fai un preventivo a Ultra Live", "aggiungi
-  la presenza di Dario ieri su Gaeta", "che c'è in programma questa settimana?".
-  Per i dati aziendali (anagrafica, P.IVA, IBAN, organico, tono) vale ceo-81100.
+  conto di Giuseppe (il codice lo sviluppa guru-webapp-81100). Usala per ogni
+  ordine operativo sui dati: creare cantieri, fare preventivi, aggiungere
+  presenze o giornate di lavoro, guardare cosa c'è nelle app (diario,
+  cantieri, presenze, fatture, preventivi), registrare pagamenti e acconti,
+  ricavi e collegamenti preventivi, assegnare squadre e mezzi controllando
+  sovrapposizioni, riconciliare Intesa, Revolut e DKV, importare da Web Desk,
+  pulire doppioni. Anche richieste informali: "crea il cantiere Sagra di
+  Marcianise", "fai un preventivo a Ultra Live", "aggiungi la presenza di
+  Dario ieri su Gaeta", "segna pagata la 143", "chi è libero giovedì?".
+  Dati aziendali: ceo-81100.
 ---
 
 # Sala operativa — Ottantunocento S.r.l.
