@@ -319,6 +319,7 @@ button{touch-action:manipulation}
 })();
 </script>
 
+<script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body>
 
@@ -451,6 +452,7 @@ button{touch-action:manipulation}
 
   <!-- SALDI -->
   <div class="pg" id="pg-saldi">
+    <button onclick="goTo('antsett')" style="width:100%;margin-bottom:12px;background:var(--navy2);border:1px solid var(--brd);border-radius:10px;padding:11px;color:var(--gold);font-size:14px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px">💸 Anticipi settimanali per dipendente →</button>
     <div class="kpi-row" id="saldi-kpi"></div>
     <input type="text" placeholder="🔍 Cerca dipendente..." id="saldi-search" oninput="renderSaldi()"
       style="width:100%;background:var(--navy2);border:1px solid var(--brd);border-radius:10px;color:var(--text);font-size:16px;padding:12px 14px;outline:none;margin-bottom:14px">
@@ -461,6 +463,24 @@ button{touch-action:manipulation}
       <button class="chip" data-f="saldato" onclick="setFiltroSaldi('saldato',this)">✓ Saldati</button>
     </div>
     <div id="saldi-list"></div>
+  </div>
+
+  <!-- ANTICIPI SETTIMANALI PER DIPENDENTE -->
+  <div class="pg" id="pg-antsett">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
+      <button onclick="goTo('saldi',document.querySelector('.nav-btn[onclick*=saldi]'))" style="background:var(--navy2);border:1px solid var(--brd);border-radius:10px;padding:9px 13px;color:var(--text);font-size:15px;cursor:pointer">←</button>
+      <div style="font-size:17px;font-weight:800">💸 Anticipi settimanali</div>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px">
+      <button onclick="antSettShift(-1)" style="background:var(--navy2);border:1px solid var(--brd);border-radius:10px;padding:10px 15px;color:var(--text);font-size:16px;cursor:pointer">◀</button>
+      <div style="flex:1;text-align:center">
+        <div id="antsett-label" style="font-size:14px;font-weight:700">—</div>
+        <div id="antsett-oggi" style="font-size:11px;color:var(--teal);cursor:pointer;margin-top:2px" onclick="antSettShift(0)">questa settimana</div>
+      </div>
+      <button onclick="antSettShift(1)" style="background:var(--navy2);border:1px solid var(--brd);border-radius:10px;padding:10px 15px;color:var(--text);font-size:16px;cursor:pointer">▶</button>
+    </div>
+    <div class="kpi-row" id="antsett-kpi"></div>
+    <div id="antsett-list"></div>
   </div>
 
   <!-- OPERAZIONI (anticipi, pagamenti, spese) -->
@@ -515,7 +535,7 @@ button{touch-action:manipulation}
           <option>Carburante</option><option>Trasferta / Vitto</option><option>Servizi esterni</option><option>Altro</option>
         </select>
       </div>
-      <div class="field"><label>Cantiere</label><input id="sp-cant" list="sp-cant-dl" placeholder="🔍 Cerca cantiere… (vuoto = nessuno)" autocomplete="off" data-af="1"><datalist id="sp-cant-dl"></datalist></div>
+      <div class="field"><label>Cantiere</label><input id="sp-cant" list="sp-cant-dl" placeholder="🔍 Cerca cantiere… (vuoto = nessuno)" autocomplete="off" data-af="1" data-sc="nome" data-sc-data="#sp-data"><datalist id="sp-cant-dl"></datalist></div>
       <div class="field"><label>Note</label><input type="text" id="sp-note" placeholder="Opzionale"></div>
       <button class="btn btn-teal" onclick="salvaSpesa()">🧾 Registra spesa</button>
     </div>
@@ -655,7 +675,7 @@ button{touch-action:manipulation}
     <div class="kpi-row" id="inc-kpi-m"></div>
     <div style="background:var(--navy2);border:1px solid var(--brd);border-radius:12px;padding:14px;margin-bottom:14px">
       <div style="font-size:12px;font-weight:700;color:var(--teal);text-transform:uppercase;letter-spacing:1px;margin-bottom:12px">➕ Registra incasso</div>
-      <div class="field"><label>Cantiere</label><select id="minc-cant"><option value="">— Seleziona —</option></select></div>
+      <div class="field"><label>Cantiere</label><select id="minc-cant" data-sc="id" data-sc-profilo="economico" data-sc-data="#minc-data"><option value="">— Seleziona —</option></select></div>
       <div class="field"><label>Data</label><input type="date" id="minc-data"></div>
       <div class="field"><label>Importo (€)</label><input type="number" id="minc-importo" step="0.01" placeholder="0.00" inputmode="decimal"></div>
       <div class="field"><label>Metodo</label><select id="minc-metodo"><option>Bonifico</option><option>Contanti</option><option>Assegno</option><option>RID/SEPA</option><option>Altro</option></select></div>
@@ -717,7 +737,7 @@ button{touch-action:manipulation}
     <!-- INPUT -->
     <div id="dia-input">
       <div style="display:flex;justify-content:flex-end;margin-bottom:8px">
-        <button onclick="diarioOpenAgenda()" style="background:var(--card);border:1px solid var(--brd);color:var(--text);border-radius:9px;padding:7px 12px;font-size:12px;font-weight:700;cursor:pointer">📅 Agenda <span id="dia-ag-badge" style="color:var(--gold)"></span></button>
+        <button onclick="diarioOpenProgramma()" style="background:var(--card);border:1px solid var(--brd);color:var(--text);border-radius:9px;padding:7px 12px;font-size:12px;font-weight:700;cursor:pointer;margin-right:6px">🗓️ Lavori pianificati</button><button onclick="diarioOpenAgenda()" style="background:var(--card);border:1px solid var(--brd);color:var(--text);border-radius:9px;padding:7px 12px;font-size:12px;font-weight:700;cursor:pointer">📅 Agenda <span id="dia-ag-badge" style="color:var(--gold)"></span></button>
       </div>
       <div class="dia-lead">Racconta la giornata (o cosa c'è da fare) — a voce o scritta. Tocca un tasto rapido per un modello, oppure scrivi libero. Poi <b>Elabora</b>.</div>
       <div class="sec-lbl">Inserimenti rapidi</div>
@@ -755,6 +775,16 @@ button{touch-action:manipulation}
       <div class="dia-recap" id="dia-recap" style="text-align:left;background:var(--card);border:1px solid var(--brd);border-radius:13px;padding:4px 14px;margin-bottom:18px"></div>
       <button class="btn btn-teal" onclick="diarioReset()">📓 Scrivi un'altra cosa</button>
       <button class="btn btn-ghost" onclick="goTo('dash',document.querySelector('.nav-btn'))">Torna alla Home</button>
+    </div>
+
+    <!-- PROGRAMMA LAVORI -->
+    <div id="dia-prog" style="display:none">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
+        <button onclick="diarioShow('input')" style="background:var(--card);border:1px solid var(--brd);color:var(--text);width:34px;height:34px;border-radius:9px;font-size:16px;cursor:pointer">←</button>
+        <div style="font-size:16px;font-weight:800">🗓️ Lavori pianificati</div>
+      </div>
+      <div style="font-size:12px;color:var(--text2);margin:-4px 0 12px">Tutto ciò che è in programma (dal Diario o dal Planning). Tocca un lavoro per cambiare data, orari, squadra o eliminarlo.</div>
+      <div id="dia-prog-list"></div>
     </div>
 
     <!-- AGENDA / PROMEMORIA -->
@@ -857,25 +887,30 @@ async function sbSet(data, versioneAttesa){
   });
   if(!res.ok) throw new Error('HTTP '+res.status);
   const rows = await res.json();
-  return rows.length > 0;
+  // Ritorna la RIGA aggiornata (con la nuova `versione`) al successo, null se conflitto
+  // (0 righe aggiornate). Così chi salva legge la versione dal PATCH, senza una GET extra.
+  return rows.length ? rows[0] : null;
 }
+// Piccola attesa crescente tra i tentativi in conflitto (altra app che scrive nello stesso istante)
+const _mobSleep = ms => new Promise(r=>setTimeout(r, ms));
 
 // Scrittura atomica sull'intero blob `dati` per i campi che salvaCloud NON riscrive
 // (es. cantieri[]: la mobile li ricarica sempre dal remoto). Legge → applica il
 // mutatore sui dati freschi → scrive col lock ottimistico, con retry sui conflitti.
 // Al successo allinea DB e la versione anti-rientro. Ritorna true se salvato.
 async function mobPatchDati(mutator){
-  for(let tentativo=1; tentativo<=3; tentativo++){
+  for(let tentativo=1; tentativo<=6; tentativo++){
     const row=await sbGet();
     const D=(row&&row.dati)?row.dati:{};
     const versione=(row&&row.versione!=null)?row.versione:null;
     mutator(D);
-    const ok=await sbSet(D, versione);
-    if(ok){
+    const saved=await sbSet(D, versione);
+    if(saved){
       Object.assign(DB, D);
-      try{ const r=await sbGet(); if(r&&r.versione!=null) _mobUltimaVersione=r.versione; }catch(_){}
+      if(saved.versione!=null) _mobUltimaVersione=saved.versione;   // versione dal PATCH, niente GET extra
       return true;
     }
+    await _mobSleep(200*tentativo);   // conflitto: breve attesa crescente, poi rileggo i dati freschi e riprovo
   }
   return false;
 }
@@ -900,9 +935,11 @@ async function loadCloud(){
       Object.assign(DB, row.dati);
       ['pagamenti','documenti','carteDkv','scontrini','addebiti','speseCantiere','cantieri','mezziDB','risorse','personaleHR','incassi'].forEach(k=>{if(!DB[k])DB[k]=[];});
       // Auto-chiusura: cantieri con data fine passata → concluso
+      // (MAI se lo stato è stato scelto a mano: c._statoManuale)
       const oggiStr=today();
       (DB.cantieri||[]).forEach(c=>{
         if(c.tipo==='lungo_periodo') return;
+        if(c._statoManuale) return;
         const s=(c.stato||'').toLowerCase();
         if(s.includes('conclus')||s.includes('perso')||s.includes('rifiut')) return;
         const fine=c.periodoFine||c.periodoInizio||'';
@@ -914,6 +951,7 @@ async function loadCloud(){
     } else {
       setStatus(true,'Cloud vuoto');
     }
+    _mobSnapshotBase();   // base per la fusione a 3 vie: com'erano i dati appena caricati
     renderAll();
     populateSelects(); // garantisce che le select anticipi/pagamenti siano popolate anche se loadCloud è chiamata più volte
   } catch(err){
@@ -950,6 +988,64 @@ function carburanteRiconciliato(nomeCantiere){
 // budget modificati in questa sessione (per non sovrascrivere quelli altrui col merge)
 const _budgetDirty = new Set();
 
+// ============================================================
+// FUSIONE A 3 VIE (anti-sfasamento Mobile ↔ Gestionale)
+// Il salvataggio NON sovrascrive più in blocco gli array condivisi con la copia
+// locale (che può essere vecchia): fonde record-per-record confrontando
+//   base  = com'era il dato quando la Mobile l'ha caricato
+//   local = com'è ora sulla Mobile
+//   remoto= com'è ADESSO sul cloud (ciò che ha scritto il Gestionale/altri)
+// Regole (PRECEDENZA AL GESTIONALE sui conflitti veri):
+//   • record che la Mobile non ha toccato  → vince il remoto (modifiche/aggiunte del Gestionale)
+//   • record aggiunto solo sulla Mobile     → si aggiunge
+//   • record modificato solo sulla Mobile   → vince la Mobile (se il Gestionale non l'ha toccato)
+//   • record modificato da entrambi         → vince il Gestionale (remoto)
+//   • record cancellato sulla Mobile        → si rimuove (solo se il Gestionale non l'ha modificato nel frattempo)
+// Nessuna aggiunta fatta altrove viene mai persa.
+const MERGE_FLAT = ['personale','carburante','anticipi','pagamenti','addebiti','speseCantiere','documenti','carteDkv','scontrini','incassi'];
+let _mobBase = null;                       // istantanea degli array condivisi al momento del load/ultimo save
+const _m3eq = (a,b)=>JSON.stringify(a)===JSON.stringify(b);
+const _m3key = x => (x && x.id!=null) ? ('id:'+x.id) : ('k:'+JSON.stringify(x));
+function _mobSnapshotBase(){
+  _mobBase = { presenze: JSON.parse(JSON.stringify(DB.presenze||{})) };
+  MERGE_FLAT.forEach(k=>{ _mobBase[k] = JSON.parse(JSON.stringify(DB[k]||[])); });
+}
+// Fusione a 3 vie di un array piatto con chiave per id (ripiego: contenuto).
+function _merge3Arr(base, local, remote){
+  base=Array.isArray(base)?base:[]; local=Array.isArray(local)?local:[]; remote=Array.isArray(remote)?remote:[];
+  const B=new Map(base.map(x=>[_m3key(x),x]));
+  const L=new Map(local.map(x=>[_m3key(x),x]));
+  const R=new Map(remote.map(x=>[_m3key(x),x]));
+  const out=new Map(R);                    // si parte dal remoto → precedenza al Gestionale
+  L.forEach((lv,k)=>{
+    const bv=B.get(k), rv=R.get(k);
+    if(bv===undefined){ if(rv===undefined) out.set(k,lv); }       // aggiunta solo Mobile
+    else if(!_m3eq(bv,lv)){                                        // la Mobile l'ha modificato
+      if(rv!==undefined && _m3eq(rv,bv)) out.set(k,lv);            // il Gestionale non l'ha toccato → vince la Mobile
+      // altrimenti (remoto cancellato o modificato) → vince il Gestionale
+    }
+  });
+  B.forEach((bv,k)=>{                                              // cancellazioni fatte sulla Mobile
+    if(!L.has(k) && R.has(k) && _m3eq(R.get(k),bv)) out.delete(k); // solo se il Gestionale non l'ha modificato
+  });
+  return [...out.values()];
+}
+// Fusione a 3 vie delle presenze: nidificate data → dipId → cella; chiave "data|dipId".
+function _merge3Pres(base, local, remote){
+  const flat=o=>{ const m=new Map(); Object.keys(o||{}).forEach(d=>Object.keys(o[d]||{}).forEach(pid=>m.set(d+'|'+pid,o[d][pid]))); return m; };
+  const B=flat(base), L=flat(local), R=flat(remote);
+  const out=new Map(R);                    // precedenza al Gestionale
+  L.forEach((lv,k)=>{
+    const bv=B.get(k), rv=R.get(k);
+    if(bv===undefined){ if(rv===undefined) out.set(k,lv); }
+    else if(!_m3eq(bv,lv)){ if(rv!==undefined && _m3eq(rv,bv)) out.set(k,lv); }
+  });
+  B.forEach((bv,k)=>{ if(!L.has(k) && R.has(k) && _m3eq(R.get(k),bv)) out.delete(k); });
+  const res={};
+  out.forEach((cell,k)=>{ const i=k.indexOf('|'); const d=k.slice(0,i), pid=k.slice(i+1); if(!res[d]) res[d]={}; res[d][pid]=cell; });
+  return res;
+}
+
 let _saveTimer = null;
 async function salvaCloud(silenzioso){
   try{
@@ -959,14 +1055,19 @@ async function salvaCloud(silenzioso){
     // Se qualcun altro (Gestionale, Planning, altro dispositivo) scrive mentre stiamo
     // salvando, il PATCH condizionato non passa: rifacciamo il merge sui dati freschi
     // invece di sovrascrivere il suo lavoro. Nessuna perdita silenziosa.
-    let salvato = false;
-    for(let tentativo = 1; tentativo <= 3 && !salvato; tentativo++){
+    ricalcolaSaldi();                       // 'saldi' è derivato: lo ricalcolo, non lo fondo
+    let savedRow = null, merged = null;
+    for(let tentativo = 1; tentativo <= 6 && !savedRow; tentativo++){
       const row = await sbGet();
       const remoto = (row && row.dati) ? row.dati : {};
       const versione = (row && row.versione !== undefined) ? row.versione : null;
 
-      const merged = { ...remoto };
-      CAMPI_GESTIONALE.forEach(k => { merged[k] = DB[k]; });
+      merged = { ...remoto };
+      // Array condivisi: fusione a 3 vie record-per-record (niente più sovrascrittura in blocco).
+      // Precedenza al Gestionale sui conflitti; nessuna aggiunta altrui viene persa.
+      MERGE_FLAT.forEach(k => { merged[k] = _merge3Arr(_mobBase && _mobBase[k], DB[k], remoto[k]); });
+      merged.presenze = _merge3Pres(_mobBase && _mobBase.presenze, DB.presenze, remoto.presenze);
+      merged.saldi = DB.saldi; // derivato: ricalcolato sopra
 
       // budgetCantieri: parte dal remoto e applica SOLO le voci modificate in questa sessione
       // (prima le modifiche al ricavo fatte dalla mobile non venivano mai salvate sul cloud)
@@ -977,28 +1078,37 @@ async function salvaCloud(silenzioso){
         if(i>=0) budgetRemoto[i]=b; else budgetRemoto.push(b);
       });
       merged.budgetCantieri = budgetRemoto;
-      DB.budgetCantieri = budgetRemoto;
 
-      if(remoto.cantieri) DB.cantieri = remoto.cantieri;
-      if(remoto.mezziDB) DB.mezziDB = remoto.mezziDB;
-      if(remoto.risorse) DB.risorse = remoto.risorse;
-      if(remoto.personaleHR) DB.personaleHR = remoto.personaleHR;
-
-      salvato = await sbSet(merged, versione);
-      if(!salvato){
+      savedRow = await sbSet(merged, versione);
+      if(!savedRow){
         console.warn(`salvaCloud: conflitto di versione (tentativo ${tentativo}) — rifaccio il merge sui dati aggiornati`);
-        setStatus(null,'Dati cambiati — riunisco...');
+        setStatus(null,'Dati cambiati — riunisco…');
+        await _mobSleep(200*tentativo);   // breve attesa crescente, poi rileggo i dati freschi e riprovo
       }
     }
 
-    if(!salvato) throw new Error('un\'altra app sta scrivendo in questo momento — riprova tra qualche secondo');
+    if(!savedRow) throw new Error('un\'altra app sta scrivendo in questo momento — riprova tra qualche secondo');
+
+    // allinea lo stato locale al risultato della fusione e riparti da qui (nuova base)
+    if(merged){
+      MERGE_FLAT.forEach(k=>{ DB[k]=merged[k]||[]; });
+      DB.presenze = merged.presenze||{};
+      DB.budgetCantieri = merged.budgetCantieri||[];
+      if(merged.cantieri) DB.cantieri = merged.cantieri;
+      if(merged.mezziDB) DB.mezziDB = merged.mezziDB;
+      if(merged.risorse) DB.risorse = merged.risorse;
+      if(merged.personaleHR) DB.personaleHR = merged.personaleHR;
+      ricalcolaSaldi();
+      _mobSnapshotBase();
+    }
+    if(savedRow.versione != null) _mobUltimaVersione = savedRow.versione;   // versione dal PATCH: niente GET extra
 
     setStatus(true,'Sincronizzato ✓');
-    try{ const _r = await sbGet(); if(_r && _r.versione != null) _mobUltimaVersione = _r.versione; }catch(_e){}   // allineo il riferimento anti-rientro
     if(!silenzioso) toast('Salvato ✓');
   } catch(err){
     setStatus(false,'Errore sync — riprova');
-    if(!silenzioso) toast('⚠ Errore: '+err.message);
+    // Un salvataggio fallito va sempre segnalato, anche in background: altrimenti sembra "salvato" ma non lo è.
+    toast('⚠ Non salvato sul cloud: '+String(err.message||err).slice(0,50)+' — tocca 🔄 Sync');
     console.error('salvaCloud error:', err);
   }
 }
@@ -1056,6 +1166,11 @@ async function mobControllaAlRientro(){
 document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='visible') mobControllaAlRientro(); });
 window.addEventListener('focus', mobControllaAlRientro);
 window.addEventListener('pageshow', (e)=>{ if(e.persisted) mobControllaAlRientro(); });
+// Poll leggero mentre l'app è in primo piano: porta su mobile le modifiche fatte nel
+// Gestionale/Planning entro ~20s senza dover uscire e rientrare (su iOS standalone gli
+// eventi focus/visibilità non sono affidabili). Controlla solo la `versione` (chiamata
+// minima) e ricarica SOLO se è cambiata e non stai scrivendo in un campo.
+setInterval(()=>{ if(document.visibilityState==='visible') mobControllaAlRientro(); }, 20000);
 
 // ============================================================
 // AUTO-VERSIONE DEL CODICE (mobile index.html) - cintura aggiuntiva al SW:
@@ -1118,8 +1233,12 @@ function ricalcolaSaldi(){
     const pag=(DB.pagamenti||[]).filter(pg=>pg.dipId===p.id).reduce((a,x)=>a+parseFloat(x.pagato||0),0);
     const scalAppl=totaleScalatureApplicate(p.id);
     const addebiti=residuoAddebitiMob(p.id);
-    const saldo=mat-ant-pag-scalAppl;
-    return {dipId:p.id,nome:p.nome,maturato:mat,anticipi:ant,pagamenti:pag,scalature:scalAppl,addebiti,saldo};
+    // Apertura/pregresso + rettifiche storiche datate (stesse del Gestionale): PRIMA la mobile le
+    // ignorava e ricalcolava un saldo diverso, risovrascrivendo quello corretto del Gestionale.
+    const apertura = parseFloat((DB.saldiApertura||{})[p.id]||0)
+      + (DB.rettificheDip||[]).filter(r=>r.dipId===p.id).reduce((a,r)=>a+parseFloat(r.importo||0),0);
+    const saldo=mat+apertura-ant-pag-scalAppl;
+    return {dipId:p.id,nome:p.nome,maturato:mat,anticipi:ant,pagamenti:pag,scalature:scalAppl,addebiti,apertura,saldo};
   });
 }
 
@@ -1414,7 +1533,11 @@ function loadPres(){
       <div class="kpi go"><div class="lb">Maturato</div><div class="vl">${fm(totOggi)}</div></div>
     </div>`;
 
-  const cantOpzioni=_cantieriOrdinati().map(c=>`<option value="${_de(c.nome)}">${_de(c.nome)}</option>`).join('');
+  // Opzioni del turno: seleziona per uguaglianza (anche nomi con apostrofi/virgolette)
+  // e mantiene il cantiere del turno anche se archiviato o rinominato.
+  const _ordT=_cantieriOrdinati();
+  const cantOpzioni=v=>{let h=_ordT.map(c=>`<option value="${_de(c.nome)}"${c.nome===v?' selected':''}>${_de(c.nome)}</option>`).join('');
+    if(v&&!_ordT.some(c=>c.nome===v)) h=`<option value="${_de(v)}" selected>${_de(v)}</option>`+h; return h;};
 
   document.getElementById('pres-list').innerHTML=DB.personale.map(p=>{
     const pr=giornata[p.id];
@@ -1438,9 +1561,9 @@ function loadPres(){
           <div style="background:${t.notturno?'rgba(100,150,255,.08)':'var(--navy)'};border:1px solid ${t.notturno?'rgba(100,150,255,.3)':'var(--brd)'};border-radius:10px;padding:10px;margin-bottom:8px">
             <div style="margin-bottom:6px">
               <label style="font-size:12px;color:var(--text2);font-weight:700;text-transform:uppercase;display:block;margin-bottom:3px">Cantiere</label>
-              <select style="width:100%;background:var(--navy2);border:1px solid var(--brd);border-radius:8px;color:var(--text);font-family:'IBM Plex Sans',sans-serif;font-size:13px;padding:8px;outline:none" onchange="updateTurnoM('${p.id}',${ti},'cantiere',this.value)">
+              <select style="width:100%;background:var(--navy2);border:1px solid var(--brd);border-radius:8px;color:var(--text);font-family:'IBM Plex Sans',sans-serif;font-size:13px;padding:8px;outline:none" data-sc="nome" data-sc-data="#pres-data" data-sc-persona="${_de(p.nome)}" onchange="updateTurnoM('${p.id}',${ti},'cantiere',this.value)">
                 <option value="">— Nessun cantiere —</option>
-                ${cantOpzioni.replace(`value="${t.cantiere}"`,`value="${t.cantiere}" selected`)}
+                ${cantOpzioni(t.cantiere||'')}
               </select>
             </div>
             <div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap">
@@ -1682,6 +1805,82 @@ async function saldaOraMob(dipId){
   toast(`${s.nome} saldato ✓`);
 }
 
+// ═══════════ ANTICIPI SETTIMANALI PER DIPENDENTE ═══════════
+// Stessa settimana del Gestionale (Domenica → Sabato) e stessa sorgente dati
+// (DB.anticipi, escludendo gli "Anticipo da pagamento"): niente sfasamenti.
+let ANTSETT_REF = null;   // Date dentro la settimana scelta; null = settimana corrente
+function _antSettBounds(ref){
+  const n = ref ? new Date(ref.getTime()) : new Date();
+  n.setHours(12,0,0,0);
+  const dom = new Date(n); dom.setDate(n.getDate()-n.getDay());   // domenica
+  const sab = new Date(dom); sab.setDate(dom.getDate()+6);        // sabato
+  const iso = d => d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+  return { da: iso(dom), al: iso(sab), dom };
+}
+function antSettShift(delta){
+  if(delta===0){ ANTSETT_REF = null; }
+  else {
+    const b = _antSettBounds(ANTSETT_REF);
+    const base = new Date(b.dom.getTime()); base.setDate(base.getDate()+delta*7);
+    ANTSETT_REF = base;
+  }
+  renderAntSett();
+}
+function renderAntSett(){
+  const {da, al} = _antSettBounds(ANTSETT_REF);
+  const oggiB = _antSettBounds(null);
+  const corrente = (da===oggiB.da);
+  const ddmm = iso => iso.slice(8)+'/'+iso.slice(5,7);
+  const lab = document.getElementById('antsett-label');
+  if(lab) lab.textContent = 'Dom '+ddmm(da)+' → Sab '+ddmm(al);
+  const og = document.getElementById('antsett-oggi');
+  if(og) og.style.visibility = corrente ? 'hidden' : 'visible';
+
+  const ants = (DB.anticipi||[]).filter(a=>a.metodo!=='Anticipo da pagamento' && a.data>=da && a.data<=al);
+  const perDip = {};
+  ants.forEach(a=>{
+    const k = a.dipId || a.dipNome || '?';
+    if(!perDip[k]) perDip[k] = { dipId:a.dipId, nome:a.dipNome || (DB.personale.find(p=>p.id===a.dipId)||{}).nome || '—', items:[], tot:0 };
+    perDip[k].items.push(a);
+    perDip[k].tot += parseFloat(a.importo||0);
+  });
+  const righe = Object.values(perDip).sort((x,y)=>y.tot-x.tot);
+  const totSett = righe.reduce((s,r)=>s+r.tot,0);
+
+  document.getElementById('antsett-kpi').innerHTML = `
+    <div class="kpi go"><div class="lb">Anticipi settimana</div><div class="vl">${fm(totSett)}</div></div>
+    <div class="kpi tc"><div class="lb">Dipendenti</div><div class="vl">${righe.length}</div></div>`;
+
+  document.getElementById('antsett-list').innerHTML = righe.length ? righe.map(r=>{
+    const init = r.nome.split(' ').map(x=>x[0]).join('').slice(0,2).toUpperCase();
+    const bid = 'as-'+(r.dipId||r.nome).toString().slice(-6).replace(/[^a-zA-Z0-9]/g,'');
+    const voci = r.items.sort((a,b)=>(b.data||'').localeCompare(a.data||'')).map(a=>
+      `<div class="dip-row" style="padding:8px 12px"><div class="dip-info"><div class="dip-nome" style="font-size:12px">📅 ${fd(a.data)} — ${a.metodo||'Contanti'}</div>${a.note?`<div class="dip-sub">${_de(a.note)}</div>`:''}</div><div class="dip-saldo" style="color:var(--red);font-size:13px">−${fm(a.importo)}</div></div>`
+    ).join('');
+    return `<div class="card">
+      <div class="card-h" onclick="toggleCard('${bid}')">
+        <div class="av" style="background:rgba(232,184,75,.15);color:var(--gold)">${init}</div>
+        <div class="dip-info"><div class="dip-nome">${r.nome}</div><div class="dip-sub">${r.items.length} anticip${r.items.length>1?'i':'o'} questa settimana</div></div>
+        <div style="text-align:right"><div style="font-size:16px;font-weight:800;color:var(--red)">−${fm(r.tot)}</div></div>
+        <span style="color:var(--text2);font-size:14px;margin-left:6px">▾</span>
+      </div>
+      <div class="card-body" id="${bid}">
+        ${voci}
+        ${r.dipId?`<button onclick="nuovoAnticipoPerMob('${r.dipId}','${al}')" style="width:100%;margin-top:10px;background:rgba(232,184,75,.1);border:1px solid var(--gold);border-radius:8px;padding:10px;color:var(--gold);font-size:13px;font-weight:700;cursor:pointer">💸 Aggiungi anticipo a ${r.nome.split(' ')[0]}</button>`:''}
+      </div>
+    </div>`;
+  }).join('') : `<div style="color:var(--text2);text-align:center;padding:30px;font-size:14px">Nessun anticipo in questa settimana.${corrente?'':'<br><span style="color:var(--teal);cursor:pointer" onclick="antSettShift(0)">torna a questa settimana</span>'}</div>`;
+}
+function nuovoAnticipoPerMob(dipId, data){
+  goTo('ops', document.querySelector('.nav-btn[onclick*="ops"]'));
+  const chip = document.querySelector('#ops-tabs .chip');
+  if(chip) setOpsTab('anticipo', chip);
+  populateSelects();
+  const sel=document.getElementById('ant-dip'); if(sel) sel.value=dipId;
+  const dt=document.getElementById('ant-data'); if(dt) dt.value = (data && data>=today()) ? today() : (data||today());
+  const imp=document.getElementById('ant-imp'); if(imp){ imp.value=''; try{ imp.focus(); }catch(e){} }
+}
+
 function setFiltroSaldi(f,el){
   _filtroSaldi=f;
   document.querySelectorAll('#saldi-filtri .chip').forEach(c=>c.classList.remove('on'));
@@ -1793,8 +1992,8 @@ async function salvaAnticipo(){
   document.getElementById('ant-imp').value='';
   document.getElementById('ant-note').value='';
   renderSaldi();
-  await salvaCloud(false);
   toast(`Anticipo di ${fm(imp)} registrato per ${p.nome} ✓`);
+  await salvaCloud(true);
 }
 
 async function salvaPagamento(){
@@ -1826,7 +2025,7 @@ async function salvaPagamento(){
   document.getElementById('pag-danno-hint').style.display='none';
   renderSaldi();
   toast(`Pagamento ${fm(imp)} a ${p.nome} ✓`);
-  await salvaCloud(false);
+  await salvaCloud(true);
 }
 
 // ============================================================
@@ -2025,7 +2224,8 @@ async function salvaSpesa(){
   document.getElementById('sp-note').value='';
   document.getElementById('foto-preview').style.display='none';
   _fotoBase64=null;
-  await salvaCloud(false);
+  toast(`Spesa di ${fm(imp)} registrata ✓`);
+  await salvaCloud(true);
 }
 
 // ── CANTIERI ──────────────────────────────────────────────────────────────
@@ -2413,6 +2613,9 @@ async function cambiaStatoCantiere(id){
   ]);
   if(idx===null) return;
   c.stato=stati[idx];
+  // scelta manuale: nessuna chiusura automatica la sovrascrive (concluso/perso la riattivano)
+  c._statoManuale = !['concluso','perso'].includes(c.stato);
+  if(c.stato!=='concluso') c._autoChiuso=false;
   salvaCloud(false); renderCantieri(); toast('Stato aggiornato: '+nomi[idx]);
 }
 
@@ -2691,6 +2894,7 @@ function goTo(pg,el){
   if(el) el.classList.add('active');
   document.getElementById('content').scrollTo(0,0);
   if(pg==='saldi') renderSaldi();
+  if(pg==='antsett') renderAntSett();
   if(pg==='cant') renderCantieri();
   if(pg==='dash') renderDash();
   if(pg==='danni') renderDanni();
@@ -3078,7 +3282,7 @@ function diarioMatchCant(nome){
 
 // ── Navigazione sotto-viste del Diario ──
 function diarioShow(v){
-  ['input','preview','done','agenda'].forEach(x=>{const el=document.getElementById('dia-'+x);if(el)el.style.display=x===v?'block':'none';});
+  ['input','preview','done','agenda','prog'].forEach(x=>{const el=document.getElementById('dia-'+x);if(el)el.style.display=x===v?'block':'none';});
   document.getElementById('content').scrollTo(0,0);
 }
 function diarioReset(){ DIARIO_AZIONI=[]; const t=document.getElementById('diario-txt'); if(t)t.value=''; diarioShow('input'); }
@@ -3097,25 +3301,27 @@ function diarioRenderAgenda(){
       <button onclick="diarioTogglePromemoria('${p.id}')" style="width:26px;height:26px;flex-shrink:0;border-radius:7px;border:1px solid ${p.fatto?'var(--green)':'var(--brd)'};background:${p.fatto?'rgba(75,232,122,.15)':'transparent'};color:var(--green);font-size:14px;cursor:pointer">${p.fatto?'✓':''}</button>
       <div style="flex:1;min-width:0">
         <div style="font-size:14px;font-weight:700;${p.fatto?'text-decoration:line-through':''}">${_de(p.titolo||'Promemoria')}</div>
-        <div style="font-size:12px;color:${(!p.fatto&&p.data&&p.data<oggi)?'var(--red)':'var(--text2)'};margin-top:2px">📅 ${_diaFmtD(p.data)}${p.ora?' · '+p.ora:''}${(!p.fatto&&p.data&&p.data<oggi)?' · scaduto':''}</div>
+        <div style="font-size:12px;color:${(!p.fatto&&p.data&&p.data<oggi)?'var(--red)':'var(--text2)'};margin-top:2px">📅 ${_diaFmtD(p.data)}${p.ora?' · '+p.ora:''}${(!p.fatto&&p.data&&p.data<oggi)?' · scaduto':''}${p.gcalEventId?' · <span style="color:var(--green)">✓ su Google</span>':(!p.fatto&&p.data&&p.data>=oggi?` · <a onclick="gcalLink('${p.id}')" style="color:var(--teal);font-weight:700;cursor:pointer">➕ Google</a>`:'')}</div>
         ${p.note?`<div style="font-size:12px;color:var(--text2);margin-top:3px">${_de(p.note)}</div>`:''}
+        ${(!p.fatto&&p.data)?`<a onclick="avvisiApri('${p.id}')" style="display:inline-block;margin-top:5px;font-size:12px;color:var(--gold);font-weight:700;cursor:pointer">🔔 ${Array.isArray(p.avvisi)?(p.avvisi.length?_avvisiTxt(p.avvisi)+' prima':'nessun avviso'):'avviso predefinito Google'} ›</a>`:''}
       </div>
       <button onclick="diarioDelPromemoria('${p.id}')" style="background:none;border:none;color:var(--red);font-size:15px;cursor:pointer;flex-shrink:0">✕</button>
     </div></div>`;
   let html=attivi.length?attivi.map(card).join(''):'<div style="color:var(--text2);text-align:center;padding:24px;font-size:14px">Nessun promemoria attivo</div>';
   if(fatti.length) html+=`<div class="sec-lbl">✓ Fatti (${fatti.length})</div>`+fatti.map(card).join('');
-  document.getElementById('dia-ag-list').innerHTML=html;
+  document.getElementById('dia-ag-list').innerHTML=(typeof _gcalBox==='function'?_gcalBox():'')+html;
   diarioAgBadge();
 }
 async function diarioTogglePromemoria(id){ const p=(DB.promemoria||[]).find(x=>x.id===id); if(!p)return; p.fatto=!p.fatto; diarioRenderAgenda(); await diarioSalvaAgenda(); }
-async function diarioDelPromemoria(id){ if(!(await sheetConfirm('Eliminare questo promemoria?',{ok:'Elimina',danger:true}))) return; DB.promemoria=(DB.promemoria||[]).filter(x=>x.id!==id); diarioRenderAgenda(); await diarioSalvaAgenda(); }
+async function diarioDelPromemoria(id){ if(!(await sheetConfirm('Eliminare questo promemoria?',{ok:'Elimina',danger:true}))) return; try{ await _gcalElimina((DB.promemoria||[]).find(x=>x.id===id)); }catch(e){} DB.promemoria=(DB.promemoria||[]).filter(x=>x.id!==id); diarioRenderAgenda(); await diarioSalvaAgenda(); }
 async function diarioSalvaAgenda(){
   setStatus(null,'Salvataggio…');
-  for(let t=1;t<=3;t++){
+  for(let t=1;t<=6;t++){
     const row=await sbGet(); const D=(row&&row.dati)?row.dati:{};
     D.promemoria=DB.promemoria||[];
-    const ok=await sbSet(D,(row&&row.versione!=null)?row.versione:null);
-    if(ok){ Object.assign(DB,D); setStatus(true,'Sincronizzato ✓'); return true; }
+    const saved=await sbSet(D,(row&&row.versione!=null)?row.versione:null);
+    if(saved){ Object.assign(DB,D); if(saved.versione!=null)_mobUltimaVersione=saved.versione; setStatus(true,'Sincronizzato ✓'); return true; }
+    await _mobSleep(200*t);
   }
   setStatus(false,'Conflitto'); toast('⚠ Riprova tra poco'); return false;
 }
@@ -3154,6 +3360,8 @@ async function diarioElabora(){
     const j=await res.json().catch(()=>({}));
     if(!res.ok) throw new Error(j.error||('errore '+res.status));
     DIARIO_AZIONI=(j.azioni||[]).map((a,i)=>diarioNorm(a,i));
+    _diarioUnisciAvvisi(DIARIO_AZIONI);
+    { const pm=DIARIO_AZIONI.filter(a=>a.tipo==='promemoria'), av=_avvisiDaTesto(txt); if(pm.length===1 && av) pm[0].avvisi=av; }
     diarioRenderPreview();
     diarioShow('preview');
     if(!DIARIO_AZIONI.length) toast('Non ho riconosciuto azioni — scrivi con nomi, importi, date o orari (es. "Appuntamento col Comune giovedì alle 10")');
@@ -3181,7 +3389,7 @@ function diarioNorm(a,i){
     o.cantNewName=c?'':(o.cantRaw||''); o.cantNewComm=a.committente||''; o.mezzo=a.mezzo||'';
     o.righe=(Array.isArray(a.righe)?a.righe:[]).map(r=>({descrizione:r.descrizione||'',qta:(r.qta!=null&&r.qta!=='')?(Number(r.qta)||1):1,prezzo:Number(r.prezzo)||0}));
     o.creaPreventivo=!!a.crea_preventivo || o.righe.length>0; }
-  if(a.tipo==='promemoria'){ o.titolo=a.titolo||o.testo; o.ora=a.ora||''; o.data=a.data||''; }
+  if(a.tipo==='promemoria'){ o.titolo=a.titolo||o.testo; o.ora=a.ora||''; o.data=a.data||''; o.avvisi=_avvisiDaTesto([a.testo,a.titolo,a.note].join(' '))||_avvisiDef(); }
   return o;
 }
 
@@ -3189,9 +3397,10 @@ function diarioNorm(a,i){
 window.diarioToggle=i=>{DIARIO_AZIONI[i].on=!DIARIO_AZIONI[i].on;const el=document.getElementById('dia-act-'+i);if(el)el.classList.toggle('off',!DIARIO_AZIONI[i].on);diarioUpdCount();};
 window.diarioSet=(i,f,v)=>{DIARIO_AZIONI[i][f]=v;};
 window.diarioSetDip=(i,v)=>{DIARIO_AZIONI[i].dipId=v;diarioRenderPreview();};
-window.diarioSetCant=(i,v)=>{DIARIO_AZIONI[i].cantMatch=diarioActiveCant().find(c=>c.id===v)||null;DIARIO_AZIONI[i].cantRaw=DIARIO_AZIONI[i].cantMatch?DIARIO_AZIONI[i].cantMatch.nome:'';diarioRenderPreview();};
+window.diarioSetCant=(i,v)=>{DIARIO_AZIONI[i].cantMatch=(DB.cantieri||[]).find(c=>c.id===v)||null;DIARIO_AZIONI[i].cantRaw=DIARIO_AZIONI[i].cantMatch?DIARIO_AZIONI[i].cantMatch.nome:'';diarioRenderPreview();};
 window.diarioSetCantMode=(i,m)=>{DIARIO_AZIONI[i].cantMode=m;diarioRenderPreview();};
 window.diarioSetBool=(i,f,v)=>{DIARIO_AZIONI[i][f]=v;};
+window.diarioToggleAvviso=(i,m)=>{ const a=DIARIO_AZIONI[i]; a.avvisi=_avvisiToggle(a.avvisi,m); _avvisiSalvaDef(a.avvisi); diarioRenderPreview(); };
 
 function diarioDipSelect(a){
   const opts=['<option value="">— scegli —</option>'].concat((DB.personale||[]).map(p=>`<option value="${p.id}"${a.dipId===p.id?' selected':''}>${_de(p.nome)}</option>`)).join('');
@@ -3202,7 +3411,7 @@ function diarioDipSelect(a){
 function diarioCantSelect(a,label){
   const opts=['<option value="">— nessuno —</option>'].concat(diarioActiveCant().map(c=>`<option value="${c.id}"${a.cantMatch&&a.cantMatch.id===c.id?' selected':''}>${_de(c.nome)}</option>`)).join('');
   return `<div class="dia-f full"><label>${label||'Cantiere'}</label>
-    <select class="${a.cantMatch?'dia-ok':'dia-warn'}" onchange="diarioSetCant(${a._i},this.value)">${opts}</select>
+    <select class="${a.cantMatch?'dia-ok':'dia-warn'}" data-sc="id" data-sc-giorno="${_de(a.data||'')}" onchange="diarioSetCant(${a._i},this.value)">${opts}</select>
     ${a.cantMatch?`<span class="dia-badge ok">✓ ${_de(a.cantMatch.nome)}</span>`:(a.cantRaw?`<span class="dia-badge warn">⚠ "${_de(a.cantRaw)}" non trovato</span>`:'')}</div>`;
 }
 function diarioCantBlock(a){
@@ -3214,7 +3423,7 @@ function diarioCantBlock(a){
       <button class="dia-segb${isNew?' on':''}" onclick="diarioSetCantMode(${a._i},'new')">➕ Nuovo</button>
     </div>
     ${!isNew
-      ? `<select class="${a.cantMatch?'dia-ok':'dia-warn'}" style="margin-top:8px" onchange="diarioSetCant(${a._i},this.value)">${opts}</select>${a.cantMatch?`<span class="dia-badge ok">✓ lavorazione su ${_de(a.cantMatch.nome)}</span>`:'<span class="dia-badge warn">⚠ scegli il cantiere</span>'}`
+      ? `<select class="${a.cantMatch?'dia-ok':'dia-warn'}" style="margin-top:8px" data-sc="id" data-sc-giorno="${_de(a.data||'')}" onchange="diarioSetCant(${a._i},this.value)">${opts}</select>${a.cantMatch?`<span class="dia-badge ok">✓ lavorazione su ${_de(a.cantMatch.nome)}</span>`:'<span class="dia-badge warn">⚠ scegli il cantiere</span>'}`
       : `<div style="margin-top:8px;display:grid;gap:8px">
           <input placeholder="Nome nuovo cantiere" value="${_de(a.cantNewName)}" onchange="diarioSet(${a._i},'cantNewName',this.value)">
           <input placeholder="Committente / cliente" value="${_de(a.cantNewComm)}" onchange="diarioSet(${a._i},'cantNewComm',this.value)">
@@ -3282,7 +3491,8 @@ function diarioCard(a){
     body=`<div class="dia-f"><label>Giorno</label><input type="date" value="${a.data}" onchange="diarioSet(${a._i},'data',this.value)"></div>
       <div class="dia-f"><label>Ora</label><input type="time" value="${a.ora}" onchange="diarioSet(${a._i},'ora',this.value)"></div>
       <div class="dia-f full"><label>Promemoria</label><input value="${_de(a.titolo)}" onchange="diarioSet(${a._i},'titolo',this.value)"></div>
-      <div class="dia-f full"><label>Note</label><input value="${_de(a.note)}" placeholder="opzionale" onchange="diarioSet(${a._i},'note',this.value)"></div>`;
+      <div class="dia-f full"><label>Note</label><input value="${_de(a.note)}" placeholder="opzionale" onchange="diarioSet(${a._i},'note',this.value)"></div>
+      <div class="dia-f full"><label>🔔 Avvisami prima</label><div class="dia-chips">${_avvisiChips(a.avvisi,`diarioToggleAvviso(${a._i},`)}</div></div>`;
   }
   return `<div class="dia-act${a.on?'':' off'}" id="dia-act-${a._i}">
     <div class="dia-ah"><div class="dia-ico" style="background:${m.bg}">${m.ic}</div>
@@ -3326,7 +3536,7 @@ function diarioApply(a,D){
     if(cantName)(D.speseCantiere=D.speseCantiere||[]).push({id:uid(),cantiere:cantName,data:a.data,importo:imp,categoria:a.categoria||'',fornitore:a.fornitore||'',descrizione:a.note||a.testo||'',fonte:'diario',statoRic:'da_riconciliare',fattura:'',scontrinoRef:_scId});
   } else if(a.tipo==='danno'){ if(!dip)return; (D.addebiti=D.addebiti||[]).push({id:uid(),dipId:dip.id,dipNome:dip.nome,importo:imp,data:a.data,descrizione:a.descrizione||'Danno',mezzo:a.mezzo||'',scalature:[],chiuso:false});
   } else if(a.tipo==='incasso'){ const c=a.cantMatch; (D.incassi=D.incassi||[]).push({id:uid(),cantiereId:c?c.id:'',cantiereName:c?c.nome:(a.cantRaw||''),committente:a.committente||'',data:a.data,importo:imp,metodo:a.metodo||'Bonifico',fattura:'',note:a.causale||a.note||''});
-  } else if(a.tipo==='promemoria'){ (D.promemoria=D.promemoria||[]).push({id:uid(),data:a.data||'',ora:a.ora||'',titolo:a.titolo||a.testo||'Promemoria',note:a.note||'',fatto:false,creato:today()});
+  } else if(a.tipo==='promemoria'){ (D.promemoria=D.promemoria||[]).push({id:uid(),data:a.data||'',ora:a.ora||'',titolo:a.titolo||a.testo||'Promemoria',note:a.note||'',avvisi:Array.isArray(a.avvisi)?a.avvisi:_avvisiDef(),fatto:false,creato:today()});
   } else if(a.tipo==='lavoro'){
     D.cantieri=D.cantieri||[]; let cant=null;
     if(a.cantMode==='new'){ cant={id:a.__cantId||uid(),nome:a.cantNewName||'Nuovo cantiere',committente:a.cantNewComm||'',stato:'da confermare',periodoInizio:a.data,periodoFine:a.data,interventi:[],fonte:'diario'}; if(a.__prevNumero)cant.preventivoRef=a.__prevNumero; else if(a.creaPreventivo)cant._preventivoDaFare=true; D.cantieri.push(cant); }
@@ -3336,23 +3546,25 @@ function diarioApply(a,D){
       if(squad.length){ // intervento nel Planning solo se c'è davvero una squadra (non per i preventivi puri)
         cant.interventi.push({id:uid(),data:a.data,squadra:squad,oraInizio:a.oraI,oraFine:a.oraF,luogo:cant.nome,mezzi:a.mezzo?[a.mezzo]:[]});
         if(!cant.periodoInizio||a.data<cant.periodoInizio)cant.periodoInizio=a.data;
-        if(!cant.periodoFine||a.data>cant.periodoFine)cant.periodoFine=a.data; } }
+        if(!cant.periodoFine||a.data>cant.periodoFine)cant.periodoFine=a.data;
+        _riapriSeChiusoAuto(cant,a.data); } }
   }
 }
 
 // ── Salvataggio atomico dell'intero blob con lock di versione + retry ──
 async function diarioSalvaTutto(list){
   setStatus(null,'Salvataggio…');
-  for(let t=1;t<=4;t++){
+  for(let t=1;t<=6;t++){
     const row=await sbGet();
     const D=(row&&row.dati)?row.dati:{};
     D.presenze=D.presenze||{};
     ['personale','cantieri','anticipi','pagamenti','scontrini','speseCantiere','addebiti','incassi','promemoria'].forEach(k=>{ if(!D[k])D[k]=[]; });
     list.forEach(a=>diarioApply(a,D));
-    const ok=await sbSet(D,(row&&row.versione!=null)?row.versione:null);
-    if(ok){ Object.assign(DB,D); try{const r=await sbGet(); if(r&&r.versione!=null)_mobUltimaVersione=r.versione;}catch(_){}
+    const saved=await sbSet(D,(row&&row.versione!=null)?row.versione:null);
+    if(saved){ Object.assign(DB,D); if(saved.versione!=null)_mobUltimaVersione=saved.versione;
       ricalcolaSaldi(); renderAll(); setStatus(true,'Sincronizzato ✓'); return true; }
     setStatus(null,'Dati cambiati — riprovo…');
+    await _mobSleep(200*t);
   }
   setStatus(false,'Conflitto — riprova'); return false;
 }
@@ -3377,7 +3589,14 @@ async function diarioConferma(){
     }
     const ok=await diarioSalvaTutto(list);
     document.getElementById('loading').style.display='none';
-    if(ok) diarioRenderDone(list); else toast('⚠ Un\'altra app sta scrivendo — riprova tra qualche secondo');
+    if(ok){
+      diarioRenderDone(list);
+      // appuntamenti con data → Google Calendar (se collegato in questa sessione)
+      if(list.some(a=>a.tipo==='promemoria' && a.data)){
+        if(gcalCollegato()) gcalSincronizzaAgenda(true);
+        else setTimeout(async()=>{ if(await sheetConfirm('Aggiungere l\'appuntamento a Google Calendar?',{ok:'📅 Aggiungi'})) gcalCollega(()=>gcalSincronizzaAgenda()); },600);
+      }
+    } else toast('⚠ Un\'altra app sta scrivendo — riprova tra qualche secondo');
   }catch(e){ document.getElementById('loading').style.display='none'; toast('⚠ '+e.message); }
 }
 
@@ -3393,7 +3612,7 @@ function diarioRenderDone(list){
     if(a.tipo==='danno') d=`${who} · ${fm(a.importo)}`;
     if(a.tipo==='incasso') d=`${a.committente||'Cliente'} · ${fm(a.importo)}`;
     if(a.tipo==='lavoro'){ const cn=a.cantMode==='new'?(a.cantNewName||'nuovo cantiere'):(a.cantMatch?a.cantMatch.nome:'—'); d=`${a.data} · ${a.squadra.length} pers. · ${cn}`; dest=a.cantMode==='new'?(a.__prevNumero?('Planning + '+a.__prevNumero):'Planning · nuovo'):'Planning · lavoraz.'; }
-    if(a.tipo==='promemoria') d=`${a.titolo||'Promemoria'}${a.data?' · '+a.data:''}${a.ora?' '+a.ora:''}`;
+    if(a.tipo==='promemoria') d=`${a.titolo||'Promemoria'}${a.data?' · '+a.data:''}${a.ora?' '+a.ora:''}${a.avvisi&&a.avvisi.length?' · 🔔 '+_avvisiTxt(a.avvisi):''}`;
     return `<div class="ri"><span style="font-size:16px">${m.ic}</span><span>${_de(d)}</span><span class="to">${_de(dest)}</span></div>`;
   }).join('');
   document.getElementById('dia-recap').innerHTML=rows;
@@ -3401,6 +3620,301 @@ function diarioRenderDone(list){
   const prevs=list.filter(a=>a.tipo==='lavoro'&&a.__prevNumero).map(a=>a.__prevNumero);
   if(prevs.length) toast(`✓ Salvato · ${prevs.join(', ')} creato in Preventivi`);
   diarioShow('done');
+}
+
+
+// ═══════════════ PROGRAMMA LAVORI (verifica e modifica di ciò che hai pianificato) ═══════════════
+// Mostra gli interventi pianificati (anche quelli creati dal Diario) giorno per giorno,
+// con squadra, orari e conflitti di persone; tocca un lavoro per modificarlo o eliminarlo.
+// Salvataggio atomico sul blob (mobPatchDati, lock di versione). L'eliminazione lascia
+// l'id in _interventiEliminati così il merge del Planning non lo fa "risorgere".
+let PROG_PASSATI=false;
+function _progCantieri(){
+  const arch=new Set(DB._cantieriArchiviati||[]);
+  return (DB.cantieri||[]).filter(c=>c && !arch.has(c.id) && (c.stato||'')!=='perso');
+}
+// Un cantiere chiuso in automatico (data fine passata) torna "in corso" se gli pianifichi un lavoro da oggi in poi;
+// altrimenti sparisce dall'app Roberto e dalle liste dei cantieri attivi.
+function _riapriSeChiusoAuto(c,data){
+  if(!c||!data||data<today()||c._statoManuale) return;
+  if(/conclus/i.test(c.stato||'') && c._autoChiuso){ c.stato='in corso'; c._autoChiuso=false; }
+}
+function _progMin(h){ const m=/^(\d{1,2}):(\d{2})/.exec(h||''); return m?(+m[1])*60+(+m[2]):null; }
+function _progVoci(){
+  const oggi=today(); const d0=new Date(); d0.setDate(d0.getDate()-7);
+  const da=PROG_PASSATI ? d0.toISOString().slice(0,10) : oggi;
+  const out=[];
+  _progCantieri().forEach(c=>(c.interventi||[]).forEach((iv,i)=>{
+    if(!iv || !iv.data || iv.data<da) return;
+    out.push({c, iv, idx:i});
+  }));
+  out.sort((a,b)=>(a.iv.data+(a.iv.oraInizio||'')).localeCompare(b.iv.data+(b.iv.oraInizio||'')));
+  return out;
+}
+// persone assegnate a più lavori sovrapposti nello stesso giorno
+function _progConflitti(voci){
+  const map={};
+  voci.forEach(v=>{ const sq=Array.isArray(v.iv.squadra)?v.iv.squadra:[]; sq.forEach(n=>{ const k=v.iv.data+'|'+String(n).toLowerCase(); (map[k]=map[k]||[]).push(v); }); });
+  const conf=new Map();
+  Object.entries(map).forEach(([k,arr])=>{
+    if(arr.length<2) return;
+    for(let i=0;i<arr.length;i++) for(let j=i+1;j<arr.length;j++){
+      const a=arr[i].iv, b=arr[j].iv;
+      const a1=_progMin(a.oraInizio)??480, a2=_progMin(a.oraFine)??1080, b1=_progMin(b.oraInizio)??480, b2=_progMin(b.oraFine)??1080;
+      if(a1<b2 && b1<a2){ const n=k.split('|')[1]; [arr[i],arr[j]].forEach(v=>{ const s=conf.get(v)||new Set(); s.add(n); conf.set(v,s); }); }
+    }
+  });
+  return conf;
+}
+function diarioOpenProgramma(){ diarioRenderProgramma(); diarioShow('prog'); }
+function progTogglePassati(){ PROG_PASSATI=!PROG_PASSATI; diarioRenderProgramma(); }
+function diarioRenderProgramma(){
+  const voci=_progVoci(); const conf=_progConflitti(voci);
+  window._PROG_VOCI=voci;
+  const giorni={}; voci.forEach((v,k)=>{ (giorni[v.iv.data]=giorni[v.iv.data]||[]).push(k); });
+  const nomeG=d=>{ const x=new Date(d+'T12:00'); return x.toLocaleDateString('it-IT',{weekday:'long',day:'2-digit',month:'long'}); };
+  const oggi=today();
+  let h=`<div style="display:flex;gap:8px;margin-bottom:12px"><button class="dia-segb ${PROG_PASSATI?'on':''}" onclick="progTogglePassati()">${PROG_PASSATI?'✓ ':''}Mostra anche ultimi 7 giorni</button></div>`;
+  if(!voci.length) h+='<div style="color:var(--text2);text-align:center;padding:24px;font-size:14px">Nessun lavoro pianificato da oggi in poi.<br>Usa il Diario («Domani Renato a Gaeta dalle 8 alle 17…») per pianificarne.</div>';
+  Object.keys(giorni).forEach(d=>{
+    h+=`<div class="sec-lbl" style="${d<oggi?'opacity:.6':''}">${d===oggi?'Oggi · ':''}${nomeG(d)}</div>`;
+    giorni[d].forEach(k=>{
+      const v=voci[k]; const iv=v.iv; const sq=Array.isArray(iv.squadra)?iv.squadra:[]; const cf=conf.get(v);
+      h+=`<div class="card" style="padding:12px;cursor:pointer;${cf?'border-color:rgba(232,84,84,.55)':''}" onclick="progApri(${k})">
+        <div style="display:flex;justify-content:space-between;gap:8px;align-items:flex-start">
+          <div style="min-width:0"><div style="font-size:14px;font-weight:800">${_de(v.c.nome||'Cantiere')}</div>
+          <div style="font-size:12px;color:var(--text2);margin-top:2px">🕗 ${_de(iv.oraInizio||'08:00')}–${_de(iv.oraFine||'18:00')}${iv.descrizione?' · '+_de(iv.descrizione):''}</div></div>
+          <span style="font-size:18px;color:var(--text2)">✎</span>
+        </div>
+        <div class="dia-chips" style="margin-top:8px">${sq.length?sq.map(n=>`<span class="dia-pchip ${cf&&cf.has(String(n).toLowerCase())?'warn':'ok'}">${_de(n)}</span>`).join(''):'<span class="dia-pchip warn">nessuna squadra</span>'}
+        ${(iv.mezzi||[]).length?`<span class="dia-pchip">🚐 ${_de((iv.mezzi||[]).join(', '))}</span>`:''}</div>
+        ${cf?`<div style="font-size:11.5px;color:var(--red);margin-top:6px">⚠ ${_de(sq.filter(n=>cf.has(String(n).toLowerCase())).join(', '))} anche su un altro lavoro nello stesso orario</div>`:''}
+      </div>`;
+    });
+  });
+  document.getElementById('dia-prog-list').innerHTML=h;
+}
+function progApri(k){
+  const v=(window._PROG_VOCI||[])[k]; if(!v) return;
+  const iv=v.iv; const sq=new Set((Array.isArray(iv.squadra)?iv.squadra:[]).map(String));
+  const pers=[...new Set([...(DB.personale||[]).map(p=>p.nome).filter(Boolean), ...sq])].sort((a,b)=>a.localeCompare(b));
+  window._PROG_ED={k, sq:new Set(sq)};
+  _sheetClose();
+  const w=document.createElement('div'); w.id='ui-sheet'; w.className='sheet-wrap';
+  const inp='width:100%;background:var(--navy);border:1px solid var(--brd);border-radius:9px;color:var(--text);padding:10px;font-size:16px;font-family:inherit';
+  w.innerHTML=`<div class="sheet" style="overflow:auto">
+    <div class="sheet-title">✎ ${_de(v.c.nome||'Lavoro')}</div>
+    <label style="font-size:11px;color:var(--text2);font-weight:700;text-transform:uppercase">Data</label>
+    <input type="date" id="pe-data" value="${_de(iv.data)}" style="${inp};margin:4px 0 10px">
+    <div style="display:flex;gap:8px">
+      <div style="flex:1"><label style="font-size:11px;color:var(--text2);font-weight:700;text-transform:uppercase">Dalle</label><input type="time" id="pe-oi" value="${_de(iv.oraInizio||'08:00')}" style="${inp};margin-top:4px"></div>
+      <div style="flex:1"><label style="font-size:11px;color:var(--text2);font-weight:700;text-transform:uppercase">Alle</label><input type="time" id="pe-of" value="${_de(iv.oraFine||'18:00')}" style="${inp};margin-top:4px"></div>
+    </div>
+    <label style="font-size:11px;color:var(--text2);font-weight:700;text-transform:uppercase;display:block;margin-top:10px">Lavoro</label>
+    <input id="pe-desc" value="${_de(iv.descrizione||'')}" placeholder="es. montaggio palco" style="${inp};margin:4px 0 10px">
+    <label style="font-size:11px;color:var(--text2);font-weight:700;text-transform:uppercase">Squadra (tocca per aggiungere o togliere)</label>
+    <div class="dia-chips" id="pe-sq" style="margin:6px 0 14px">${pers.map(n=>`<button type="button" class="dia-pchip ${sq.has(n)?'ok':''}" data-n="${_de(n)}" onclick="progToggleSq(this)" style="cursor:pointer;${sq.has(n)?'':'opacity:.55'}">${sq.has(n)?'✓ ':''}${_de(n)}</button>`).join('')}</div>
+    <button class="btn btn-teal" onclick="progSalva()">💾 Salva modifiche</button>
+    <button class="btn btn-red" onclick="progElimina()">🗑 Elimina questo lavoro</button>
+    <button class="btn btn-ghost" onclick="_sheetClose()">Annulla</button>
+  </div>`;
+  document.body.appendChild(w);
+  requestAnimationFrame(()=>w.classList.add('on'));
+  w.addEventListener('click',e=>{ if(e.target===w) _sheetClose(); });
+}
+function progToggleSq(b){
+  const n=b.dataset.n; const S=window._PROG_ED.sq;
+  if(S.has(n)){ S.delete(n); b.classList.remove('ok'); b.style.opacity='.55'; b.textContent=n; }
+  else { S.add(n); b.classList.add('ok'); b.style.opacity=''; b.textContent='✓ '+n; }
+}
+// trova l'intervento nel blob fresco: per id, altrimenti per data+ora nello stesso cantiere
+function _progTrova(D, v){
+  const c=(D.cantieri||[]).find(x=>x.id===v.c.id); if(!c||!Array.isArray(c.interventi)) return null;
+  let i = v.iv.id!=null ? c.interventi.findIndex(x=>x && x.id===v.iv.id) : -1;
+  if(i<0) i=c.interventi.findIndex(x=>x && x.data===v.iv.data && (x.oraInizio||'')===(v.iv.oraInizio||'') && JSON.stringify(x.squadra||[])===JSON.stringify(v.iv.squadra||[]));
+  return i<0 ? null : {c, i};
+}
+async function progSalva(){
+  const E=window._PROG_ED; const v=(window._PROG_VOCI||[])[E.k]; if(!v) return;
+  const data=document.getElementById('pe-data').value, oi=document.getElementById('pe-oi').value, of=document.getElementById('pe-of').value;
+  const desc=document.getElementById('pe-desc').value.trim(); const squadra=[...E.sq];
+  if(!data){ toast('⚠ Metti la data'); return; }
+  setStatus(null,'Salvataggio…');
+  let trovato=true;
+  try{
+    const ok=await mobPatchDati(D=>{
+      const t=_progTrova(D, v); if(!t){ trovato=false; return; }
+      const iv=t.c.interventi[t.i];
+      iv.data=data; iv.oraInizio=oi||'08:00'; iv.oraFine=of||'18:00'; iv.squadra=squadra;
+      if(desc) iv.descrizione=desc; else delete iv.descrizione;
+      if(iv.id==null) iv.id=uid();
+      if(!t.c.periodoInizio||data<t.c.periodoInizio) t.c.periodoInizio=data;
+      if(!t.c.periodoFine||data>t.c.periodoFine) t.c.periodoFine=data;
+      _riapriSeChiusoAuto(t.c,data);
+    });
+    if(!trovato){ setStatus(true,'Sincronizzato ✓'); toast('⚠ Lavoro non trovato: forse è stato modificato altrove — ricarica'); _sheetClose(); return; }
+    if(!ok){ setStatus(false,'Conflitto'); toast('⚠ Un\'altra app sta scrivendo — riprova'); return; }
+    setStatus(true,'Sincronizzato ✓'); _sheetClose(); renderAll&&renderAll(); diarioRenderProgramma(); toast('✓ Lavoro aggiornato');
+  }catch(e){ setStatus(false,'Errore'); toast('⚠ '+e.message); }
+}
+async function progElimina(){
+  const E=window._PROG_ED; const v=(window._PROG_VOCI||[])[E.k]; if(!v) return;
+  _sheetClose();
+  if(!(await sheetConfirm(`Eliminare il lavoro del ${_diaFmtD(v.iv.data)} su «${_de(v.c.nome||'')}»?`,{ok:'Elimina',danger:true}))) return;
+  setStatus(null,'Salvataggio…');
+  try{
+    const ok=await mobPatchDati(D=>{
+      const t=_progTrova(D, v); if(!t) return;
+      const iv=t.c.interventi[t.i];
+      t.c.interventi.splice(t.i,1);
+      if(iv && iv.id!=null){ D._interventiEliminati=Array.isArray(D._interventiEliminati)?D._interventiEliminati:[]; if(!D._interventiEliminati.includes(String(iv.id))) D._interventiEliminati.push(String(iv.id)); }
+    });
+    if(!ok){ setStatus(false,'Conflitto'); toast('⚠ Un\'altra app sta scrivendo — riprova'); return; }
+    setStatus(true,'Sincronizzato ✓'); renderAll&&renderAll(); diarioRenderProgramma(); toast('🗑 Lavoro eliminato');
+  }catch(e){ setStatus(false,'Errore'); toast('⚠ '+e.message); }
+}
+
+// ═══════════════ GOOGLE CALENDAR — appuntamenti dell'Agenda ═══════════════
+// Stesso client OAuth del Planning (stessa origine github.io), ma con permesso di
+// SCRITTURA sugli eventi. Il token dura ~1 ora: dopo va ricollegato con un tocco.
+const GCAL_CLIENT_ID='728971439296-02m5rg881uil90qtqct0cqsnc7bln8om.apps.googleusercontent.com';
+const GCAL_SCOPE='https://www.googleapis.com/auth/calendar.events';
+const GCAL_API='https://www.googleapis.com/calendar/v3/calendars/primary/events';
+let _gcalClient=null, _gcalDopo=null;
+function _gcalTok(){ try{ const t=JSON.parse(sessionStorage.getItem('gcal_mob_tok')||'null'); return (t&&t.exp>Date.now()+60000)?t.t:null; }catch(e){ return null; } }
+function gcalCollegato(){ return !!_gcalTok(); }
+function gcalCollega(poi){
+  if(!window.google||!google.accounts||!google.accounts.oauth2){ toast('Google non ancora caricato, riprova tra un attimo'); return; }
+  _gcalDopo=poi||null;
+  if(!_gcalClient) _gcalClient=google.accounts.oauth2.initTokenClient({client_id:GCAL_CLIENT_ID, scope:GCAL_SCOPE, callback:r=>{
+    if(r&&r.access_token){
+      try{ sessionStorage.setItem('gcal_mob_tok',JSON.stringify({t:r.access_token,exp:Date.now()+((+r.expires_in||3600)*1000)})); localStorage.setItem('gcal_mob_on','1'); }catch(e){}
+      toast('✓ Google Calendar collegato'); diarioRenderAgenda();
+      const f=_gcalDopo; _gcalDopo=null; if(f) f();
+    } else toast('⚠ Google: '+((r&&(r.error_description||r.error))||'collegamento non riuscito'));
+  }, error_callback:e=>{ _gcalDopo=null; toast('⚠ Google: '+((e&&(e.type==='popup_failed_to_open'?'finestra bloccata — usa ➕ Google sul singolo appuntamento':e.type==='popup_closed'?'finestra chiusa':(e.message||e.type)))||'errore')); }});
+  _gcalClient.requestAccessToken();
+}
+function _gcalEvento(p){
+  const desc=[p.note||'', '— dall\'Agenda 81|00 Mobile'].filter(Boolean).join('\n');
+  if(p.ora){
+    const [h,m]=p.ora.split(':').map(Number); const fine=new Date(2000,0,1,h,(m||0)+60);
+    const hf=String(fine.getHours()).padStart(2,'0')+':'+String(fine.getMinutes()).padStart(2,'0');
+    const dataFine = fine.getDate()===1 ? p.data : (()=>{ const x=new Date(p.data+'T12:00'); x.setDate(x.getDate()+1); return x.toISOString().slice(0,10); })();
+    return {summary:p.titolo||'Promemoria', description:desc, start:{dateTime:p.data+'T'+p.ora+':00', timeZone:'Europe/Rome'}, end:{dateTime:dataFine+'T'+hf+':00', timeZone:'Europe/Rome'}, reminders:_gcalReminders(p)};
+  }
+  const x=new Date(p.data+'T12:00'); x.setDate(x.getDate()+1);
+  return {summary:p.titolo||'Promemoria', description:desc, start:{date:p.data}, end:{date:x.toISOString().slice(0,10)}, reminders:_gcalReminders(p)};
+}
+function gcalLink(id){
+  const p=(DB.promemoria||[]).find(x=>x.id===id); if(!p||!p.data) return;
+  const ev=_gcalEvento(p), z=x=>x.replace(/[-:]/g,'');
+  const dates=ev.start.date? z(ev.start.date)+'/'+z(ev.end.date) : z(ev.start.dateTime)+'/'+z(ev.end.dateTime);
+  const u='https://calendar.google.com/calendar/render?action=TEMPLATE&text='+encodeURIComponent(ev.summary)+'&dates='+dates+'&ctz=Europe/Rome&details='+encodeURIComponent(ev.description||'');
+  window.open(u,'_blank');
+}
+// L'elaborazione a volte trasforma "avvisami 1 ora prima" in un SECONDO appuntamento
+// ("⚠ PROMEMORIA – tra 1 ora…"): lo riconosco, lo tolgo e lo trasformo nell'avviso dell'appuntamento vero.
+function _diarioUnisciAvvisi(az){
+  const pm=az.filter(a=>a.tipo==='promemoria'&&a.data&&a.ora);
+  const min=h=>{ const m=/^(\d{1,2}):(\d{2})/.exec(h||''); return m?(+m[1])*60+(+m[2]):null; };
+  const eAvviso=a=>/promemoria|avviso|reminder|\btra\s+(\d|un|mezz|due|tre)/i.test((a.titolo||'')+' '+(a.note||''));
+  const togli=new Set();
+  pm.forEach(r=>{
+    if(!eAvviso(r)) return;
+    const testo=(r.titolo||'')+' '+(r.note||'');
+    const cand=pm.filter(q=>q!==r && !togli.has(q) && q.data===r.data && min(q.ora)>min(r.ora) && !eAvviso(q));
+    if(!cand.length) return;
+    const q=cand.find(q=>testo.includes(q.ora)) || (cand.length===1?cand[0]:null); if(!q) return;
+    const diff=min(q.ora)-min(r.ora); if(diff<=0||diff>2880) return;
+    q.avvisi=[...new Set([...(_avvisiDaTesto((q.titolo||'')+' '+(q.note||''))||[]),diff])].sort((a,b)=>a-b);
+    togli.add(r);
+  });
+  for(let i=az.length-1;i>=0;i--) if(togli.has(az[i])) az.splice(i,1);
+  az.forEach((a,i)=>a._i=i);
+}
+// ── Avvisi (promemoria Google: notifica sul telefono X minuti prima) ──
+const AVVISI=[{m:15,l:'15 min'},{m:30,l:'30 min'},{m:60,l:'1 ora'},{m:120,l:'2 ore'},{m:1440,l:'1 giorno'},{m:2880,l:'2 giorni'}];
+function _avvisiTxt(a){ return (a||[]).slice().sort((x,y)=>x-y).map(m=>(AVVISI.find(v=>v.m===m)||{l:(m%60?m+' min':(m/60)+' ore')}).l).join(' + '); }
+function _avvisiDef(){ try{ const v=JSON.parse(localStorage.getItem('mob_avvisi_def')||'null'); if(Array.isArray(v)) return v; }catch(e){} return [60]; }
+function _avvisiSalvaDef(a){ try{ localStorage.setItem('mob_avvisi_def',JSON.stringify(a||[])); }catch(e){} }
+function _avvisiToggle(a,m){ a=Array.isArray(a)?a.slice():[]; const i=a.indexOf(m); if(i>=0) a.splice(i,1); else if(a.length<5) a.push(m); return a.sort((x,y)=>x-y); }
+function _avvisiChips(a,fn){ a=a||[]; const L=AVVISI.concat(a.filter(m=>!AVVISI.some(v=>v.m===m)).map(m=>({m,l:_avvisiTxt([m])}))).sort((x,y)=>x.m-y.m); return L.map(v=>`<button type="button" class="dia-pchip ${a.includes(v.m)?'ok':''}" onclick="${fn}${v.m})" style="cursor:pointer;${a.includes(v.m)?'':'opacity:.55'}">${a.includes(v.m)?'✓ ':''}${v.l}</button>`).join(''); }
+// "avvisami 2 ore prima", "ricordamelo mezz'ora prima", "avvisami il giorno prima"
+function _avvisiDaTesto(t){
+  t=String(t||'').toLowerCase().replace(/’/g,"'"); if(!/(avvis|ricord|notific|allert)/.test(t)) return null;
+  const out=new Set(), num={un:1,uno:1,una:1,due:2,tre:3,quattro:4,cinque:5,sei:6,dieci:10,quindici:15,venti:20,trenta:30};
+  t=t.replace(/(\d+)\s*h\s*(\d+)/g,(x,h,mm)=>h+' ore e '+mm+' minuti').replace(/(\d+)\s*h\b/g,'$1 ore');
+  const re=/(\d+|un[ao]?|due|tre|quattro|cinque|sei|dieci|quindici|venti|trenta|mezz[ao]?)[\s']*(minut\w*|min\b|or[ae]\b|giorn[oi]\b)(?:\s+e\s+(mezz[ao]|un quarto|\d+\s*min\w*))?\s+(?:di\s+)?prima/g; let m;
+  while((m=re.exec(t))){ const n=/^mezz/.test(m[1])?0.5:(num[m[1]]||+m[1]); const u=m[2]; let min=/^min/.test(u)?n:/^or/.test(u)?n*60:n*1440;
+    if(m[3]) min+= /^mezz/.test(m[3])?30 : /quarto/.test(m[3])?15 : (parseInt(m[3])||0);
+    if(min>0&&min<=40320) out.add(Math.round(min)); }
+  if(/(il|un) giorno prima/.test(t)) out.add(1440);
+  return out.size?[...out].sort((a,b)=>a-b).slice(0,5):null;
+}
+function _gcalReminders(p){ return Array.isArray(p.avvisi)?{useDefault:false,overrides:p.avvisi.map(m=>({method:'popup',minutes:m}))}:{useDefault:true}; }
+function avvisiApri(id){
+  const p=(DB.promemoria||[]).find(x=>x.id===id); if(!p) return;
+  window._AVV_ED={id, a:Array.isArray(p.avvisi)?p.avvisi.slice():_avvisiDef()};
+  _sheetClose();
+  const w=document.createElement('div'); w.id='ui-sheet'; w.className='sheet-wrap';
+  w.innerHTML=`<div class="sheet"><div class="sheet-title">🔔 ${_de(p.titolo||'Promemoria')}</div>
+    <div style="font-size:12.5px;color:var(--text2);margin-bottom:8px">Avvisami prima (puoi sceglierne più di uno, o nessuno):</div>
+    <div class="dia-chips" id="avv-chips" style="margin-bottom:14px"></div>
+    <button class="btn btn-teal" onclick="avvisiSalva()">💾 Salva</button>
+    <button class="btn btn-ghost" onclick="_sheetClose()">Annulla</button></div>`;
+  document.body.appendChild(w); _avvisiRenderEd();
+  requestAnimationFrame(()=>w.classList.add('on'));
+  w.addEventListener('click',e=>{ if(e.target===w) _sheetClose(); });
+}
+function _avvisiRenderEd(){ const el=document.getElementById('avv-chips'); if(el) el.innerHTML=_avvisiChips(window._AVV_ED.a,'avvisiToggleEd('); }
+function avvisiToggleEd(m){ window._AVV_ED.a=_avvisiToggle(window._AVV_ED.a,m); _avvisiRenderEd(); }
+async function avvisiSalva(){
+  const E=window._AVV_ED; const p=(DB.promemoria||[]).find(x=>x.id===E.id); if(!p) return;
+  p.avvisi=E.a; _avvisiSalvaDef(E.a); _sheetClose(); diarioRenderAgenda();
+  const aggiorna=async()=>{ const tok=_gcalTok(); if(!tok||!p.gcalEventId) return;
+    try{ const r=await fetch(GCAL_API+'/'+encodeURIComponent(p.gcalEventId),{method:'PATCH',headers:{Authorization:'Bearer '+tok,'Content-Type':'application/json'},body:JSON.stringify({reminders:_gcalReminders(p)})});
+      toast(r.ok?'✓ Avviso aggiornato anche su Google':'⚠ Google non ha aggiornato l\'avviso ('+r.status+')'); }catch(e){ toast('⚠ '+e.message); } };
+  // il popup Google va aperto subito (stesso tocco), prima di attese di rete
+  if(p.gcalEventId && !gcalCollegato()) gcalCollega(aggiorna);
+  await diarioSalvaAgenda();
+  if(p.gcalEventId){ if(gcalCollegato()) aggiorna(); } else toast('✓ Avviso salvato');
+}
+// Invia a Google gli appuntamenti con data non ancora sincronizzati; salva l'id evento nel blob
+async function gcalSincronizzaAgenda(silenzioso){
+  const tok=_gcalTok();
+  if(!tok){ if(!silenzioso) gcalCollega(()=>gcalSincronizzaAgenda()); return 0; }
+  const da=(DB.promemoria||[]).filter(p=>!p.fatto && p.data && p.data>=today() && !p.gcalEventId);
+  if(!da.length){ if(!silenzioso) toast('✓ Agenda già allineata con Google Calendar'); return 0; }
+  const fatti={}; let err=0;
+  for(const p of da){
+    try{
+      const r=await fetch(GCAL_API,{method:'POST',headers:{Authorization:'Bearer '+tok,'Content-Type':'application/json'},body:JSON.stringify(_gcalEvento(p))});
+      if(r.status===401){ sessionStorage.removeItem('gcal_mob_tok'); toast('⚠ Sessione Google scaduta: ricollega'); diarioRenderAgenda(); break; }
+      if(!r.ok){ err++; try{ const j=await r.json(); console.warn('GCal',r.status,j); if(r.status===403) toast('⚠ Google nega il permesso di scrittura sul calendario'); }catch(e){} continue; }
+      const ev=await r.json(); fatti[p.id]=ev.id;
+    }catch(e){ err++; }
+  }
+  const n=Object.keys(fatti).length;
+  if(n){
+    try{ await mobPatchDati(D=>{ (D.promemoria||[]).forEach(p=>{ if(fatti[p.id]) p.gcalEventId=fatti[p.id]; }); }); }catch(e){}
+    (DB.promemoria||[]).forEach(p=>{ if(fatti[p.id]) p.gcalEventId=fatti[p.id]; });
+  }
+  diarioRenderAgenda();
+  if(!silenzioso || n) toast(n?`📅 ${n} appuntament${n>1?'i':'o'} in Google Calendar`+(err?` · ⚠ ${err} non inviati`:''):(err?`⚠ ${err} non inviati`:'Niente da inviare'));
+  return n;
+}
+async function _gcalElimina(p){
+  const tok=_gcalTok(); if(!p||!p.gcalEventId||!tok) return;
+  try{ await fetch(GCAL_API+'/'+encodeURIComponent(p.gcalEventId),{method:'DELETE',headers:{Authorization:'Bearer '+tok}}); }catch(e){}
+}
+function _gcalBox(){
+  const on=gcalCollegato(); const n=(DB.promemoria||[]).filter(p=>!p.fatto&&p.data&&p.data>=today()&&!p.gcalEventId).length;
+  return `<div class="card" style="padding:10px 12px;display:flex;align-items:center;gap:10px;margin-bottom:12px">
+    <span style="width:9px;height:9px;border-radius:50%;background:${on?'var(--green)':'var(--text2)'};flex-shrink:0"></span>
+    <div style="flex:1;font-size:12.5px">${on?'Google Calendar collegato':'Google Calendar non collegato'}${n?` · <b style="color:var(--gold)">${n} da inviare</b>`:''}</div>
+    <button onclick="${on?'gcalSincronizzaAgenda()':'gcalCollega(()=>gcalSincronizzaAgenda())'}" style="background:var(--teal);border:none;color:#fff;border-radius:8px;padding:7px 11px;font-size:12px;font-weight:700;cursor:pointer">${on?'↻ Sincronizza':'📅 Collega'}</button>
+  </div>`;
 }
 
 // Tasti rapidi: inseriscono un modello da completare
@@ -3429,5 +3943,349 @@ if('serviceWorker' in navigator){
   });
 }
 </script>
+<!-- ═══════════ SELETTORE COMMESSA v1.1 — blocco condiviso app 81100 ═══════════
+  Copiare IDENTICO nelle altre app (Gestionale, Planning, Roberto, Buono Consegna, Preventivi).
+  Uso: aggiungere a un <select> o <input> esistente
+    data-sc="id"   → il controllo contiene l'ID del cantiere
+    data-sc="nome" → il controllo contiene il NOME del cantiere
+  opzionali:
+    data-sc-profilo="economico"  (incassi/fatture: finestra conclusi 180 gg; default operativo 60 gg)
+    data-sc-data="#id-campo-data" oppure data-sc-giorno="AAAA-MM-GG"  (data del record → suggeriti)
+    data-sc-persona="Nome Cognome"  (in cima i cantieri dove la persona è in squadra quel giorno)
+    data-sc-compatto  (bottone basso, per righe di tabella; automatico sulle select con classe "ie")
+  Se la select contiene l'opzione value="__nuovo__", il foglio offre "➕ Crea nuovo cantiere"
+  (sceglie __nuovo__ e lascia la creazione al codice dell'app, come prima).
+  Il controllo originale resta nel DOM (nascosto) e tiene il valore: il codice che legge .value
+  e gli onchange esistenti funzionano come prima (alla scelta parte un evento 'change').
+  Legge i cantieri da DB.cantieri e l'archivio da DB._cantieriArchiviati / c.archiviato.
+  INTERRUTTORE D'EMERGENZA (tornano le tendine classiche, nessun dato toccato):
+    per tutti   → DB._selettoreCommessaOff = true  (chiave nel blob gestionale_dati 'unico')
+    un telefono → aprire l'app con ?sc=off  (?sc=on per riattivarlo) -->
+<style>
+.sc-orig{display:none!important}
+.sc-btn[hidden]{display:none!important}
+.sc-btn:disabled{opacity:.45;cursor:default}
+.sc-btn.sc-compact{min-height:34px;padding:4px 8px;font-size:13px;gap:6px}
+.sc-btn.sc-compact .sc-bm{display:none}
+.sc-btn.sc-compact .sc-bn,.sc-btn.sc-compact .sc-ph{font-size:12px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+#sc-sheet[hidden],#sc-scrim[hidden],#sc-sheet [hidden]{display:none!important}
+.sc-btn{width:100%;display:flex;align-items:center;gap:10px;text-align:left;min-height:48px;padding:10px 12px;border:1px solid var(--brd,#e2e5ea);border-radius:10px;background:var(--navy2,#fff);color:var(--text,#1b2740);font:15px 'IBM Plex Sans',-apple-system,sans-serif;cursor:pointer}
+.sc-btn .sc-bt{display:flex;flex-direction:column;gap:1px;min-width:0;flex:1}
+.sc-btn .sc-bn{font-weight:600;overflow-wrap:anywhere}
+.sc-btn .sc-bm{font-size:12px;color:var(--text2,#5f6a7d);overflow-wrap:anywhere}
+.sc-btn .sc-ph{color:var(--text2,#5f6a7d)}
+.sc-btn .sc-chev{color:var(--text2,#5f6a7d);font-size:20px;line-height:1}
+.sc-btn.sc-warn{border-color:var(--gold,#a9781a)}
+#sc-scrim{position:fixed;inset:0;background:rgba(20,28,45,.45);z-index:100000}
+#sc-sheet{position:fixed;left:0;right:0;bottom:0;top:max(24px,env(safe-area-inset-top,0px));z-index:100001;background:var(--navy,#eef1f5);border-radius:16px 16px 0 0;display:flex;flex-direction:column;max-width:640px;margin:0 auto;box-shadow:0 -8px 30px rgba(0,0,0,.18);font-family:'IBM Plex Sans',-apple-system,sans-serif;color:var(--text,#1b2740)}
+#sc-sheet .sc-top{padding:10px 16px;display:flex;flex-direction:column;gap:8px;border-bottom:1px solid var(--brd,#e2e5ea);background:var(--navy2,#fff);border-radius:16px 16px 0 0}
+#sc-sheet .sc-row1{display:flex;align-items:center;gap:6px}
+#sc-sheet .sc-row1 h3{font-size:17px;flex:1;min-width:0;margin:0}
+#sc-sheet .sc-lnk{border:none;background:transparent;font:600 15px inherit;font-family:inherit;color:var(--teal,#0e7c66);cursor:pointer;min-height:44px;padding:0 6px}
+#sc-sheet input[type=search],#sc-sheet select{width:100%;font:16px inherit;font-family:inherit;padding:11px 12px;border:1px solid var(--brd,#e2e5ea);border-radius:10px;background:var(--navy2,#fff);color:var(--text,#1b2740);outline:none;-webkit-appearance:none;appearance:none}
+#sc-sheet .sc-filt{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+#sc-sheet .sc-filt select{font-size:15px;padding:9px 10px}
+#sc-sheet .sc-ctx{font-size:12px;color:var(--text2,#5f6a7d)}
+#sc-sheet .sc-body{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:2px 16px calc(24px + env(safe-area-inset-bottom,0px))}
+#sc-sheet .sc-grp{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--text2,#5f6a7d);margin:16px 2px 8px;display:flex;justify-content:space-between;gap:8px}
+#sc-sheet .sc-list{display:flex;flex-direction:column;gap:6px}
+#sc-sheet .sc-it{display:flex;gap:12px;align-items:flex-start;width:100%;text-align:left;background:var(--navy2,#fff);border:1px solid var(--brd,#e2e5ea);border-radius:12px;padding:11px 12px;cursor:pointer;color:inherit;font:inherit;min-height:54px}
+#sc-sheet .sc-it.sc-cur{border-color:var(--teal,#0e7c66);box-shadow:inset 0 0 0 1px var(--teal,#0e7c66)}
+#sc-sheet .sc-dot{width:10px;height:10px;border-radius:50%;margin-top:6px;flex-shrink:0;background:#9aa3b2}
+#sc-sheet .sc-dot.att{background:var(--teal,#0e7c66)}#sc-sheet .sc-dot.lp{background:var(--gold,#a9781a)}
+#sc-sheet .sc-dot.wait{background:var(--gold,#a9781a);box-shadow:inset 0 0 0 2px var(--navy2,#fff)}
+#sc-sheet .sc-dot.arc{background:transparent;border:2px solid #9aa3b2}
+#sc-sheet .sc-tx{min-width:0;flex:1;display:flex;flex-direction:column;gap:2px}
+#sc-sheet .sc-n{font-weight:600;font-size:15px;overflow-wrap:anywhere}
+#sc-sheet .sc-m{font-size:13px;color:var(--text2,#5f6a7d);overflow-wrap:anywhere}
+#sc-sheet .sc-tags{display:flex;gap:6px;flex-wrap:wrap;margin-top:3px}
+#sc-sheet .sc-tag{font:600 11px 'IBM Plex Mono',ui-monospace,monospace;padding:1px 6px;border-radius:5px;background:var(--navy,#eef1f5);color:var(--text2,#5f6a7d);border:1px solid var(--brd,#e2e5ea)}
+#sc-sheet .sc-tag.att{color:var(--teal,#0e7c66);border-color:var(--teal,#0e7c66);background:var(--td,rgba(14,124,102,.08))}
+#sc-sheet .sc-tag.lp{color:var(--gold,#a9781a);border-color:var(--gold,#a9781a);background:rgba(169,120,26,.08)}
+#sc-sheet .sc-tag.why{font-family:inherit;color:var(--teal,#0e7c66);border-color:transparent;background:var(--td,rgba(14,124,102,.1))}
+#sc-sheet mark{background:#fde9a8;color:inherit;border-radius:3px;padding:0 1px}
+#sc-sheet .sc-more{width:100%;margin-top:16px;padding:14px;border-radius:12px;border:1.5px dashed var(--teal,#0e7c66);background:transparent;color:var(--teal,#0e7c66);font:700 15px inherit;font-family:inherit;cursor:pointer;min-height:52px}
+#sc-sheet .sc-none{width:100%;margin-top:12px;padding:12px;border-radius:12px;border:1px solid var(--brd,#e2e5ea);background:transparent;color:var(--text2,#5f6a7d);font:600 14px inherit;font-family:inherit;cursor:pointer;min-height:48px}
+#sc-sheet .sc-empty{padding:20px 4px;color:var(--text2,#5f6a7d);font-size:14px;text-align:center}
+</style>
+<script>
+(function(){
+  'use strict';
+  const SC_VER='1.1';
+  const NUOVO='__nuovo__';
+  const FINESTRA={operativo:60,economico:180};
+  const MAX_RECENTI=5, LS_RECENTI='sc81_recenti';
+  const MESI=['gennaio','febbraio','marzo','aprile','maggio','giugno','luglio','agosto','settembre','ottobre','novembre','dicembre'];
+  const MESI_B=['gen','feb','mar','apr','mag','giu','lug','ago','set','ott','nov','dic'];
+  const norm=s=>String(s==null?'':s).normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase().replace(/[’`]/g,"'").replace(/\s+/g,' ').trim();
+  const esc=s=>String(s==null?'':s).replace(/[&<>"]/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[ch]));
+  const oggiISO=()=>{const d=new Date();return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,10);};
+  const addG=(iso,n)=>{const d=new Date(iso+'T12:00:00');d.setDate(d.getDate()+n);return d.toISOString().slice(0,10);};
+  const fmtD=iso=>{if(!iso)return '';const p=iso.split('-');return (+p[2])+' '+MESI_B[+p[1]-1];};
+
+  // ── dati: legge DB.cantieri ogni volta (si aggiorna da solo dopo un sync)
+  function cantieri(){
+    const db=(typeof DB!=='undefined'&&DB)||{};
+    const arch=new Set(db._cantieriArchiviati||[]);
+    return (db.cantieri||[]).filter(c=>c&&c.id&&(c.nome||c.name)).map(c=>{
+      const nome=String(c.nome||c.name).trim();
+      const s=norm(c.stato);
+      const arc=arch.has(c.id)||c.archiviato===true;
+      const conc=s.includes('conclus')||s.includes('pers')||s.includes('rifiut');
+      const ivs=(Array.isArray(c.interventi)?c.interventi:[]).filter(iv=>iv&&iv.data);
+      let ini=c.periodoInizio||'', fin=c.periodoFine||'';
+      if(!ini&&ivs.length) ini=ivs.reduce((a,iv)=>iv.data<a?iv.data:a,ivs[0].data);
+      if(!fin&&ivs.length) fin=ivs.reduce((a,iv)=>iv.data>a?iv.data:a,ivs[0].data);
+      if(!fin) fin=ini;
+      const cli=c.clienteNome||c.committente||'';
+      const mesi=[];
+      if(ini){let y=+ini.slice(0,4),m=+ini.slice(5,7);const fy=+fin.slice(0,4),fm=+fin.slice(5,7);
+        for(let k=0;k<24&&(y<fy||(y===fy&&m<=fm));k++){mesi.push(MESI[m-1]);m++;if(m>12){m=1;y++;}}}
+      return {c,id:c.id,nome,cli,luogo:c.luogo||'',cod:c.codice||'',stato:c.stato||'',ini,fin,ivs,
+        lp:c.tipo==='lungo_periodo',arc,conc,att:!arc&&!conc,mese:ini?ini.slice(0,7):'',nn:' '+norm(nome),
+        hay:norm([nome,cli,c.luogo,c.codice,mesi.join(' '),ini.slice(0,4)].join(' '))};
+    });
+  }
+  function recenti(){try{return JSON.parse(localStorage.getItem(LS_RECENTI)||'[]')||[];}catch(e){return [];}}
+  function segnaRecente(id){try{localStorage.setItem(LS_RECENTI,JSON.stringify([id,...recenti().filter(x=>x!==id)].slice(0,MAX_RECENTI)));}catch(e){}}
+
+  // ── stato del foglio
+  let cur=null; // {el, modo, profilo, giorno, persona}
+  let vista='smart';
+  let sheet, scrim;
+
+  function periodo(x){ if(!x.ini) return 'date da definire'; return x.ini===x.fin?fmtD(x.ini):fmtD(x.ini)+' – '+fmtD(x.fin); }
+  function dot(x){ if(x.arc) return 'arc'; if(x.conc) return ''; if(x.lp) return 'lp'; const s=norm(x.stato); return (s.includes('confermar')||s.includes('arrivo')||s.includes('fermo'))?'wait':'att'; }
+  function tagStato(x){
+    if(x.arc) return '<span class="sc-tag">archivio</span>';
+    if(x.conc) return '<span class="sc-tag">'+esc(x.stato||'concluso')+'</span>';
+    if(x.lp) return '<span class="sc-tag lp">deposito / lungo periodo</span>';
+    return '<span class="sc-tag att">'+esc(x.stato||'attivo')+'</span>';
+  }
+  function hl(text,toks){
+    text=String(text||''); if(!toks.length) return esc(text);
+    const n=text.normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase();
+    if(n.length!==text.length) return esc(text);
+    const mk=new Array(text.length).fill(false);
+    toks.forEach(t=>{let i=n.indexOf(t);while(i>=0){for(let k=i;k<i+t.length;k++)mk[k]=true;i=n.indexOf(t,i+t.length);}});
+    let s='',open=false;
+    for(let i=0;i<text.length;i++){if(mk[i]&&!open){s+='<mark>';open=true;}if(!mk[i]&&open){s+='</mark>';open=false;}s+=esc(text[i]);}
+    return open?s+'</mark>':s;
+  }
+  function riga(x,toks,why,selId){
+    const meta=[x.cli,x.luogo&&norm(x.luogo)!==norm(x.nome)?x.luogo:'',periodo(x)].filter(Boolean).map(v=>hl(v,toks)).join(' · ');
+    return '<button type="button" class="sc-it'+(x.id===selId?' sc-cur':'')+'" data-sc-id="'+esc(x.id)+'"><span class="sc-dot '+dot(x)+'"></span>'+
+      '<span class="sc-tx"><span class="sc-n">'+hl(x.nome,toks)+'</span><span class="sc-m">'+meta+'</span>'+
+      '<span class="sc-tags">'+(why?'<span class="sc-tag why">'+esc(why)+'</span>':'')+tagStato(x)+(x.cod?'<span class="sc-tag">'+hl(x.cod,toks)+'</span>':'')+'</span></span></button>';
+  }
+  function gruppo(t,items,toks,whyFn,selId){
+    if(!items.length) return '';
+    return '<div class="sc-grp"><span>'+t+'</span><span>'+items.length+'</span></div><div class="sc-list">'+items.map(x=>riga(x,toks,whyFn?whyFn(x):'',selId)).join('')+'</div>';
+  }
+  const perData=(a,b)=>(b.ini||'9999').localeCompare(a.ini||'9999');
+
+  function inFinestra(x){ if(x.arc) return false; if(x.att) return true; return !!x.fin&&x.fin>=addG(oggiISO(),-FINESTRA[cur.profilo]); }
+  function suggeriti(L){
+    const d=cur.giorno||oggiISO(), p=norm(cur.persona);
+    const out=[], why={};
+    const push=(x,w)=>{ if(!why[x.id]){why[x.id]=w;out.push(x);} };
+    if(p) L.forEach(x=>{ if(!x.arc&&x.ivs.some(iv=>iv.data===d&&(iv.squadra||[]).some(n=>norm(n)===p))) push(x,'in squadra quel giorno'); });
+    L.forEach(x=>{ if(!x.arc&&x.ivs.some(iv=>iv.data===d)) push(x,'lavorazione quel giorno'); });
+    L.filter(x=>!x.arc&&x.ini&&x.ini<=addG(d,1)&&x.fin>=addG(d,-1)).sort((a,b)=>(b.att-a.att)||perData(a,b))
+      .forEach(x=>push(x,x.att?'in corso quel giorno':'attivo quel giorno'));
+    return {out,why};
+  }
+  function idCorrente(L){
+    if(!cur) return '';
+    const v=cur.el.value; if(!v) return '';
+    if(cur.modo==='id') return v;
+    const n=norm(v); const x=L.find(y=>norm(y.nome)===n); return x?x.id:'';
+  }
+
+  function renderSmart(){
+    const L=cantieri(), selId=idCorrente(L);
+    const q=sheet.querySelector('#sc-q').value.trim(), toks=norm(q).split(' ').filter(Boolean);
+    const d=cur.giorno||oggiISO();
+    sheet.querySelector('#sc-ctx').textContent=(cur.profilo==='economico'?'Incassi e fatture':'Lavoro operativo')+' · record del '+fmtD(d)+' '+d.slice(0,4)+' · conclusi ultimi '+FINESTRA[cur.profilo]+' giorni';
+    let h='';
+    if(toks.length){
+      // pertinenza: parola del NOME che inizia col testo cercato > dentro il nome > altrove (cliente, luogo…)
+      const punti=x=>toks.reduce((a,t)=>a+(x.nn.includes(' '+t)?3:x.nn.includes(t)?2:0),0);
+      const hits=L.filter(x=>toks.every(t=>x.hay.includes(t))).map(x=>({x,p:punti(x)}));
+      const best=hits.reduce((m,h)=>Math.max(m,h.p),0);
+      const ord=(a,b)=>(b.p-a.p)||(b.x.att-a.x.att)||perData(a.x,b.x);
+      // in alto: le più pertinenti (anche se vecchie) e quelle nella finestra; sotto il resto dell'archivio
+      const top=hits.filter(h=>h.p===best&&best>0||inFinestra(h.x)).sort(ord).map(h=>h.x);
+      const resto=hits.filter(h=>!(h.p===best&&best>0||inFinestra(h.x))).sort(ord).map(h=>h.x);
+      h+=gruppo('Risultati',top,toks,null,selId);
+      h+=gruppo('Più vecchie e archivio',resto,toks,null,selId);
+      if(!hits.length) h+='<div class="sc-empty">Nessuna commessa contiene “'+esc(q)+'”.<br>Prova con il cliente, il luogo, il mese (es. “agosto”) o il codice COM.</div>';
+    }else{
+      const {out:sug,why}=suggeriti(L), visti=new Set(sug.map(x=>x.id));
+      const rec=recenti().map(id=>L.find(x=>x.id===id)).filter(x=>x&&!visti.has(x.id)).slice(0,MAX_RECENTI);
+      rec.forEach(x=>visti.add(x.id));
+      const att=L.filter(x=>x.att&&!visti.has(x.id)).sort((a,b)=>(a.lp-b.lp)||perData(a,b));
+      const conc=L.filter(x=>!x.att&&inFinestra(x)&&!visti.has(x.id)).sort((a,b)=>(b.fin||'').localeCompare(a.fin||''));
+      h+=gruppo('⭐ Suggeriti per il '+fmtD(d),sug,[],x=>why[x.id],selId);
+      h+=gruppo('🕘 Usati di recente',rec,[],null,selId);
+      h+=gruppo('🟢 Attivi',att,[],null,selId);
+      h+=gruppo('⚪ Conclusi negli ultimi '+FINESTRA[cur.profilo]+' giorni',conc,[],null,selId);
+    }
+    h+='<button type="button" class="sc-more" data-sc-azione="tutte">Non la trovi? Cerca in tutte le '+L.length+' commesse ›</button>';
+    if(cur.nuovoOk) h+='<button type="button" class="sc-none" data-sc-azione="nuovo">➕ Crea nuovo cantiere</button>';
+    if(cur.vuotoOk) h+='<button type="button" class="sc-none" data-sc-azione="nessuno">✕ Nessun cantiere</button>';
+    sheet.querySelector('#sc-body').innerHTML=h;
+  }
+  function riempiFiltri(L){
+    const mesi=[...new Set(L.map(x=>x.mese).filter(Boolean))].sort().reverse();
+    sheet.querySelector('#sc-f-mese').innerHTML='<option value="">Tutti i mesi</option>'+mesi.map(m=>'<option value="'+m+'">'+MESI[+m.slice(5)-1].replace(/^./,c=>c.toUpperCase())+' '+m.slice(0,4)+'</option>').join('');
+    const cl={}; L.forEach(x=>{if(x.cli){const k=norm(x.cli);(cl[k]=cl[k]||{n:x.cli,k:0}).k++;}});
+    sheet.querySelector('#sc-f-cli').innerHTML='<option value="">Tutti i clienti</option>'+Object.entries(cl).sort((a,b)=>a[1].n.localeCompare(b[1].n,'it',{sensitivity:'base'})).map(([k,v])=>'<option value="'+esc(k)+'">'+esc(v.n)+' ('+v.k+')</option>').join('');
+  }
+  function renderTutte(){
+    const L=cantieri(), selId=idCorrente(L);
+    const q=sheet.querySelector('#sc-q').value.trim(), toks=norm(q).split(' ').filter(Boolean);
+    const fm=sheet.querySelector('#sc-f-mese').value, fs=sheet.querySelector('#sc-f-stato').value, fc=sheet.querySelector('#sc-f-cli').value;
+    const list=L.filter(x=>toks.every(t=>x.hay.includes(t))&&(!fm||x.mese===fm)&&(!fc||norm(x.cli)===fc)&&
+      (!fs||(fs==='att'&&x.att)||(fs==='conc'&&x.conc&&!x.arc)||(fs==='arc'&&x.arc))).sort(perData);
+    sheet.querySelector('#sc-ctx').textContent='Elenco completo · '+list.length+' di '+L.length+' commesse · dalla più recente';
+    const byM={}; list.forEach(x=>{(byM[x.mese||'—']=byM[x.mese||'—']||[]).push(x);});
+    const keys=Object.keys(byM).sort((a,b)=>a==='—'?-1:b==='—'?1:b.localeCompare(a));
+    sheet.querySelector('#sc-body').innerHTML=list.length
+      ? keys.map(k=>gruppo(k==='—'?'Senza date':MESI[+k.slice(5)-1].replace(/^./,c=>c.toUpperCase())+' '+k.slice(0,4),byM[k],toks,null,selId)).join('')
+      : '<div class="sc-empty">Nessuna commessa con questi filtri.<br>Togli un filtro o cambia la ricerca.</div>';
+    if(cur.nuovoOk) sheet.querySelector('#sc-body').insertAdjacentHTML('beforeend','<button type="button" class="sc-none" data-sc-azione="nuovo">➕ Crea nuovo cantiere</button>');
+  }
+  function render(){ vista==='tutte'?renderTutte():renderSmart(); }
+  function setVista(v){
+    vista=v;
+    sheet.querySelector('#sc-filt').hidden=v!=='tutte';
+    sheet.querySelector('#sc-back').hidden=v!=='tutte';
+    sheet.querySelector('#sc-tit').textContent=v==='tutte'?'Tutte le commesse':'Scegli commessa';
+    if(v==='tutte') riempiFiltri(cantieri());
+    sheet.querySelector('#sc-body').scrollTop=0; render();
+  }
+
+  function costruisci(){
+    scrim=document.createElement('div'); scrim.id='sc-scrim'; scrim.hidden=true;
+    sheet=document.createElement('div'); sheet.id='sc-sheet'; sheet.hidden=true;
+    sheet.setAttribute('role','dialog'); sheet.setAttribute('aria-modal','true');
+    sheet.innerHTML='<div class="sc-top"><div class="sc-row1"><button type="button" class="sc-lnk" id="sc-back" hidden>‹ Indietro</button>'+
+      '<h3 id="sc-tit">Scegli commessa</h3><button type="button" class="sc-lnk" id="sc-close">Chiudi</button></div>'+
+      '<input type="search" id="sc-q" placeholder="🔍 Nome, cliente, luogo, COM-…, mese" autocomplete="off" autocorrect="off" spellcheck="false" data-af="1">'+
+      '<div class="sc-filt" id="sc-filt" hidden><select id="sc-f-mese" aria-label="Mese"></select>'+
+      '<select id="sc-f-stato" aria-label="Stato"><option value="">Tutti gli stati</option><option value="att">Attivi</option><option value="conc">Conclusi</option><option value="arc">Archiviati</option></select>'+
+      '<select id="sc-f-cli" aria-label="Cliente" style="grid-column:1/-1"></select></div>'+
+      '<div class="sc-ctx" id="sc-ctx"></div></div><div class="sc-body" id="sc-body"></div>';
+    document.body.appendChild(scrim); document.body.appendChild(sheet);
+    scrim.addEventListener('click',chiudi);
+    sheet.querySelector('#sc-close').addEventListener('click',chiudi);
+    sheet.querySelector('#sc-back').addEventListener('click',()=>setVista('smart'));
+    sheet.querySelector('#sc-q').addEventListener('input',render);
+    ['#sc-f-mese','#sc-f-stato','#sc-f-cli'].forEach(s=>sheet.querySelector(s).addEventListener('change',render));
+    sheet.querySelector('#sc-body').addEventListener('click',e=>{
+      const a=e.target.closest('[data-sc-azione]');
+      if(a){ const z=a.dataset.scAzione; if(z==='tutte') setVista('tutte'); else if(z==='nuovo') scegli(NUOVO); else scegli(null); return; }
+      const it=e.target.closest('[data-sc-id]'); if(it) scegli(it.dataset.scId);
+    });
+    document.addEventListener('keydown',e=>{ if(e.key==='Escape'&&sheet&&!sheet.hidden) chiudi(); });
+  }
+  function giornoDi(el){
+    if(el.dataset.scGiorno) return el.dataset.scGiorno;
+    if(el.dataset.scData){ try{ const f=document.querySelector(el.dataset.scData); if(f&&f.value) return f.value; }catch(e){} }
+    return oggiISO();
+  }
+  function apri(el){
+    if(!sheet) costruisci();
+    cur={el,modo:el.dataset.sc==='id'?'id':'nome',profilo:el.dataset.scProfilo==='economico'?'economico':'operativo',
+      giorno:giornoDi(el),persona:el.dataset.scPersona||'',
+      vuotoOk:el.tagName!=='SELECT'||[...el.options].some(o=>o.value===''),
+      nuovoOk:el.tagName==='SELECT'&&[...el.options].some(o=>o.value===NUOVO)};
+    sheet.querySelector('#sc-q').value='';
+    sheet.querySelector('#sc-f-stato').value='';
+    scrim.hidden=false; sheet.hidden=false;
+    setVista('smart');
+    // su telefono non apriamo subito la tastiera: si vedono prima i suggeriti
+    if(!(window.matchMedia&&matchMedia('(pointer:coarse)').matches)) setTimeout(()=>sheet.querySelector('#sc-q').focus(),50);
+  }
+  function chiudi(){ if(!sheet) return; sheet.hidden=true; scrim.hidden=true; if(cur&&cur.btn) try{cur.btn.focus();}catch(e){} cur=null; }
+
+  // imposta il valore sul controllo originale e avvisa il codice esistente
+  function scegli(id){
+    if(!cur) return;
+    const el=cur.el, L=cantieri();
+    const x=id&&id!==NUOVO?L.find(y=>y.id===id):null;
+    const v=id===NUOVO?NUOVO:x?(cur.modo==='id'?x.id:x.nome):'';
+    if(el.tagName==='SELECT'&&v&&![...el.options].some(o=>o.value===v)){
+      const o=document.createElement('option'); o.value=v; o.textContent=x.nome; el.appendChild(o);
+    }
+    el.value=v;
+    if(x) segnaRecente(x.id);
+    chiudi();
+    el.dispatchEvent(new Event('input',{bubbles:true}));
+    el.dispatchEvent(new Event('change',{bubbles:true}));
+    etichetta(el);
+  }
+
+  // ── bottone al posto del controllo
+  function etichetta(el){
+    const b=el._scBtn; if(!b) return;
+    const v=el.value, L=cantieri();
+    const x=!v?null:(el.dataset.sc==='id'?L.find(y=>y.id===v):L.find(y=>norm(y.nome)===norm(v)));
+    b.disabled=!!el.disabled;
+    b.classList.toggle('sc-warn',!!v&&!x&&v!==NUOVO);
+    const h=v===NUOVO ? '<span class="sc-bn">➕ Nuovo cantiere</span><span class="sc-bm">il nome viene chiesto dall\'app</span>'
+      : !v
+      ? '<span class="sc-ph">'+esc(el.dataset.scVuoto||'🔍 Scegli o cerca la commessa…')+'</span>'
+      : x ? '<span class="sc-bn">'+esc(x.nome)+'</span><span class="sc-bm">'+esc([x.cli,periodo(x),x.cod].filter(Boolean).join(' · '))+'</span>'
+          : '<span class="sc-bn">'+esc(v)+'</span><span class="sc-bm">⚠ non trovato tra le commesse: tocca per ricollegarlo</span>';
+    const t=b.querySelector('.sc-bt'); if(t.innerHTML!==h) t.innerHTML=h;
+    const ti=x?[x.nome,x.cli,periodo(x),x.cod].filter(Boolean).join(' · '):(v&&v!==NUOVO?v:'');
+    if(b.title!==ti) b.title=ti;
+  }
+  function potenzia(el){
+    if(el._scBtn||!el.parentNode) return;
+    const b=document.createElement('button'); b.type='button'; b.className='sc-btn';
+    b.innerHTML='<span class="sc-bt"></span><span class="sc-chev">›</span>';
+    if(el.classList.contains('ie')||el.hasAttribute('data-sc-compatto')) b.classList.add('sc-compact');
+    // in una riga flex il bottone prende lo stesso spazio della select originale
+    if(el.style.flex){ b.style.flex=el.style.flex; b.style.width='auto'; }
+    if(el.style.minWidth) b.style.minWidth=el.style.minWidth;
+    b.addEventListener('click',()=>{ if(el.disabled) return; apri(el); cur.btn=b; });
+    el.parentNode.insertBefore(b,el.nextSibling);
+    el.classList.add('sc-orig'); el._scBtn=b; el.dataset.scOk=SC_VER;
+    // valori impostati da codice (es. precompila, reset del form) aggiornano il bottone
+    const proto=Object.getPrototypeOf(el), d=Object.getOwnPropertyDescriptor(proto,'value');
+    if(d&&d.set) try{ Object.defineProperty(el,'value',{configurable:true,get(){return d.get.call(el);},set(v){d.set.call(el,v);etichetta(el);}}); }catch(e){}
+    etichetta(el);
+  }
+  function spento(){
+    try{ if(localStorage.getItem('sc81_off')==='1') return true; }catch(e){}
+    return !!(typeof DB!=='undefined'&&DB&&DB._selettoreCommessaOff===true);
+  }
+  let pend=false;
+  function scansiona(){
+    pend=false;
+    const off=spento();
+    document.querySelectorAll('[data-sc]').forEach(el=>{
+      if(off){ if(el._scBtn){ el.classList.remove('sc-orig'); el._scBtn.hidden=true; } return; }
+      if(!el._scBtn) potenzia(el); else { el.classList.add('sc-orig'); el._scBtn.hidden=false; etichetta(el); }
+    });
+  }
+  function pianifica(){ if(!pend){ pend=true; (window.requestAnimationFrame||setTimeout)(scansiona); } }
+  function avvia(){
+    try{ const q=new URLSearchParams(location.search).get('sc');
+      if(q==='off') localStorage.setItem('sc81_off','1'); else if(q==='on') localStorage.removeItem('sc81_off'); }catch(e){}
+    scansiona();
+    // ignora le modifiche fatte dal selettore stesso (foglio e bottoni), altrimenti si rincorre
+    const nostro=t=>(sheet&&(t===sheet||sheet.contains(t)))||(t.closest&&t.closest('.sc-btn'));
+    try{ new MutationObserver(ms=>{ if(ms.every(m=>nostro(m.target))) return; pianifica(); })
+      .observe(document.body,{childList:true,subtree:true,attributes:true,attributeFilter:['disabled']}); }catch(e){}
+  }
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',avvia); else avvia();
+  window.SelettoreCommessa={versione:SC_VER,apri,aggiorna:scansiona,spento};
+})();
+</script>
+<!-- ═══════════ fine SELETTORE COMMESSA v1.1 ═══════════ -->
 </body>
 </html>
