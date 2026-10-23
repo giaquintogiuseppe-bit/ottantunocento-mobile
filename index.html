@@ -1387,14 +1387,15 @@ const WA_TPL=[
   {k:'pagamento', lbl:'💶 Pagamento'},
   {k:'libero',    lbl:'✏️ Libero'}
 ];
-// Cliente del cantiere: per clienteId, altrimenti per nome uguale al committente
+// Cliente del cantiere: per clienteId, altrimenti per nome uguale al committente.
+// Il numero WhatsApp è `cellulare` se c'è (aggiunto senza toccare il fisso in `telefono`), altrimenti `telefono`.
 function waClienteDi(c){
   const L=DB.clienti||[];
   let cl=c&&c.clienteId?L.find(x=>x.id===c.clienteId):null;
   const nomeC=((c&&(c.committente||c.clienteNome))||'').trim();
   if(!cl&&nomeC){ const n=nomeC.toLowerCase(); cl=L.find(x=>((x.ragioneSociale||x.nome||'').trim().toLowerCase())===n)||null; }
   const ref=cl&&cl.referenteId?L.find(x=>x.id===cl.referenteId):null;
-  return { cl, nome:(cl&&(cl.ragioneSociale||cl.nome))||nomeC, referente:((cl&&cl.referente)||'').trim(), tel:(cl&&cl.telefono)||(ref&&ref.telefono)||'' };
+  return { cl, nome:(cl&&(cl.ragioneSociale||cl.nome))||nomeC, referente:((cl&&cl.referente)||'').trim(), tel:(cl&&(cl.cellulare||cl.telefono))||(ref&&(ref.cellulare||ref.telefono))||'' };
 }
 // Numero in formato internazionale senza "+" (es. 393331234567); null se non valido
 function waNumero(t){
@@ -1475,7 +1476,7 @@ function waApriCliente(cantId, tpl, residuo){
   document.body.appendChild(w);
   requestAnimationFrame(()=>w.classList.add('on'));
   const tel=w.querySelector('#wa-tel'), txt=w.querySelector('#wa-txt'), salvaRow=w.querySelector('#wa-salva-row');
-  const aggSalva=()=>{ salvaRow.style.display=(info.cl&&tel.value.trim()&&tel.value.trim()!==String(info.cl.telefono||'').trim())?'flex':'none'; };
+  const aggSalva=()=>{ salvaRow.style.display=(info.cl&&tel.value.trim()&&tel.value.trim()!==String(info.cl.cellulare||info.cl.telefono||'').trim())?'flex':'none'; };
   tel.addEventListener('input',aggSalva); aggSalva();
   let attuale=tpl;
   const scegli=async k=>{
@@ -1501,7 +1502,7 @@ function waApriCliente(cantId, tpl, residuo){
     _sheetClose();
     if(salva){
       const nuovo=tel.value.trim(), idCl=info.cl.id;
-      mobPatchDati(D=>{ const x=(D.clienti||[]).find(y=>y.id===idCl); if(x) x.telefono=nuovo; })
+      mobPatchDati(D=>{ const x=(D.clienti||[]).find(y=>y.id===idCl); if(x){ if(x.telefono&&!x.cellulare) x.cellulare=nuovo; else if(x.cellulare) x.cellulare=nuovo; else x.telefono=nuovo; } })
         .then(ok=>{ toast(ok?'Numero salvato nella scheda cliente ✓':'⚠ Numero non salvato — riprova'); if(_dettNomeMobile) renderDett(); })
         .catch(()=>toast('⚠ Numero non salvato — riprova'));
     }
