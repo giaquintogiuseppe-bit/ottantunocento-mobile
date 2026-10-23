@@ -988,6 +988,37 @@ async function loadCloud(){
 // non aggiornata.
 const CAMPI_GESTIONALE = ['personale','presenze','carburante','anticipi','pagamenti','saldi','addebiti','speseCantiere','documenti','carteDkv','scontrini','incassi'];
 
+// ── Fatture fornitori assegnate ai cantieri (tabella Supabase 'fatture_acquisto') ──
+// Stessa regola del Gestionale: costo della commessa al NETTO IVA (aliquota DB.config.ivaStd,
+// default 22%), escluse le righe segnate "doppione". Cantiere per nome o, in mancanza, per id.
+let FA_ROWS = [], _faErr = false;
+async function caricaFattureFornitori(){
+  try{
+    const r = await fetch(`${SB_URL}/rest/v1/fatture_acquisto?select=id,fornitore,numero,rif_fornitore,data_fattura,importo,stato_verificato,cantiere_id,cantiere_nome&limit=8000`, {
+      headers:{'apikey':SB_KEY,'Authorization':`Bearer ${SB_KEY}`}, cache:'no-cache'
+    });
+    if(!r.ok) throw new Error('HTTP '+r.status);
+    const j = await r.json(); if(!Array.isArray(j)) throw new Error('risposta non valida');
+    FA_ROWS = j; _faErr = false;
+  }catch(e){ _faErr = true; console.warn('fatture fornitori non caricate:', e); }
+}
+function _ivaStd(){ const v=(DB.config&&DB.config.ivaStd!=null)?parseFloat(DB.config.ivaStd):0.22; return (isFinite(v)&&v>=0&&v<1)?v:0.22; }
+function _netIVA(gross){ return (parseFloat(gross)||0)/(1+_ivaStd()); }
+// Fatture fornitori di un cantiere (nome normalizzato), con importo netto
+function fattureFornitoriDi(nomeCantiere){
+  const k=_normNome(nomeCantiere);
+  return FA_ROWS.filter(f=>{
+    if(f.stato_verificato==='doppione') return false;
+    let n=f.cantiere_nome||'';
+    if(!n && f.cantiere_id){ const c=(DB.cantieri||[]).find(x=>x.id===f.cantiere_id); if(c) n=c.nome; }
+    return n && _normNome(n)===k;
+  }).map(f=>({...f, netto:_netIVA(f.importo)}));
+}
+function rinfrescaVisteCosti(){
+  if(document.getElementById('pg-cant')?.classList.contains('active')) renderCantieri();
+  if(document.getElementById('pg-dett')?.classList.contains('active')) renderDett();
+}
+
 // ── Carburante riconciliato DKV (tabella Supabase 'rifornimenti') ──
 let RIFORNIMENTI_CLOUD = [];
 const _normNome = s => (s||'').toLowerCase().trim().replace(/\s+/g,' ');
@@ -1138,6 +1169,7 @@ async function syncCloud(){
     // Prima salva i dati locali, poi carica dal cloud
     await salvaCloud(true);
     await loadCloud();
+    await caricaFattureFornitori(); rinfrescaVisteCosti();
     toast('Sincronizzazione completa ✓');
   }
   catch(e){ toast('⚠ Errore: '+e.message); }
@@ -2464,7 +2496,8 @@ function renderCantieri(){
   const totCosti  = attivi.reduce((a,c)=>{
     const cp=costoPersonale(c.nome,cpMap)+(onMap[c.nome.toLowerCase().trim()]||0);
     const sd=(DB.speseCantiere||[]).filter(s=>(s.cantiere||'').toLowerCase()===c.nome.toLowerCase()).reduce((x,s)=>x+parseFloat(s.importo||0),0);
-    return a+cp+sd;
+    const fo=fattureFornitoriDi(c.nome).reduce((x,f)=>x+f.netto,0);
+    return a+cp+sd+fo;
   },0);
 
   document.getElementById('cant-kpi').innerHTML=`
@@ -2489,7 +2522,8 @@ function renderCantieri(){
     const sd = (DB.speseCantiere||[]).filter(s=>(s.cantiere||'').toLowerCase()===nLC).reduce((a,s)=>a+parseFloat(s.importo||0),0);
     const carb = (DB.carburante||[]).filter(f=>(f.cantiere||'').toLowerCase()===nLC).reduce((a,f)=>a+parseFloat(f.totale||0),0)
                + carburanteRiconciliato(c.nome);
-    const costoTot = cp+on+sd+carb;
+    const fo = fattureFornitoriDi(c.nome).reduce((a,f)=>a+f.netto,0);
+    const costoTot = cp+on+sd+carb+fo;
     const ricavo = getBudget(c.id,c.nome);
     const margine = ricavo - costoTot;
     const pct = ricavo>0 ? Math.min(100,(costoTot/ricavo)*100) : 0;
@@ -2514,6 +2548,7 @@ function renderCantieri(){
           ${on?`<span style="font-size:12px;font-weight:700;color:var(--gold)">⚙️ ${fm(on)}</span>`:''}
           ${sd?`<span style="font-size:12px;font-weight:700;color:var(--red)">💳 ${fm(sd)}</span>`:''}
           ${carb?`<span style="font-size:12px;font-weight:700;color:var(--text2)">⛽ ${fm(carb)}</span>`:''}
+          ${fo?`<span style="font-size:12px;font-weight:700;color:var(--red)">🧾 ${fm(fo)}</span>`:''}
           ${ricavo?`<span style="font-size:12px;font-weight:700;color:${margine>=0?'var(--green)':'var(--red)'}">= ${margine>=0?'+':''}${fm(margine)}</span>`:''}
         </div>
       </div>
@@ -2917,7 +2952,7 @@ function renderDett(){
   const fg=s=>s?GG[new Date(s+'T12:00:00').getDay()]:'';
 
   const gmap={};
-  const addG=d=>{if(!gmap[d])gmap[d]={p:[],s:[],cc:[]};};
+  const addG=d=>{if(!gmap[d])gmap[d]={p:[],s:[],cc:[],f:[]};};
   Object.keys(DB.presenze||{}).sort().forEach(d=>{
     (DB.personale||[]).forEach(p=>{
       const turni=getTurniRaw(d,p.id);
@@ -2943,26 +2978,29 @@ function renderDett(){
   });
   (DB.speseCantiere||[]).filter(s=>match(s.cantiere)&&inPer(s.data)).forEach(s=>{addG(s.data);gmap[s.data].s.push(s);});
   (DB.carburante||[]).filter(f=>match(f.cantiere)&&inPer(f.data)).forEach(f=>{addG(f.data);gmap[f.data].cc.push(f);});
+  fattureFornitoriDi(nome).filter(f=>f.data_fattura&&inPer(f.data_fattura)).forEach(f=>{addG(f.data_fattura);gmap[f.data_fattura].f.push(f);});
 
   const giorni=Object.keys(gmap).sort();
-  let totP=0,totO=0,totS=0,totC=0,body='';
+  let totP=0,totO=0,totS=0,totC=0,totF=0,body='';
   giorni.forEach(d=>{
     const g=gmap[d];
     const tP=g.p.reduce((a,x)=>a+x.tot,0);
     const tO=Math.round(g.p.reduce((a,x)=>a+(x.oneri||0),0)*100)/100;
     const tS=g.s.reduce((a,x)=>a+parseFloat(x.importo||0),0);
     const tC=g.cc.reduce((a,x)=>a+parseFloat(x.totale||0),0);
-    totP+=tP;totO+=tO;totS+=tS;totC+=tC;
+    const tF=g.f.reduce((a,x)=>a+x.netto,0);
+    totP+=tP;totO+=tO;totS+=tS;totC+=tC;totF+=tF;
     const gid='dm'+d.replace(/-/g,'');
     body+=`<div class="card" style="margin-bottom:10px;padding:0;overflow:hidden">
       <div onclick="var e=document.getElementById('${gid}');e.style.display=e.style.display=='none'?'block':'none'" style="display:flex;justify-content:space-between;align-items:center;padding:12px 14px;background:var(--navy2);cursor:pointer">
-        <b style="font-size:13px">${fg(d)} ${fd(d)}</b>
-        <div style="font-size:12px;display:flex;gap:8px">
+        <b style="font-size:13px;white-space:nowrap">${fg(d)} ${fd(d)}</b>
+        <div style="font-size:12px;display:flex;flex-wrap:wrap;justify-content:flex-end;gap:4px 8px;white-space:nowrap">
           ${tP?`<span style="color:var(--gold)">👷${fm(tP)}</span>`:''}
           ${tO?`<span style="color:var(--gold)">⚙️${fm(tO)}</span>`:''}
           ${tS?`<span style="color:var(--red)">💳${fm(tS)}</span>`:''}
           ${tC?`<span style="color:var(--text2)">⛽${fm(tC)}</span>`:''}
-          <b>${fm(tP+tO+tS+tC)}</b>
+          ${tF?`<span style="color:var(--red)">🧾${fm(tF)}</span>`:''}
+          <b>${fm(tP+tO+tS+tC+tF)}</b>
         </div>
       </div>
       <div id="${gid}" style="display:none;padding:10px 14px">
@@ -2982,17 +3020,20 @@ function renderDett(){
           </div>
         </div>`).join('')}
         ${g.cc.map(x=>`<div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--brd)"><span style="font-size:13px">⛽ ${x.prodotto||''} ${x.litri||''}L</span><span style="font-weight:700">${fm(x.totale)}</span></div>`).join('')}
+        ${g.f.map(x=>`<div style="display:flex;justify-content:space-between;gap:6px;padding:5px 0;border-bottom:1px solid var(--brd)"><span style="font-size:13px;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">🧾 <b>${_de(x.fornitore||'—')}</b> <span style="color:var(--text2)">${_de(x.rif_fornitore||x.numero||'')} · netto IVA</span></span><span style="color:var(--red);font-weight:700;flex-shrink:0">${fm(x.netto)}</span></div>`).join('')}
       </div>
     </div>`;
   });
   totO=Math.round(totO*100)/100;
-  const totTot=totP+totO+totS+totC;
+  const totTot=totP+totO+totS+totC+totF;
   document.getElementById('dett-kpi').innerHTML=`
     <div class="kpi tc"><div class="lb">Giorni</div><div class="vl">${giorni.length}</div></div>
     <div class="kpi go"><div class="lb">Netto giornate</div><div class="vl">${fm(totP)}</div></div>
     <div class="kpi go"><div class="lb">Oneri giornalieri</div><div class="vl">${fm(totO)}</div></div>
     <div class="kpi gn"><div class="lb">Spese+Carb</div><div class="vl" style="color:var(--red)">${fm(totS+totC)}</div></div>
-    <div class="kpi" style="border-color:var(--teal);grid-column:1/-1"><div class="lb">Totale</div><div class="vl" style="color:var(--teal)">${fm(totTot)}</div></div>`;
+    <div class="kpi gn"><div class="lb">Fatture fornitori</div><div class="vl" style="color:var(--red)">${fm(totF)}</div></div>
+    <div class="kpi" style="border-color:var(--teal)"><div class="lb">Totale</div><div class="vl" style="color:var(--teal)">${fm(totTot)}</div></div>
+    ${_faErr?'<div style="grid-column:1/-1;font-size:12px;color:var(--gold)">⚠ Fatture fornitori non caricate: tocca 🔄 Sync per riprovare</div>':''}`;
   document.getElementById('dett-body').innerHTML=body||'<div style="color:var(--text2);text-align:center;padding:20px">Nessuna attività nel periodo</div>';
 }
 
@@ -3478,7 +3519,7 @@ document.getElementById('pag-data').value=today();
 document.getElementById('sp-data').value=today();
 
 // Carica dal cloud all'avvio
-loadCloud().then(()=>caricaRifornimentiCloud().then(()=>{ if(typeof renderCant==='function' && document.getElementById('pg-cant')?.classList.contains('active')) renderCant(); }));
+loadCloud().then(()=>Promise.all([caricaRifornimentiCloud(),caricaFattureFornitori()]).then(rinfrescaVisteCosti));
 
 // ═══════════════════════ DIARIO DI BORDO ═══════════════════════
 // Motore: Edge Function diario-parse (Claude). L'anteprima aggancia i nomi
