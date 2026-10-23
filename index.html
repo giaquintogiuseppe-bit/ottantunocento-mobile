@@ -584,6 +584,9 @@ button{touch-action:manipulation}
     <button onclick="goTo('cant',document.querySelector('.nav-btn:last-child'))" style="background:var(--navy2);border:1px solid var(--brd);border-radius:8px;padding:8px 14px;color:var(--text);font-size:13px;font-weight:700;margin-bottom:14px;cursor:pointer">← Cantieri</button>
     <div style="font-size:18px;font-weight:800;margin-bottom:12px" id="dett-nome"></div>
 
+    <!-- WhatsApp al cliente -->
+    <div id="dett-wa-box" style="margin-bottom:14px"></div>
+
     <!-- Budget inline -->
     <div style="background:rgba(14,124,102,.08);border:1px solid rgba(14,124,102,.3);border-radius:12px;padding:14px;margin-bottom:14px">
       <div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--teal);margin-bottom:4px">💰 Ricavo previsto / Budget</div>
@@ -1326,8 +1329,10 @@ function renderIncassiMob(){
             <button onclick="elimIncassoMob('${x.id}')" style="background:none;border:none;color:var(--red);font-size:14px;cursor:pointer">✕</button>
           </div>
         </div>`).join('')}
-      ${ricavo>0&&residuo>0?`<button onclick="precompilaMIncasso('${c.id}','${residuo}')" style="width:100%;margin-top:8px;background:rgba(14,124,102,.08);border:1px dashed var(--teal);border-radius:8px;padding:9px;color:var(--teal);font-size:12px;font-weight:700;cursor:pointer">
-        + Saldo (${fm(residuo)})</button>`:''}
+      ${ricavo>0&&residuo>0?`<div style="display:flex;gap:6px;margin-top:8px">
+        <button onclick="precompilaMIncasso('${c.id}','${residuo}')" style="flex:1;background:rgba(14,124,102,.08);border:1px dashed var(--teal);border-radius:8px;padding:9px;color:var(--teal);font-size:12px;font-weight:700;cursor:pointer">
+        + Saldo (${fm(residuo)})</button>
+        <button onclick="waApriCliente('${c.id}','pagamento','${residuo}')" style="flex:1;background:rgba(37,211,102,.08);border:1px solid rgba(37,211,102,.45);border-radius:8px;padding:9px;color:#128C7E;font-size:12px;font-weight:700;cursor:pointer">💬 Sollecito</button></div>`:''}
     </div>`;
   });
   document.getElementById('inc-list-m').innerHTML=html||'<div style="color:var(--text2);text-align:center;padding:20px;font-size:13px">Nessun cantiere con budget impostato</div>';
@@ -1368,6 +1373,137 @@ async function elimIncassoMob(id){
   await salvaCloud(true);
   renderIncassiMob();
   toast('Eliminato');
+}
+
+// ── WHATSAPP CLIENTI ──────────────────────────────────────────────────────
+// Apre WhatsApp (link wa.me) nella chat del cliente con il messaggio già scritto:
+// l'invio parte dal WhatsApp del telefono, con un tocco su "Invia".
+const WA_FIRMA='Giuseppe Giaquinto – Ottantunocento';
+const WA_TPL=[
+  {k:'conferma',  lbl:'📅 Conferma'},
+  {k:'arrivo',    lbl:'🚚 Arrivo squadra'},
+  {k:'fine',      lbl:'✅ Fine lavori'},
+  {k:'preventivo',lbl:'🧾 Preventivo'},
+  {k:'pagamento', lbl:'💶 Pagamento'},
+  {k:'libero',    lbl:'✏️ Libero'}
+];
+// Cliente del cantiere: per clienteId, altrimenti per nome uguale al committente
+function waClienteDi(c){
+  const L=DB.clienti||[];
+  let cl=c&&c.clienteId?L.find(x=>x.id===c.clienteId):null;
+  const nomeC=((c&&(c.committente||c.clienteNome))||'').trim();
+  if(!cl&&nomeC){ const n=nomeC.toLowerCase(); cl=L.find(x=>((x.ragioneSociale||x.nome||'').trim().toLowerCase())===n)||null; }
+  const ref=cl&&cl.referenteId?L.find(x=>x.id===cl.referenteId):null;
+  return { cl, nome:(cl&&(cl.ragioneSociale||cl.nome))||nomeC, referente:((cl&&cl.referente)||'').trim(), tel:(cl&&cl.telefono)||(ref&&ref.telefono)||'' };
+}
+// Numero in formato internazionale senza "+" (es. 393331234567); null se non valido
+function waNumero(t){
+  let n=String(t||'').trim(), intl=false;
+  if(n.startsWith('+')){ intl=true; n=n.slice(1); }
+  n=n.replace(/\D/g,'');
+  if(!intl&&n.startsWith('00')){ intl=true; n=n.slice(2); }
+  if(!intl&&(n.startsWith('0')||(n.startsWith('3')&&n.length<=10))) n='39'+n;   // numero italiano senza prefisso
+  return n.length>=10?n:null;
+}
+const waTitolo=s=>String(s||'').toLowerCase().replace(/(^|[\s'’-])(\S)/g,(m,a,b)=>a+b.toUpperCase());
+function waPeriodo(c){
+  const a=c.periodoInizio||'', b=c.periodoFine||'';
+  if(a&&b&&a!==b) return `dal ${fd(a)} al ${fd(b)}`;
+  return (a||b)?`il ${fd(a||b)}`:'';
+}
+function waTesto(k, c, info, fattureTxt){
+  const saluto=`Buongiorno${info.referente?' '+waTitolo(info.referente):''},`;
+  const cant=`"${c.nome}"`, luogo=c.luogo?` a ${c.luogo}`:'', per=waPeriodo(c);
+  const fine=`\n\n${WA_FIRMA}`;
+  switch(k){
+    case 'conferma':
+      return `${saluto}\nle confermiamo ${cant}${luogo}${per?' '+per:''}.\nPer qualsiasi necessità restiamo a disposizione.${fine}`;
+    case 'arrivo':
+      return `${saluto}\nla nostra squadra arriverà${luogo}${c.periodoInizio?' il '+fd(c.periodoInizio):''} alle ore __:__ per ${cant}.\nCi può indicare un referente presente sul posto?${fine}`;
+    case 'fine':
+      return `${saluto}\n${cant} si è concluso: la ringraziamo per la fiducia.${c.dataRitiro?`\nIl ritiro delle attrezzature è previsto il ${fd(c.dataRitiro)}.`:''}\nSaremo felici di lavorare ancora insieme.${fine}`;
+    case 'preventivo':
+      return `${saluto}\nle abbiamo inviato il preventivo${c.preventivoRef?' '+c.preventivoRef:''} per ${cant}.\nRestiamo a disposizione per chiarimenti o modifiche.${fine}`;
+    case 'pagamento':
+      return `${saluto}\nle ricordiamo cortesemente il pagamento ${fattureTxt&&fattureTxt.includes('Fattura')?'delle seguenti fatture':'relativo a '+cant}:\n${fattureTxt||'• importo € ______'}\n\nSe ha già provveduto, non tenga conto di questo messaggio. Grazie!${fine}`;
+    default:
+      return `${saluto}\n${fine}`;
+  }
+}
+// Fatture emesse e non saldate del cantiere o del cliente → righe del messaggio di sollecito
+async function waFattureAperte(c, info){
+  const sel='select=numero,data_fattura,importo,scadenza,acconti';
+  const q=[`${SB_URL}/rest/v1/fatture?${sel}&stato=eq.emessa&cantiere_id=eq.${encodeURIComponent(c.id)}`];
+  if(info.nome) q.push(`${SB_URL}/rest/v1/fatture?${sel}&stato=eq.emessa&cliente=ilike.${encodeURIComponent(info.nome)}`);
+  const rows=[];
+  for(const u of q){
+    try{ const r=await fetch(u,{headers:{apikey:SB_KEY,Authorization:`Bearer ${SB_KEY}`}}); if(r.ok) rows.push(...await r.json()); }catch(_){}
+  }
+  const visti=new Set();
+  return rows.filter(f=>!visti.has(f.numero)&&visti.add(f.numero)).map(f=>{
+    const acc=(Array.isArray(f.acconti)?f.acconti:[]).reduce((a,x)=>a+parseFloat(x.importo||0),0);
+    const res=parseFloat(f.importo||0)-acc;
+    return res>0.01?`• Fattura n. ${f.numero}${f.data_fattura?' del '+fd(f.data_fattura):''}: ${fm(res)}${acc>0?' (residuo)':''}${f.scadenza?', scadenza '+fd(f.scadenza):''}`:null;
+  }).filter(Boolean).join('\n');
+}
+
+function waApriCliente(cantId, tpl, residuo){
+  const c=(DB.cantieri||[]).find(x=>x.id===cantId);
+  if(!c){ toast('Cantiere non trovato'); return; }
+  const info=waClienteDi(c);
+  if(!tpl){
+    const s=(c.stato||'').toLowerCase();
+    tpl=s.includes('conclus')?'fine':((c.periodoInizio||'')>today()?'conferma':'libero');
+  }
+  _sheetClose();
+  const w=document.createElement('div'); w.id='ui-sheet'; w.className='sheet-wrap';
+  w.innerHTML=`<div class="sheet" style="max-height:92vh;overflow-y:auto">
+    <div class="sheet-title">💬 WhatsApp al cliente</div>
+    <div class="sheet-msg" style="margin-bottom:12px"><b>${_de(info.nome||'Cliente non indicato')}</b><br><span style="font-size:12px;color:var(--text2)">${_de(c.nome)}</span></div>
+    <div class="field" style="margin-bottom:8px"><label>Numero WhatsApp</label>
+      <input type="tel" id="wa-tel" inputmode="tel" autocomplete="off" data-af="1" placeholder="es. 333 1234567" value="${_de(info.tel)}"></div>
+    <label id="wa-salva-row" style="display:none;align-items:center;gap:8px;font-size:13px;color:var(--text2);margin-bottom:12px">
+      <input type="checkbox" id="wa-salva" checked style="width:18px;height:18px"> Salva il numero nella scheda cliente</label>
+    <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px">
+      ${WA_TPL.map(t=>`<button class="ct-chip${t.k===tpl?' on':''}" data-k="${t.k}">${t.lbl}</button>`).join('')}</div>
+    <div class="field"><textarea id="wa-txt" rows="9" style="resize:vertical;line-height:1.45"></textarea></div>
+    <button class="btn" id="wa-go" style="background:#25D366;color:#fff">💬 Apri WhatsApp</button>
+    <button class="btn btn-ghost" id="wa-annulla">Annulla</button>
+  </div>`;
+  document.body.appendChild(w);
+  requestAnimationFrame(()=>w.classList.add('on'));
+  const tel=w.querySelector('#wa-tel'), txt=w.querySelector('#wa-txt'), salvaRow=w.querySelector('#wa-salva-row');
+  const aggSalva=()=>{ salvaRow.style.display=(info.cl&&tel.value.trim()&&tel.value.trim()!==String(info.cl.telefono||'').trim())?'flex':'none'; };
+  tel.addEventListener('input',aggSalva); aggSalva();
+  let attuale=tpl;
+  const scegli=async k=>{
+    attuale=k;
+    w.querySelectorAll('[data-k]').forEach(b=>b.classList.toggle('on',b.dataset.k===k));
+    if(k!=='pagamento'){ txt.value=waTesto(k,c,info); return; }
+    txt.value='Cerco le fatture aperte…';
+    let righe=await waFattureAperte(c,info);
+    if(!righe&&parseFloat(residuo)>0) righe=`• importo da saldare: ${fm(residuo)}`;
+    if(attuale==='pagamento') txt.value=waTesto('pagamento',c,info,righe);
+  };
+  w.querySelectorAll('[data-k]').forEach(b=>b.onclick=()=>scegli(b.dataset.k));
+  scegli(tpl);
+  w.querySelector('#wa-annulla').onclick=_sheetClose;
+  w.addEventListener('click',e=>{ if(e.target===w) _sheetClose(); });
+  w.querySelector('#wa-go').onclick=()=>{
+    const num=waNumero(tel.value);
+    if(!num){ toast('Inserisci un numero valido'); tel.focus(); return; }
+    // WhatsApp va aperto subito (dentro il tocco), altrimenti il browser lo blocca
+    const url=`https://wa.me/${num}?text=${encodeURIComponent(txt.value.trim())}`;
+    if(!window.open(url,'_blank')) location.href=url;
+    const salva=info.cl&&salvaRow.style.display!=='none'&&w.querySelector('#wa-salva').checked;
+    _sheetClose();
+    if(salva){
+      const nuovo=tel.value.trim(), idCl=info.cl.id;
+      mobPatchDati(D=>{ const x=(D.clienti||[]).find(y=>y.id===idCl); if(x) x.telefono=nuovo; })
+        .then(ok=>{ toast(ok?'Numero salvato nella scheda cliente ✓':'⚠ Numero non salvato — riprova'); if(_dettNomeMobile) renderDett(); })
+        .catch(()=>toast('⚠ Numero non salvato — riprova'));
+    }
+  };
 }
 
 // ── DASHBOARD ─────────────────────────────────────────────────────────────
@@ -2377,6 +2513,7 @@ function renderCantieri(){
       </div>
       <div style="display:flex;gap:6px;border-top:1px solid var(--brd);padding-top:8px;margin-top:4px">
         <button onclick="apriDettCantiere('${cid}')" style="flex:1;background:var(--navy2);border:1px solid var(--brd);border-radius:7px;padding:7px;color:var(--text);font-size:12px;font-weight:700;cursor:pointer">📋 Dettaglio</button>
+        ${c.id&&mobClienteDi(c)!=='— senza cliente —'?`<button onclick="waApriCliente('${c.id}')" title="WhatsApp al cliente" style="flex:0 0 auto;background:rgba(37,211,102,.08);border:1px solid rgba(37,211,102,.45);border-radius:7px;padding:7px 10px;color:#128C7E;font-size:12px;font-weight:700;cursor:pointer">💬</button>`:''}
         <button onclick="cambiaStatoCantiere('${cid}')" style="flex:1;background:var(--navy2);border:1px solid var(--brd);border-radius:7px;padding:7px;color:var(--text2);font-size:12px;font-weight:700;cursor:pointer">✏️ Stato</button>
         ${archiviato
           ? `<button onclick="ripristinaCantiere('${cid}')" style="flex:1;background:rgba(14,124,102,.1);border:1px solid var(--teal);border-radius:7px;padding:7px;color:var(--teal);font-size:12px;font-weight:700;cursor:pointer">↩ Ripristina</button>`
@@ -2715,6 +2852,15 @@ function renderDett(){
   const ric=c?getBudget(c.id,nome):0;
   const bv=document.getElementById('m-budget-val');
   if(bv) bv.textContent=ric>0?fm(ric):'Non impostato';
+  // WhatsApp al cliente
+  const wb=document.getElementById('dett-wa-box');
+  if(wb){
+    const wi=c?waClienteDi(c):null;
+    wb.innerHTML=(c&&wi.nome)?`<button onclick="waApriCliente('${c.id}')" style="width:100%;display:flex;align-items:center;gap:10px;background:rgba(37,211,102,.08);border:1px solid rgba(37,211,102,.45);border-radius:12px;padding:11px 14px;color:var(--text);cursor:pointer;text-align:left">
+        <span style="font-size:22px">💬</span>
+        <span style="flex:1;min-width:0"><span style="display:block;font-size:14px;font-weight:800;color:#128C7E">Scrivi al cliente su WhatsApp</span>
+        <span style="display:block;font-size:12px;color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${_de(wi.nome)} · ${wi.tel?'📱 '+_de(wi.tel):'numero da inserire'}</span></span></button>`:'';
+  }
   // Preventivo collegato / pulsante crea
   const pb=document.getElementById('dett-prev-box');
   if(pb){
