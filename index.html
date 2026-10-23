@@ -2459,9 +2459,10 @@ function renderCantieri(){
   const archiviati= cantieri.filter(c=>archIds.has(c.id));
 
   const cpMap = costoPersonaleMap();   // una passata sulle presenze, riusata ovunque sotto
+  const onMap = oneriMap();
   const totRicavo = attivi.reduce((a,c)=>a+getBudget(c.id,c.nome),0);
   const totCosti  = attivi.reduce((a,c)=>{
-    const cp=costoPersonale(c.nome,cpMap);
+    const cp=costoPersonale(c.nome,cpMap)+(onMap[c.nome.toLowerCase().trim()]||0);
     const sd=(DB.speseCantiere||[]).filter(s=>(s.cantiere||'').toLowerCase()===c.nome.toLowerCase()).reduce((x,s)=>x+parseFloat(s.importo||0),0);
     return a+cp+sd;
   },0);
@@ -2484,10 +2485,11 @@ function renderCantieri(){
   const cardCantiere = (c, archiviato=false) => {
     const nLC = c.nome.toLowerCase();
     const cp = costoPersonale(c.nome,cpMap);
+    const on = onMap[nLC.trim()]||0;
     const sd = (DB.speseCantiere||[]).filter(s=>(s.cantiere||'').toLowerCase()===nLC).reduce((a,s)=>a+parseFloat(s.importo||0),0);
     const carb = (DB.carburante||[]).filter(f=>(f.cantiere||'').toLowerCase()===nLC).reduce((a,f)=>a+parseFloat(f.totale||0),0)
                + carburanteRiconciliato(c.nome);
-    const costoTot = cp+sd+carb;
+    const costoTot = cp+on+sd+carb;
     const ricavo = getBudget(c.id,c.nome);
     const margine = ricavo - costoTot;
     const pct = ricavo>0 ? Math.min(100,(costoTot/ricavo)*100) : 0;
@@ -2509,6 +2511,7 @@ function renderCantieri(){
         ${ricavo>0?`<div style="height:5px;background:var(--brd);border-radius:3px;margin-bottom:8px;overflow:hidden"><div style="height:100%;width:${pct}%;background:${barCol};border-radius:3px"></div></div>`:''}
         <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">
           ${cp?`<span style="font-size:12px;font-weight:700;color:var(--gold)">👷 ${fm(cp)}</span>`:''}
+          ${on?`<span style="font-size:12px;font-weight:700;color:var(--gold)">⚙️ ${fm(on)}</span>`:''}
           ${sd?`<span style="font-size:12px;font-weight:700;color:var(--red)">💳 ${fm(sd)}</span>`:''}
           ${carb?`<span style="font-size:12px;font-weight:700;color:var(--text2)">⛽ ${fm(carb)}</span>`:''}
           ${ricavo?`<span style="font-size:12px;font-weight:700;color:${margine>=0?'var(--green)':'var(--red)'}">= ${margine>=0?'+':''}${fm(margine)}</span>`:''}
@@ -2928,34 +2931,45 @@ function renderDett(){
         entry.turni.push(t);
         entry.tot+=parseFloat(t.importo||0);
       });
+      // oneri giornalieri: quota di questo cantiere sulla giornata (data della presenza)
+      const qOn=oneriPresenza(d,p.id).filter(o=>match(o.cantiere)).reduce((a,o)=>a+o.quota,0);
+      if(qOn && inPer(d)){
+        addG(d);
+        let entry=gmap[d].p.find(x=>x.dipId===p.id);
+        if(!entry){entry={dipId:p.id,nome:p.nome,turni:[],tot:0};gmap[d].p.push(entry);}
+        entry.oneri=(entry.oneri||0)+qOn;
+      }
     });
   });
   (DB.speseCantiere||[]).filter(s=>match(s.cantiere)&&inPer(s.data)).forEach(s=>{addG(s.data);gmap[s.data].s.push(s);});
   (DB.carburante||[]).filter(f=>match(f.cantiere)&&inPer(f.data)).forEach(f=>{addG(f.data);gmap[f.data].cc.push(f);});
 
   const giorni=Object.keys(gmap).sort();
-  let totP=0,totS=0,totC=0,body='';
+  let totP=0,totO=0,totS=0,totC=0,body='';
   giorni.forEach(d=>{
     const g=gmap[d];
     const tP=g.p.reduce((a,x)=>a+x.tot,0);
+    const tO=Math.round(g.p.reduce((a,x)=>a+(x.oneri||0),0)*100)/100;
     const tS=g.s.reduce((a,x)=>a+parseFloat(x.importo||0),0);
     const tC=g.cc.reduce((a,x)=>a+parseFloat(x.totale||0),0);
-    totP+=tP;totS+=tS;totC+=tC;
+    totP+=tP;totO+=tO;totS+=tS;totC+=tC;
     const gid='dm'+d.replace(/-/g,'');
     body+=`<div class="card" style="margin-bottom:10px;padding:0;overflow:hidden">
       <div onclick="var e=document.getElementById('${gid}');e.style.display=e.style.display=='none'?'block':'none'" style="display:flex;justify-content:space-between;align-items:center;padding:12px 14px;background:var(--navy2);cursor:pointer">
         <b style="font-size:13px">${fg(d)} ${fd(d)}</b>
         <div style="font-size:12px;display:flex;gap:8px">
           ${tP?`<span style="color:var(--gold)">👷${fm(tP)}</span>`:''}
+          ${tO?`<span style="color:var(--gold)">⚙️${fm(tO)}</span>`:''}
           ${tS?`<span style="color:var(--red)">💳${fm(tS)}</span>`:''}
           ${tC?`<span style="color:var(--text2)">⛽${fm(tC)}</span>`:''}
-          <b>${fm(tP+tS+tC)}</b>
+          <b>${fm(tP+tO+tS+tC)}</b>
         </div>
       </div>
       <div id="${gid}" style="display:none;padding:10px 14px">
         ${g.p.map(x=>`<div style="padding:5px 0;border-bottom:1px solid var(--brd)">
           <div style="display:flex;justify-content:space-between"><b style="font-size:13px">👷 ${x.nome}</b><span style="color:var(--gold);font-weight:700">${fm(x.tot)}</span></div>
           ${(x.turni||[]).map(t=>`<div style="font-size:12px;color:var(--text2);padding-left:12px;margin-top:2px">${t.oraI}–${t.oraF}${t.notturno?' 🌙':''} · ${fm(t.importo)}</div>`).join('')}
+          ${x.oneri?`<div style="font-size:12px;color:var(--text2);padding-left:12px;margin-top:2px">⚙️ oneri giornalieri · ${fm(x.oneri)}</div>`:''}
         </div>`).join('')}
         ${g.s.map(x=>`<div style="display:flex;justify-content:space-between;align-items:center;gap:6px;padding:5px 0;border-bottom:1px solid var(--brd)">
           <div onclick="riconciliaSpesa('${x.id}')" style="min-width:0;cursor:pointer;flex:1">
@@ -2971,12 +2985,14 @@ function renderDett(){
       </div>
     </div>`;
   });
-  const totTot=totP+totS+totC;
+  totO=Math.round(totO*100)/100;
+  const totTot=totP+totO+totS+totC;
   document.getElementById('dett-kpi').innerHTML=`
     <div class="kpi tc"><div class="lb">Giorni</div><div class="vl">${giorni.length}</div></div>
-    <div class="kpi go"><div class="lb">Personale</div><div class="vl">${fm(totP)}</div></div>
+    <div class="kpi go"><div class="lb">Netto giornate</div><div class="vl">${fm(totP)}</div></div>
+    <div class="kpi go"><div class="lb">Oneri giornalieri</div><div class="vl">${fm(totO)}</div></div>
     <div class="kpi gn"><div class="lb">Spese+Carb</div><div class="vl" style="color:var(--red)">${fm(totS+totC)}</div></div>
-    <div class="kpi" style="border-color:var(--teal)"><div class="lb">Totale</div><div class="vl" style="color:var(--teal)">${fm(totTot)}</div></div>`;
+    <div class="kpi" style="border-color:var(--teal);grid-column:1/-1"><div class="lb">Totale</div><div class="vl" style="color:var(--teal)">${fm(totTot)}</div></div>`;
   document.getElementById('dett-body').innerHTML=body||'<div style="color:var(--text2);text-align:center;padding:20px">Nessuna attività nel periodo</div>';
 }
 
@@ -3002,6 +3018,42 @@ function costoPersonaleMap(){
 function costoPersonale(nome, map){
   const k=(nome||'').toLowerCase().trim();
   return (map||costoPersonaleMap())[k]||0;
+}
+
+// ── ONERI GIORNALIERI (stessa regola del Gestionale) ──────────────────────
+// Costo fisso azienda per giornata retribuita (contributi, assunzione, spese):
+// valore con decorrenza in DB.costoFissoStorico (default 25 €), eccezione per
+// singola giornata in presenza.costoFisso. La quota del giorno si divide in
+// parti uguali tra i cantieri lavorati quel giorno.
+function costoFissoAllaData(d){
+  const st=(DB.costoFissoStorico&&DB.costoFissoStorico.length)?DB.costoFissoStorico:[{dal:'2020-01-01',valore:25}];
+  const vig=[...st].filter(x=>x.dal<=d).sort((a,b)=>(a.dal||'').localeCompare(b.dal||'')).pop();
+  return vig?(parseFloat(vig.valore)||0):25;
+}
+// divisione equa con resto sull'ultimo: quoteEque(25,3) → [8.33, 8.33, 8.34]
+function quoteEque(tot,n){
+  if(n<=0||!tot) return [];
+  const base=Math.floor(tot/n*100)/100;
+  const q=Array(n).fill(base);
+  q[n-1]=Math.round((tot-base*(n-1))*100)/100;
+  return q;
+}
+// Quote oneri di una presenza: [{cantiere, quota}]
+function oneriPresenza(d,dipId){
+  const p=((DB.presenze||{})[d]||{})[dipId]||{};
+  const cants=[];
+  getTurniRaw(d,dipId).forEach(t=>{ const n=(t.cantiere||'').trim(); if(n && !cants.includes(n)) cants.push(n); });
+  if(!cants.length) return [];
+  const fisso=(p.costoFisso!=null && p.costoFisso!=='')?(parseFloat(p.costoFisso)||0):costoFissoAllaData(d);
+  return quoteEque(fisso,cants.length).map((q,i)=>({cantiere:cants[i],quota:q}));
+}
+// Oneri per cantiere (chiave = nome normalizzato), una passata sulle presenze
+function oneriMap(){
+  const map={};
+  const P=DB.presenze||{};
+  for(const d in P) for(const dipId in P[d])
+    oneriPresenza(d,dipId).forEach(o=>{ const k=o.cantiere.toLowerCase(); map[k]=Math.round(((map[k]||0)+o.quota)*100)/100; });
+  return map;
 }
 
 // ── BOTTOM SHEET riutilizzabile (sostituisce confirm/prompt nativi) ───────
