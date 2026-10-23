@@ -1460,8 +1460,10 @@ function waApriCliente(cantId, tpl, residuo){
   w.innerHTML=`<div class="sheet" style="max-height:92vh;overflow-y:auto">
     <div class="sheet-title">💬 WhatsApp al cliente</div>
     <div class="sheet-msg" style="margin-bottom:12px"><b>${_de(info.nome||'Cliente non indicato')}</b><br><span style="font-size:12px;color:var(--text2)">${_de(c.nome)}</span></div>
+    <!-- autocomplete="tel" (escluso da _killAutofill): su iPhone la barra sopra la tastiera
+         offre "Compilazione automatica contatto" per prendere il numero dalla rubrica -->
     <div class="field" style="margin-bottom:8px"><label>Numero WhatsApp</label>
-      <input type="tel" id="wa-tel" inputmode="tel" autocomplete="off" data-af="1" placeholder="es. 333 1234567" value="${_de(info.tel)}"></div>
+      <input type="tel" id="wa-tel" inputmode="tel" autocomplete="tel" data-af-done="1" placeholder="es. 333 1234567 · o scegli dalla rubrica" value="${_de(info.tel)}"></div>
     <label id="wa-salva-row" style="display:none;align-items:center;gap:8px;font-size:13px;color:var(--text2);margin-bottom:12px">
       <input type="checkbox" id="wa-salva" checked style="width:18px;height:18px"> Salva il numero nella scheda cliente</label>
     <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px">
