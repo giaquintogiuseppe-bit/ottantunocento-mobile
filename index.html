@@ -881,7 +881,7 @@ let _presDati = {}; // stato presenze giornata corrente in editing
 
 // ── SUPABASE FETCH ────────────────────────────────────────────────────────
 async function sbGet(){
-  // legge anche `versione`: serve al lock ottimistico (vedi sbSet)
+  // legge anche `versione`: riferimento per il controllo al rientro
   const res = await fetch(`${SB_URL}/rest/v1/gestionale_dati?id=eq.unico&select=dati,aggiornato_il,versione`, {
     headers:{'apikey':SB_KEY,'Authorization':`Bearer ${SB_KEY}`},
     cache:'no-cache'
@@ -891,42 +891,71 @@ async function sbGet(){
   return rows[0];
 }
 
-// LOCK OTTIMISTICO — scrive SOLO se la riga è ancora alla versione che abbiamo letto.
-// Il database incrementa `versione` ad ogni update (trigger trg_gestionale_dati_versione),
-// qualunque app scriva. Se qualcuno ha scritto tra la nostra lettura e la nostra
-// scrittura, il PATCH non aggiorna nulla e restituiamo false: chi chiama rifà il merge
-// sui dati freschi invece di sovrascrivere il lavoro altrui.
-// Ritorna true = salvato, false = conflitto (qualcuno ha scritto nel frattempo).
-async function sbSet(data, versioneAttesa){
-  const filtro = (versioneAttesa === undefined || versioneAttesa === null) ? '' : `&versione=eq.${versioneAttesa}`;
-  const res = await fetch(`${SB_URL}/rest/v1/gestionale_dati?id=eq.unico${filtro}`, {
-    method:'PATCH',
-    headers:{'apikey':SB_KEY,'Authorization':`Bearer ${SB_KEY}`,'Content-Type':'application/json','Prefer':'return=representation'},
-    body: JSON.stringify({dati:data})
-  });
-  if(!res.ok) throw new Error('HTTP '+res.status);
-  const rows = await res.json();
-  // Ritorna la RIGA aggiornata (con la nuova `versione`) al successo, null se conflitto
-  // (0 righe aggiornate). Così chi salva legge la versione dal PATCH, senza una GET extra.
-  return rows.length ? rows[0] : null;
-}
+// LOCK OTTIMISTICO — le scritture (vedi _mobScriviParti) passano SOLO se la riga è ancora
+// alla versione letta. Il database incrementa `versione` ad ogni update (trigger
+// trg_gestionale_dati_versione), qualunque app scriva: se qualcuno ha scritto nel frattempo
+// si rifà il merge sui dati freschi invece di sovrascrivere il lavoro altrui.
 // Piccola attesa crescente tra i tentativi in conflitto (altra app che scrive nello stesso istante)
 const _mobSleep = ms => new Promise(r=>setTimeout(r, ms));
 
-// Scrittura atomica sull'intero blob `dati` per i campi che salvaCloud NON riscrive
-// (es. cantieri[]: la mobile li ricarica sempre dal remoto). Legge → applica il
-// mutatore sui dati freschi → scrive col lock ottimistico, con retry sui conflitti.
-// Al successo allinea DB e la versione anti-rientro. Ritorna true se salvato.
-async function mobPatchDati(mutator){
+// ── LETTURA/SCRITTURA PER PARTI ───────────────────────────────────────────
+// La Mobile legge e scrive SOLO le parti del blob che le servono (non più ~1 MB
+// scaricato, rimandato e riricevuto a ogni salvataggio). La scrittura passa dalla
+// funzione del database aggiorna_parti_mobile: accetta solo le parti della Mobile,
+// controlla la versione (lock ottimistico, come prima) e fonde con `dati || campi`,
+// quindi tutto ciò che la Mobile non manda resta com'è.
+async function _mobLeggiParti(parti){
+  const sel = 'versione,' + parti.map(k=>k+':dati->'+k).join(',');
+  const res = await fetch(`${SB_URL}/rest/v1/gestionale_dati?id=eq.unico&select=${sel}`, {
+    headers:{'apikey':SB_KEY,'Authorization':`Bearer ${SB_KEY}`}, cache:'no-cache'
+  });
+  if(!res.ok) throw new Error('HTTP '+res.status);
+  const rows = await res.json();
+  if(!rows || !rows[0]) throw new Error('dati non trovati');
+  const r = rows[0], D = {};
+  parti.forEach(k=>{ if(r[k]!==null && r[k]!==undefined) D[k]=r[k]; });
+  return { versione: (r.versione!=null ? r.versione : null), D };
+}
+// Ritorna {ok:true, versione, versione_prima} se salvato, {ok:false} se un'altra app ha scritto nel frattempo.
+async function _mobScriviParti(campi, versioneAttesa){
+  const res = await fetch(`${SB_URL}/rest/v1/rpc/aggiorna_parti_mobile`, {
+    method:'POST',
+    headers:{'apikey':SB_KEY,'Authorization':`Bearer ${SB_KEY}`,'Content-Type':'application/json'},
+    body: JSON.stringify({ campi, versione_attesa: (versioneAttesa==null ? null : versioneAttesa) })
+  });
+  const j = await res.json().catch(()=>null);
+  if(!res.ok) throw new Error((j&&(j.message||j.hint))||('HTTP '+res.status));
+  return j || { ok:false };
+}
+// Solo le parti davvero cambiate rispetto a quanto letto: meno dati in viaggio.
+function _mobCambiate(dopo, prima, parti){
+  const out = {};
+  parti.forEach(k=>{ if(dopo[k]!==undefined && JSON.stringify(dopo[k])!==JSON.stringify(prima[k])) out[k]=dopo[k]; });
+  return out;
+}
+// Dopo un salvataggio: se tra il nostro ultimo allineamento e il salvataggio qualcun altro
+// aveva scritto (versione_prima ≠ quella che conoscevamo), NON adottiamo la nuova versione:
+// così il controllo al rientro (ogni 20 s) ricarica e porta qui le modifiche altrui.
+function _mobAdottaVersione(esito){
+  if(!esito || esito.versione==null) return;
+  if(_mobUltimaVersione===null || esito.versione_prima==null || esito.versione_prima===_mobUltimaVersione) _mobUltimaVersione=esito.versione;
+}
+
+// Scrittura atomica per i campi che salvaCloud NON riscrive (es. cantieri[]: la mobile li
+// ricarica sempre dal remoto). Legge SOLO le parti indicate → applica il mutatore sui dati
+// freschi → scrive solo quelle cambiate col lock di versione, con retry sui conflitti.
+// Al successo allinea DB (solo quelle parti). Ritorna true se salvato.
+async function mobPatchDati(mutator, parti){
+  if(!Array.isArray(parti) || !parti.length) throw new Error('mobPatchDati: parti non indicate');
   for(let tentativo=1; tentativo<=6; tentativo++){
-    const row=await sbGet();
-    const D=(row&&row.dati)?row.dati:{};
-    const versione=(row&&row.versione!=null)?row.versione:null;
+    const {versione, D} = await _mobLeggiParti(parti);
+    const prima = JSON.parse(JSON.stringify(D));
     mutator(D);
-    const saved=await sbSet(D, versione);
-    if(saved){
-      Object.assign(DB, D);
-      if(saved.versione!=null) _mobUltimaVersione=saved.versione;   // versione dal PATCH, niente GET extra
+    const campi = _mobCambiate(D, prima, parti);
+    const esito = await _mobScriviParti(campi, versione);
+    if(esito && esito.ok){
+      parti.forEach(k=>{ if(D[k]!==undefined) DB[k]=D[k]; });
+      _mobAdottaVersione(esito);
       return true;
     }
     await _mobSleep(200*tentativo);   // conflitto: breve attesa crescente, poi rileggo i dati freschi e riprovo
@@ -1106,18 +1135,20 @@ async function salvaCloud(silenzioso){
     // salvando, il PATCH condizionato non passa: rifacciamo il merge sui dati freschi
     // invece di sovrascrivere il suo lavoro. Nessuna perdita silenziosa.
     ricalcolaSaldi();                       // 'saldi' è derivato: lo ricalcolo, non lo fondo
-    let savedRow = null, merged = null;
-    for(let tentativo = 1; tentativo <= 6 && !savedRow; tentativo++){
-      const row = await sbGet();
-      const remoto = (row && row.dati) ? row.dati : {};
-      const versione = (row && row.versione !== undefined) ? row.versione : null;
+    // Parti che la Mobile fonde e scrive (solo queste viaggiano: niente più blob intero)
+    const PARTI = [...MERGE_FLAT, 'presenze', 'saldi', 'budgetCantieri'];
+    let esito = null, merged = null;
+    for(let tentativo = 1; tentativo <= 6 && !(esito && esito.ok); tentativo++){
+      const letto = await _mobLeggiParti(PARTI);
+      const remoto = letto.D;
+      const versione = letto.versione;
 
-      merged = { ...remoto };
+      merged = {};
       // Array condivisi: fusione a 3 vie record-per-record (niente più sovrascrittura in blocco).
       // Precedenza al Gestionale sui conflitti; nessuna aggiunta altrui viene persa.
       MERGE_FLAT.forEach(k => { merged[k] = _merge3Arr(_mobBase && _mobBase[k], DB[k], remoto[k]); });
       merged.presenze = _merge3Pres(_mobBase && _mobBase.presenze, DB.presenze, remoto.presenze);
-      merged.saldi = DB.saldi; // derivato: ricalcolato sopra
+      if(DB.saldi!==undefined && DB.saldi!==null) merged.saldi = DB.saldi; // derivato: ricalcolato sopra
 
       // budgetCantieri: parte dal remoto e applica SOLO le voci modificate in questa sessione
       // (prima le modifiche al ricavo fatte dalla mobile non venivano mai salvate sul cloud)
@@ -1129,29 +1160,26 @@ async function salvaCloud(silenzioso){
       });
       merged.budgetCantieri = budgetRemoto;
 
-      savedRow = await sbSet(merged, versione);
-      if(!savedRow){
+      // si mandano solo le parti cambiate rispetto al cloud
+      esito = await _mobScriviParti(_mobCambiate(merged, remoto, PARTI), versione);
+      if(!(esito && esito.ok)){
         console.warn(`salvaCloud: conflitto di versione (tentativo ${tentativo}) — rifaccio il merge sui dati aggiornati`);
         setStatus(null,'Dati cambiati — riunisco…');
         await _mobSleep(200*tentativo);   // breve attesa crescente, poi rileggo i dati freschi e riprovo
       }
     }
 
-    if(!savedRow) throw new Error('un\'altra app sta scrivendo in questo momento — riprova tra qualche secondo');
+    if(!(esito && esito.ok)) throw new Error('un\'altra app sta scrivendo in questo momento — riprova tra qualche secondo');
 
     // allinea lo stato locale al risultato della fusione e riparti da qui (nuova base)
     if(merged){
       MERGE_FLAT.forEach(k=>{ DB[k]=merged[k]||[]; });
       DB.presenze = merged.presenze||{};
       DB.budgetCantieri = merged.budgetCantieri||[];
-      if(merged.cantieri) DB.cantieri = merged.cantieri;
-      if(merged.mezziDB) DB.mezziDB = merged.mezziDB;
-      if(merged.risorse) DB.risorse = merged.risorse;
-      if(merged.personaleHR) DB.personaleHR = merged.personaleHR;
       ricalcolaSaldi();
       _mobSnapshotBase();
     }
-    if(savedRow.versione != null) _mobUltimaVersione = savedRow.versione;   // versione dal PATCH: niente GET extra
+    _mobAdottaVersione(esito);   // se altri avevano scritto, il controllo al rientro ricarica il resto
 
     setStatus(true,'Sincronizzato ✓');
     if(!silenzioso) toast('Salvato ✓');
@@ -1181,7 +1209,7 @@ async function syncCloud(){
 // Quando la mobile torna in primo piano / riprende il focus, controlla se sul
 // cloud c'è una versione più recente: se sì (e non stai scrivendo in un campo)
 // ricarica in automatico con loadCloud() che ridisegna tutto (renderAll).
-// Il salvataggio (sbSet con lock ottimistico + retry) NON viene toccato.
+// Il salvataggio (_mobScriviParti con lock ottimistico + retry) NON viene toccato.
 // ============================================================
 let _mobUltimaVersione = null;
 let _mobRientroInCorso = false;
@@ -1534,7 +1562,7 @@ function waApriCliente(cantId, tpl, residuo){
     _sheetClose();
     if(salva){
       const nuovo=tel.value.trim(), idCl=info.cl.id;
-      mobPatchDati(D=>{ const x=(D.clienti||[]).find(y=>y.id===idCl); if(x){ if(x.telefono&&!x.cellulare) x.cellulare=nuovo; else if(x.cellulare) x.cellulare=nuovo; else x.telefono=nuovo; } })
+      mobPatchDati(D=>{ const x=(D.clienti||[]).find(y=>y.id===idCl); if(x){ if(x.telefono&&!x.cellulare) x.cellulare=nuovo; else if(x.cellulare) x.cellulare=nuovo; else x.telefono=nuovo; } }, ['clienti'])
         .then(ok=>{ toast(ok?'Numero salvato nella scheda cliente ✓':'⚠ Numero non salvato — riprova'); if(_dettNomeMobile) renderDett(); })
         .catch(()=>toast('⚠ Numero non salvato — riprova'));
     }
@@ -2773,7 +2801,7 @@ async function addFornituraDaCantiere(){
       const b=D.budgetCantieri.find(x=>x.cantiereId===c.id);
       if(b){ b.ricavoPrevisto=parseFloat(b.ricavoPrevisto||0)+importo; b.cantiereName=c.nome; }
       else D.budgetCantieri.push({cantiereId:c.id,cantiereName:c.nome,ricavoPrevisto:importo,note:''});
-    });
+    }, ['cantieri','budgetCantieri']);
     document.getElementById('loading').style.display='none';
     if(!ok){ toast('⚠ Un\'altra app sta scrivendo — riprova tra qualche secondo'); return; }
     // budget già persistito dalla scrittura atomica: niente _budgetDirty (eviterebbe
@@ -2793,7 +2821,7 @@ async function eliminaFornitura(id){
     cc.forniture=(cc.forniture||[]).filter(x=>x.id!==id);
     const b=(D.budgetCantieri||[]).find(x=>x.cantiereId===c.id);
     if(b) b.ricavoPrevisto=Math.max(0, parseFloat(b.ricavoPrevisto||0)-parseFloat(voce.importo||0));
-  });
+  }, ['cantieri','budgetCantieri']);
   document.getElementById('loading').style.display='none';
   if(!ok){ toast('⚠ Riprova tra qualche secondo'); return; }
   renderDett(); renderCantieri();
@@ -2807,7 +2835,7 @@ async function creaPrevFornitura(id){
   document.getElementById('loading').style.display='flex';
   try{
     const numero=await diarioCreaPreventivo(c.id, c.nome+' — '+voce.descrizione, c.committente||'', [{descrizione:voce.descrizione,qta:1,prezzo:voce.importo}]);
-    const ok=await mobPatchDati(D=>{ const cc=(D.cantieri||[]).find(x=>x.id===c.id); if(!cc) return; const v=(cc.forniture||[]).find(x=>x.id===id); if(v) v.preventivoRef=numero; });
+    const ok=await mobPatchDati(D=>{ const cc=(D.cantieri||[]).find(x=>x.id===c.id); if(!cc) return; const v=(cc.forniture||[]).find(x=>x.id===id); if(v) v.preventivoRef=numero; }, ['cantieri']);
     document.getElementById('loading').style.display='none';
     if(!ok){ toast('⚠ Riprova tra qualche secondo'); return; }
     renderDett();
@@ -2819,14 +2847,19 @@ async function archiviaCantiere(id){
   const c=(DB.cantieri||[]).find(x=>x.id===id);
   if(!c) return;
   if(!(await sheetConfirm('Archiviare "'+c.nome+'"?',{ok:'Archivia'}))) return;
+  // Scrittura diretta della sola lista archiviati (prima salvaCloud non la salvava: si perdeva)
   if(!DB._cantieriArchiviati) DB._cantieriArchiviati=[];
   if(!DB._cantieriArchiviati.includes(id)) DB._cantieriArchiviati.push(id);
-  salvaCloud(false); renderCantieri(); toast('Archiviato ✓');
+  renderCantieri();
+  const ok=await mobPatchDati(D=>{ const a=Array.isArray(D._cantieriArchiviati)?D._cantieriArchiviati:[]; if(!a.includes(id)) a.push(id); D._cantieriArchiviati=a; }, ['_cantieriArchiviati']).catch(()=>false);
+  renderCantieri(); toast(ok?'Archiviato ✓':'⚠ Non salvato sul cloud — riprova');
 }
 
-function ripristinaCantiere(id){
+async function ripristinaCantiere(id){
   DB._cantieriArchiviati=(DB._cantieriArchiviati||[]).filter(x=>x!==id);
-  salvaCloud(false); renderCantieri(); toast('Ripristinato ✓');
+  renderCantieri();
+  const ok=await mobPatchDati(D=>{ D._cantieriArchiviati=(Array.isArray(D._cantieriArchiviati)?D._cantieriArchiviati:[]).filter(x=>x!==id); }, ['_cantieriArchiviati']).catch(()=>false);
+  renderCantieri(); toast(ok?'Ripristinato ✓':'⚠ Non salvato sul cloud — riprova');
 }
 
 async function cambiaStatoCantiere(id){
@@ -2841,11 +2874,12 @@ async function cambiaStatoCantiere(id){
     {label:'Perso / Rifiutato',emoji:'❌',danger:true}
   ]);
   if(idx===null) return;
-  c.stato=stati[idx];
   // scelta manuale: nessuna chiusura automatica la sovrascrive (concluso/perso la riattivano)
-  c._statoManuale = !['concluso','perso'].includes(c.stato);
-  if(c.stato!=='concluso') c._autoChiuso=false;
-  salvaCloud(false); renderCantieri(); toast('Stato aggiornato: '+nomi[idx]);
+  const applica=cc=>{ cc.stato=stati[idx]; cc._statoManuale=!['concluso','perso'].includes(cc.stato); if(cc.stato!=='concluso') cc._autoChiuso=false; };
+  applica(c); renderCantieri();
+  // Scrittura diretta sul cantiere (prima salvaCloud non salvava i cantieri: il cambio si perdeva)
+  const ok=await mobPatchDati(D=>{ const cc=(D.cantieri||[]).find(x=>x.id===id); if(cc) applica(cc); }, ['cantieri']).catch(()=>false);
+  renderCantieri(); toast(ok?'Stato aggiornato: '+nomi[idx]:'⚠ Non salvato sul cloud — riprova');
 }
 
 // Dettaglio giornaliero cantiere sul mobile
@@ -2878,7 +2912,7 @@ async function creaPreventivoDaDett(){
   try{
     const numero=await diarioCreaPreventivo(c.id, c.nome, c.committente||'');
     // Persisti preventivoRef sul cantiere (write atomico che include i cantieri, con lock)
-    await mobPatchDati(D=>{ const cc=(D.cantieri||[]).find(x=>x.id===c.id); if(cc) cc.preventivoRef=numero; });
+    await mobPatchDati(D=>{ const cc=(D.cantieri||[]).find(x=>x.id===c.id); if(cc) cc.preventivoRef=numero; }, ['cantieri']);
     c.preventivoRef=numero;
     document.getElementById('loading').style.display='none';
     renderDett(); renderCantieri();
@@ -3609,13 +3643,8 @@ async function diarioTogglePromemoria(id){ const p=(DB.promemoria||[]).find(x=>x
 async function diarioDelPromemoria(id){ if(!(await sheetConfirm('Eliminare questo promemoria?',{ok:'Elimina',danger:true}))) return; try{ await _gcalElimina((DB.promemoria||[]).find(x=>x.id===id)); }catch(e){} DB.promemoria=(DB.promemoria||[]).filter(x=>x.id!==id); diarioRenderAgenda(); await diarioSalvaAgenda(); }
 async function diarioSalvaAgenda(){
   setStatus(null,'Salvataggio…');
-  for(let t=1;t<=6;t++){
-    const row=await sbGet(); const D=(row&&row.dati)?row.dati:{};
-    D.promemoria=DB.promemoria||[];
-    const saved=await sbSet(D,(row&&row.versione!=null)?row.versione:null);
-    if(saved){ Object.assign(DB,D); if(saved.versione!=null)_mobUltimaVersione=saved.versione; setStatus(true,'Sincronizzato ✓'); return true; }
-    await _mobSleep(200*t);
-  }
+  const ok=await mobPatchDati(D=>{ D.promemoria=DB.promemoria||[]; }, ['promemoria']);
+  if(ok){ setStatus(true,'Sincronizzato ✓'); return true; }
   setStatus(false,'Conflitto'); toast('⚠ Riprova tra poco'); return false;
 }
 
@@ -3847,18 +3876,13 @@ function diarioApply(a,D){
 // ── Salvataggio atomico dell'intero blob con lock di versione + retry ──
 async function diarioSalvaTutto(list){
   setStatus(null,'Salvataggio…');
-  for(let t=1;t<=6;t++){
-    const row=await sbGet();
-    const D=(row&&row.dati)?row.dati:{};
+  const PARTI=['presenze','personale','cantieri','anticipi','pagamenti','scontrini','speseCantiere','addebiti','incassi','promemoria'];
+  const ok=await mobPatchDati(D=>{
     D.presenze=D.presenze||{};
     ['personale','cantieri','anticipi','pagamenti','scontrini','speseCantiere','addebiti','incassi','promemoria'].forEach(k=>{ if(!D[k])D[k]=[]; });
     list.forEach(a=>diarioApply(a,D));
-    const saved=await sbSet(D,(row&&row.versione!=null)?row.versione:null);
-    if(saved){ Object.assign(DB,D); if(saved.versione!=null)_mobUltimaVersione=saved.versione;
-      ricalcolaSaldi(); renderAll(); setStatus(true,'Sincronizzato ✓'); return true; }
-    setStatus(null,'Dati cambiati — riprovo…');
-    await _mobSleep(200*t);
-  }
+  }, PARTI);
+  if(ok){ ricalcolaSaldi(); renderAll(); setStatus(true,'Sincronizzato ✓'); return true; }
   setStatus(false,'Conflitto — riprova'); return false;
 }
 
@@ -4044,7 +4068,7 @@ async function progSalva(){
       if(!t.c.periodoInizio||data<t.c.periodoInizio) t.c.periodoInizio=data;
       if(!t.c.periodoFine||data>t.c.periodoFine) t.c.periodoFine=data;
       _riapriSeChiusoAuto(t.c,data);
-    });
+    }, ['cantieri']);
     if(!trovato){ setStatus(true,'Sincronizzato ✓'); toast('⚠ Lavoro non trovato: forse è stato modificato altrove — ricarica'); _sheetClose(); return; }
     if(!ok){ setStatus(false,'Conflitto'); toast('⚠ Un\'altra app sta scrivendo — riprova'); return; }
     setStatus(true,'Sincronizzato ✓'); _sheetClose(); renderAll&&renderAll(); diarioRenderProgramma(); toast('✓ Lavoro aggiornato');
@@ -4061,7 +4085,7 @@ async function progElimina(){
       const iv=t.c.interventi[t.i];
       t.c.interventi.splice(t.i,1);
       if(iv && iv.id!=null){ D._interventiEliminati=Array.isArray(D._interventiEliminati)?D._interventiEliminati:[]; if(!D._interventiEliminati.includes(String(iv.id))) D._interventiEliminati.push(String(iv.id)); }
-    });
+    }, ['cantieri','_interventiEliminati']);
     if(!ok){ setStatus(false,'Conflitto'); toast('⚠ Un\'altra app sta scrivendo — riprova'); return; }
     setStatus(true,'Sincronizzato ✓'); renderAll&&renderAll(); diarioRenderProgramma(); toast('🗑 Lavoro eliminato');
   }catch(e){ setStatus(false,'Errore'); toast('⚠ '+e.message); }
@@ -4190,7 +4214,7 @@ async function gcalSincronizzaAgenda(silenzioso){
   }
   const n=Object.keys(fatti).length;
   if(n){
-    try{ await mobPatchDati(D=>{ (D.promemoria||[]).forEach(p=>{ if(fatti[p.id]) p.gcalEventId=fatti[p.id]; }); }); }catch(e){}
+    try{ await mobPatchDati(D=>{ (D.promemoria||[]).forEach(p=>{ if(fatti[p.id]) p.gcalEventId=fatti[p.id]; }); }, ['promemoria']); }catch(e){}
     (DB.promemoria||[]).forEach(p=>{ if(fatti[p.id]) p.gcalEventId=fatti[p.id]; });
   }
   diarioRenderAgenda();
