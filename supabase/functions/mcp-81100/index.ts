@@ -1,4 +1,4 @@
-// MCP Connector 81|00 — Ottantunocento (v2.3: lettura + scritture con conferma + PDF preventivi)
+// MCP Connector 81|00 — Ottantunocento (v2.5: lettura + scritture con conferma + PDF preventivi + invio via Gmail)
 // Transport: Streamable HTTP (stateless JSON), protocollo MCP 2024-11-05
 // Lettura: diario eventi/cantieri · presenze · fatture & incassi · preventivi · personale · clienti · SQL in sola lettura
 // Scrittura: crea_cantiere · aggiungi_lavorazione · aggiungi_presenza · crea_preventivo · aggiungi_spesa · registra_acconto
