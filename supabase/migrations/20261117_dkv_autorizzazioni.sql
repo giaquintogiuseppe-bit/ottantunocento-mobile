@@ -26,6 +26,9 @@ create table if not exists public.dkv_autorizzazioni (
   parsed           boolean not null default false,
   sospetta         boolean not null default false,
   motivi_sospetto  text,
+  cantiere         text,                   -- cantiere dello scontrino Telegram abbinato (null se non abbinato)
+  scontrino_autore text,                   -- autore dello scontrino Telegram abbinato
+  scontrino_trovato boolean not null default false,  -- true = abbinato a uno scontrino in scontrini_telegram (targa/mezzo +-45 min)
   stato            text not null default 'nuova',  -- nuova / vista / archiviata_gmail
   creato_il        timestamptz not null default now()
 );

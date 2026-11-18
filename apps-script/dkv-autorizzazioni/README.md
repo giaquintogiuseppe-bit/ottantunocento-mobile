@@ -19,12 +19,40 @@ DKV Analytics ──email + allegato xlsx──▶ Gmail Giuseppe
                            → label "DKV/processata" + ARCHIVIA (mai cancella) → stato='archiviata_gmail'
                                             ▼
                                   Supabase: dkv_autorizzazioni  (solo antifrode)
+                                            ▲
+  trigger ogni 2 ore ─▶ riconciliaScontrini()  (scrive: abbina scontrini Telegram dopo il grace period)
                                             ▼
   trigger 21:00 Europe/Rome ─▶ reportSerale()  (REPORT, sola lettura)
                            email HTML a REPORT_TO: totali + sospette in rosso in cima
 ```
 
 La tabella è **solo antifrode**: non scrive in `DB.carburante`, non tocca `index.html`; la fonte costi autorevole resta l'import xlsx.
+
+## Incrocio con gli scontrini Telegram (cantiere / "senza scontrino")
+
+**Dipendenza**: tabella Supabase `scontrini_telegram` (scritta dal bot Telegram; qui solo lettura) con `ts` (timestamptz),
+`autore`, `mezzo` (targa **o nome** del mezzo), `cantiere`, `note`. Una transazione DKV senza scontrino corrispondente è un
+rifornimento non registrato / non associato a cantiere.
+
+- **Abbinamento** (`abbinaScontrino_`, funzione pura): `mezzo` ~ `targa` DKV, entrambi normalizzati (maiuscolo, solo
+  alfanumerici); match se uguali **o uno contiene l'altro** (il "contiene" solo da 3 caratteri in su). In più, se `mezzo` è un
+  nome, si usa la mappa flotta `FLOTTA_NOMI_`. Finestra temporale: `|ts_scontrino - ts_transazione| <= SOGLIA_MINUTI_SCONTRINO`
+  (45 min); fra più candidati vince il più vicino. Ritorna `{trovato, cantiere, autore}`.
+- **Mappa flotta nomi: PARZIALE**, oggi solo `GM972CF = PRAMAC 2`, `FX943SG = Clio`. Va completata nel `.gs` (`FLOTTA_NOMI_`):
+  finché manca una targa, gli scontrini che indicano il mezzo per nome non verranno abbinati (falsi "senza scontrino").
+- **Ingest** (`processaGiornata`): per ogni transazione con targa e data cerca gli scontrini nella finestra e, se trova,
+  valorizza `cantiere`, `scontrino_autore`, `scontrino_trovato=true`. **Non** segnala mai "senza scontrino" qui: lo scontrino
+  arriva dopo l'email DKV (anche il giorno seguente).
+- **Grace period** (`riconciliaScontrini`, trigger ogni 2 ore): per le righe `scontrino_trovato=false AND parsed=true` con
+  `ts_transazione` più vecchia di `SOGLIA_ORE_GRACE_SCONTRINO` (24 h) rifà l'abbinamento. Se ora lo trova: `scontrino_trovato=true`,
+  cantiere/autore, e toglie il motivo "senza scontrino" ricalcolando `sospetta`. Se non lo trova: `sospetta=true` + motivo
+  *"rifornimento senza scontrino Telegram (non associato a cantiere)"* (una sola volta: idempotente). Non cancella nulla.
+  Le transazioni **rifiutate** (`DEC_*`) sono escluse (nessun rifornimento = nessuno scontrino); se la lettura degli scontrini
+  fallisce la riga è saltata e ritentata al giro dopo. Un ingest ripetuto dello stesso `authorization_id` azzera cantiere/motivo,
+  che la riconciliazione ricalcola.
+- **Report**: sola lettura; ha la colonna `Cantiere` e le "senza scontrino" compaiono tra le sospette.
+- **Nuove colonne** in `dkv_autorizzazioni`: `cantiere text`, `scontrino_autore text`, `scontrino_trovato boolean not null default false`
+  (nella migration `20261117_dkv_autorizzazioni.sql`; se già applicata: `alter table ... add column if not exists ...`).
 
 ## Installazione (una volta, manuale)
 
@@ -56,6 +84,8 @@ La tabella è **solo antifrode**: non scrive in `DB.carburante`, non tocca `inde
 | `SOGLIA_MINUTI_DOPPIA` | `30` | due transazioni stessa carta entro N min; `0` disattiva |
 | `SOGLIA_STAZIONE_NUOVA` | `1` | `0` disattiva |
 | `SOGLIA_MIN_STORICO_STAZIONI` | `5` | "stazione nuova" attiva solo dopo N stazioni note |
+| `SOGLIA_MINUTI_SCONTRINO` | `45` | finestra abbinamento targa/mezzo ↔ scontrino Telegram (± minuti) |
+| `SOGLIA_ORE_GRACE_SCONTRINO` | `24` (ore) | attesa prima di dichiarare "senza scontrino" |
 | `MAX_THREAD_PER_GIRO` | `50` | thread per esecuzione dell'ingest |
 
 Tutte le soglie vivono nei `DEFAULTS_` in cima al `.gs` e nelle Script Properties: nessun valore hardcoded altrove.
@@ -63,8 +93,9 @@ Tutte le soglie vivono nei `DEFAULTS_` in cima al `.gs` e nelle Script Propertie
 ## Trigger
 
 - `processaGiornata` ogni **30 minuti**: solo ingest (parse + salva + archivia). Se un thread fallisce resta in `DKV/da-processare` e viene ritentato.
+- `riconciliaScontrini` ogni **2 ore**: verifica ritardata "senza scontrino" (scrive solo PATCH). Con grace 24 h basta questa cadenza e il motivo è già scritto prima del report delle 21:00.
 - `reportSerale` una volta al giorno alle **21:00 Europe/Rome** (Apps Script esegue nella finestra 21:00–22:00): sola lettura.
-- `creaTrigger()` rimuove i vecchi trigger di queste due funzioni e li reinstalla (idempotente).
+- `creaTrigger()` rimuove i vecchi trigger di queste tre funzioni e li reinstalla (idempotente).
 
 ## Sicurezza
 
@@ -86,7 +117,8 @@ La targa arriva già dall'email ("Licence plate"): la mappa carta→targa non se
 ## Test
 
 `node test-dkv.js` — Gmail/UrlFetch/PropertiesService finti: `mappaRigaDKV_` (pura) sul campione reale, soglie (sopra/sotto/null), upsert idempotente,
-ingest (solo label+archivio), report in sola lettura.
+ingest (solo label+archivio), `abbinaScontrino_` (targa uguale, fuori finestra, "contiene"/nome via mappa, null-safe), helper motivi
+"senza scontrino" (senza doppioni), `riconciliaScontrini` (grace, idempotenza, solo GET/PATCH), report in sola lettura.
 `node --check` non accetta l'estensione `.gs`: per la sintassi copia il file con estensione `.js`.
 La parte Drive/SpreadsheetApp (`leggiAllegatiXlsx_`) non è coperta da unit test: va verificata con un'email reale
 (attenzione a `Authorization ID` di 18 cifre con zero iniziale: deve restare testo dopo la conversione).

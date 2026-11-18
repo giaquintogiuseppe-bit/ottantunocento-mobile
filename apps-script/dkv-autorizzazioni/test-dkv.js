@@ -124,6 +124,77 @@ ctx.leggiAllegatiXlsx_ = () => { throw new Error('Drive KO'); };
 const tot2 = ctx.processaGiornata();
 assert.strictEqual(tot2.errori, 1); assert.strictEqual(tot2.threads, 0); assert.deepStrictEqual([...calls], []);
 
+// (d) abbinaScontrino_ (pura) + helper motivi "senza scontrino"
+{
+  const r0 = { targa: 'FS504WE', ts_transazione: '2026-11-18T09:50:00+01:00' };   // = 08:50Z
+  const sc = (ts, mezzo, cantiere, autore) => ({ ts, mezzo, cantiere, autore, note: '' });
+  let a = ctx.abbinaScontrino_(r0, [sc('2026-11-18T08:30:00Z', 'fs 504-we', 'Cantiere Rossi', 'Mario')], 45);
+  assert.deepStrictEqual({ ...a }, { trovato: true, cantiere: 'Cantiere Rossi', autore: 'Mario' });          // targa uguale (normalizzata), 20 min
+  a = ctx.abbinaScontrino_(r0, [sc('2026-11-18T07:50:00Z', 'FS504WE', 'X', 'Y')], 45); assert.strictEqual(a.trovato, false); assert.strictEqual(a.cantiere, null); // 60 min: fuori finestra
+  a = ctx.abbinaScontrino_(r0, [sc('2026-11-18T08:50:00Z', 'GM972CF', 'X', 'Y')], 45); assert.strictEqual(a.trovato, false);  // altro mezzo
+  a = ctx.abbinaScontrino_(r0, [sc('2026-11-18T08:50:00Z', 'furgone FS504WE', 'Bianchi', 'Lia')], 45); assert.strictEqual(a.trovato, true); // contiene
+  const r1 = { targa: 'GM972CF', ts_transazione: '2026-11-18T09:50:00+01:00' };
+  a = ctx.abbinaScontrino_(r1, [sc('2026-11-18T08:45:00Z', 'Pramac 2', 'Verdi', 'Gigi')], 45); assert.strictEqual(a.trovato, true); assert.strictEqual(a.cantiere, 'Verdi'); // nome via mappa flotta
+  a = ctx.abbinaScontrino_({ targa: 'FX943SG', ts_transazione: '2026-11-18T09:50:00+01:00' }, [sc('2026-11-18T08:50:00Z', 'Clio', 'Neri', 'Pia')], 45); assert.strictEqual(a.trovato, true);
+  a = ctx.abbinaScontrino_(r1, [sc('2026-11-18T08:20:00Z', 'GM972CF', 'Lontano', 'A'), sc('2026-11-18T08:48:00Z', 'GM972CF', 'Vicino', 'B')], 45); assert.strictEqual(a.cantiere, 'Vicino'); // il più vicino
+  a = ctx.abbinaScontrino_(r1, [sc('2026-11-18T08:50:00Z', 'Pramac 2', '  ', 'B')], 45); assert.strictEqual(a.trovato, true); assert.strictEqual(a.cantiere, null);
+  // null-safe
+  [[null, []], [{}, []], [r1, null], [r1, undefined], [r1, [null, {}, { ts: 'boh', mezzo: 'GM972CF' }, { ts: '2026-11-18T08:50:00Z' }]],
+    [{ targa: 'GM972CF', ts_transazione: 'boh' }, [sc('2026-11-18T08:50:00Z', 'GM972CF', 'X', 'Y')]], [{ ts_transazione: '2026-11-18T08:50:00Z' }, [sc('2026-11-18T08:50:00Z', '', 'X', 'Y')]]]
+    .forEach(([rr, ss]) => { assert.doesNotThrow(() => ctx.abbinaScontrino_(rr, ss, 45)); assert.strictEqual(ctx.abbinaScontrino_(rr, ss, 45).trovato, false); });
+  assert.strictEqual(ctx.abbinaScontrino_(r1, [], 45).trovato, false);
+  // helper motivi: aggiunge una volta sola, rimuove, ricalcola sospetta
+  const M = ctx.MOTIVO_SENZA_SCONTRINO_;
+  let h = ctx.aggiornaMotivoScontrino_(null, true); assert.deepStrictEqual({ ...h }, { sospetta: true, motivi_sospetto: M });
+  h = ctx.aggiornaMotivoScontrino_(h.motivi_sospetto, true); assert.strictEqual(h.motivi_sospetto, M);                                  // niente doppioni
+  h = ctx.aggiornaMotivoScontrino_('importo 400 oltre il massimo 300', true); assert.strictEqual(h.motivi_sospetto, 'importo 400 oltre il massimo 300; ' + M);
+  h = ctx.aggiornaMotivoScontrino_(h.motivi_sospetto, true); assert.strictEqual(h.motivi_sospetto.split(M).length, 2);
+  h = ctx.aggiornaMotivoScontrino_(h.motivi_sospetto, false); assert.deepStrictEqual({ ...h }, { sospetta: true, motivi_sospetto: 'importo 400 oltre il massimo 300' }); // resta sospetta per altro
+  h = ctx.aggiornaMotivoScontrino_(M, false); assert.deepStrictEqual({ ...h }, { sospetta: false, motivi_sospetto: null });
+  h = ctx.aggiornaMotivoScontrino_(null, false); assert.deepStrictEqual({ ...h }, { sospetta: false, motivi_sospetto: null });
+}
+
+// (e) supabaseTab_ su altra tabella + riconciliaScontrini (grace, idempotenza, scrittura solo PATCH)
+{
+  const log = []; let dkvRows = []; let scontrini = []; let scFail = false;
+  ctx.UrlFetchApp.fetch = (url, o) => {
+    log.push({ url, o });
+    if (/\/scontrini_telegram\?/.test(url)) { if (scFail) return { getResponseCode: () => 500, getContentText: () => 'KO CHIAVE-SEGRETA' }; return { getResponseCode: () => 200, getContentText: () => JSON.stringify(scontrini) }; }
+    if (o.method === 'get') return { getResponseCode: () => 200, getContentText: () => JSON.stringify(dkvRows) };
+    return { getResponseCode: () => 204, getContentText: () => '' };
+  };
+  ctx.supabaseTab_(cfg, 'scontrini_telegram', 'get', '?select=ts');
+  assert.match(log[0].url, /\/rest\/v1\/scontrini_telegram\?select=ts$/); assert.strictEqual(log[0].o.headers.apikey, 'CHIAVE-SEGRETA');
+  ctx.supabase_(cfg, 'get', '?select=id'); assert.match(log[1].url, /\/rest\/v1\/dkv_autorizzazioni\?select=id$/);
+
+  const ts = new Date(Date.now() - 48 * 3600000).toISOString();
+  dkvRows = [
+    { authorization_id: 'A1', targa: 'FS504WE', ts_transazione: ts, esito: 'APP_X', sospetta: false, motivi_sospetto: null },            // senza scontrino -> flag
+    { authorization_id: 'A2', targa: 'FS504WE', ts_transazione: ts, esito: 'APP_X', sospetta: true, motivi_sospetto: ctx.MOTIVO_SENZA_SCONTRINO_ }, // già flaggata, ora trovato
+    { authorization_id: 'A3', targa: 'FS504WE', ts_transazione: ts, esito: 'DEC_PIN', sospetta: true, motivi_sospetto: 'x' },             // rifiutata: saltata
+    { authorization_id: 'A4', targa: 'FS504WE', ts_transazione: ts, esito: 'APP_X', sospetta: true, motivi_sospetto: ctx.MOTIVO_SENZA_SCONTRINO_ } // già flaggata, ancora senza: nessun PATCH
+  ];
+  scontrini = [];
+  log.length = 0;
+  let t = ctx.riconciliaScontrini(cfg);
+  assert.deepStrictEqual({ ...t }, { esaminate: 3, trovate: 0, senza_scontrino: 3, saltate: 1, errori: 0 });
+  const q = log[0].url; assert.match(q, /scontrino_trovato=eq\.false/); assert.match(q, /parsed=eq\.true/); assert.match(q, /ts_transazione=lte\./);
+  const patches = log.filter((x) => x.o.method === 'patch');
+  assert.strictEqual(patches.length, 1); assert.match(patches[0].url, /authorization_id=eq\.A1$/);                      // solo A1: A2/A4 già segnalate (idempotente)
+  assert.deepStrictEqual({ ...JSON.parse(patches[0].o.payload) }, { sospetta: true, motivi_sospetto: ctx.MOTIVO_SENZA_SCONTRINO_ });
+  assert.ok(log.every((x) => x.o.method === 'get' || x.o.method === 'patch'));                                          // niente POST/DELETE
+  // ora arriva lo scontrino: A1 e A2 trovate, motivo tolto, sospetta ricalcolata
+  scontrini = [{ ts, mezzo: 'FS504WE', cantiere: 'Rossi', autore: 'Mario' }];
+  log.length = 0; t = ctx.riconciliaScontrini(cfg);
+  assert.strictEqual(t.trovate, 3);
+  const p2 = log.filter((x) => x.o.method === 'patch').map((x) => JSON.parse(x.o.payload));
+  assert.strictEqual(p2.length, 3); assert.strictEqual(p2[0].scontrino_trovato, true); assert.strictEqual(p2[0].cantiere, 'Rossi');
+  assert.deepStrictEqual({ sospetta: p2[1].sospetta, m: p2[1].motivi_sospetto }, { sospetta: false, m: null });         // A2: motivo rimosso
+  // errore di lettura scontrini: riga saltata, nessun PATCH, nessuna chiave nei log/errori
+  scFail = true; log.length = 0; t = ctx.riconciliaScontrini(cfg);
+  assert.strictEqual(t.errori, 3); assert.strictEqual(log.filter((x) => x.o.method === 'patch').length, 0);
+}
+
 // report: sola lettura (solo GET), mail senza chiave, sospette in rosso
 fetches.length = 0;
 ctx.UrlFetchApp.fetch = (url, o) => { fetches.push({ url, o }); return { getResponseCode: () => 200, getContentText: () => JSON.stringify([
@@ -133,5 +204,5 @@ const out = ctx.reportSerale();
 assert.deepStrictEqual(fetches.map((x) => x.o.method), ['get']); assert.strictEqual(out.transazioni, 2); assert.strictEqual(out.sospette, 1);
 const m = sentMails[0]; assert.strictEqual(m.to, 'giaquinto.giuseppe@gmail.com');
 assert.ok(m.opt.htmlBody.indexOf('ANOMALIE SOSPETTE') < m.opt.htmlBody.indexOf('Elenco del giorno'));
-assert.ok(m.opt.htmlBody.includes('&lt;max&gt;')); assert.ok(!JSON.stringify(m).includes('CHIAVE-SEGRETA'));
+assert.ok(m.opt.htmlBody.includes('<th>Cantiere</th>')); assert.ok(m.opt.htmlBody.includes('&lt;max&gt;')); assert.ok(!JSON.stringify(m).includes('CHIAVE-SEGRETA'));
 console.log('OK: tutti i test DKV passano');

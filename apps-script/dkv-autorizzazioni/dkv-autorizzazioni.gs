@@ -6,6 +6,10 @@
  *   1. INGEST  (processaGiornata, trigger ogni 30 min): legge i thread con label LABEL_IN, legge l'ALLEGATO xlsx
  *      di ogni email (parseEmailDKV, conversione via Drive) -> una riga per transazione, valuta i sospetti, fa upsert
  *      su Supabase (tabella dkv_autorizzazioni, idempotente su authorization_id), poi etichetta LABEL_DONE e ARCHIVIA il thread. Non cancella e non cestina mai.
+ *   1b. RICONCILIAZIONE (riconciliaScontrini, trigger ogni 2 ore, scrive): incrocio con gli scontrini del bot Telegram
+ *      (tabella Supabase scontrini_telegram: ts, autore, mezzo, cantiere, note). All'ingest si ARRICCHISCE solo il record
+ *      (cantiere/autore dello scontrino se già presente). Lo scontrino arriva spesso DOPO l'email DKV (anche il giorno
+ *      dopo): quindi "senza scontrino" si dichiara SOLO dopo SOGLIA_ORE_GRACE_SCONTRINO ore, in riconciliaScontrini.
  *   2. REPORT  (reportSerale, trigger giornaliero ~21:00 Europe/Rome): SOLA LETTURA su Supabase; invia a REPORT_TO
  *      un'email HTML con le transazioni del giorno e, in cima in rosso, quelle sospette.
  *
@@ -42,10 +46,17 @@ var DEFAULTS_ = {
   SOGLIA_GIORNI_LAVORATIVI: '1,2,3,4,5,6',        // 1=lunedì ... 7=domenica; fuori da questi = "giorno non lavorativo"
   SOGLIA_MINUTI_DOPPIA: '30',                     // due transazioni stessa carta entro N minuti (0 = disattivato)
   SOGLIA_STAZIONE_NUOVA: '1',                     // 1 = segnala stazione mai vista prima (0 = disattivato)
-  SOGLIA_MIN_STORICO_STAZIONI: '5'                // "stazione nuova" attiva solo dopo almeno N stazioni già note (evita falsi allarmi all'avvio)
+  SOGLIA_MIN_STORICO_STAZIONI: '5',               // "stazione nuova" attiva solo dopo almeno N stazioni già note (evita falsi allarmi all'avvio)
+  SOGLIA_MINUTI_SCONTRINO: '45',                  // finestra abbinamento DKV<->scontrino Telegram: |ts_scontrino - ts_transazione| <= N minuti
+  SOGLIA_ORE_GRACE_SCONTRINO: '24'                // ore da attendere prima di dichiarare "senza scontrino" (lo scontrino può arrivare il giorno dopo)
 };
 var STATI_ = { NUOVA: 'nuova', ARCHIVIATA: 'archiviata_gmail' };
 var TABELLA_ = 'dkv_autorizzazioni';
+var TABELLA_SCONTRINI_ = 'scontrini_telegram';   // scritta dal bot Telegram; qui SOLO lettura
+var MOTIVO_SENZA_SCONTRINO_ = 'rifornimento senza scontrino Telegram (non associato a cantiere)';
+// Mappa flotta TARGA -> NOME MEZZO, per quando nello scontrino `mezzo` è un nome e non la targa.
+// PARZIALE (best-effort): va completata con le altre targhe/nomi della flotta.
+var FLOTTA_NOMI_ = { GM972CF: 'PRAMAC 2', FX943SG: 'Clio' };
 
 function config_() {
   var p = PropertiesService.getScriptProperties();
@@ -156,7 +167,8 @@ function recordVuoto_() {
   return {
     authorization_id: null, gmail_message_id: null, ricevuta_il: null, ts_transazione: null, carta_last4: null, targa: null,
     stazione: null, prodotto: null, importo: null, litri: null, esito: null, product_code: null, km: null, citta: null,
-    station_number: null, customer_number: null, raw_subject: '', raw_body: '', parsed: false
+    station_number: null, customer_number: null, raw_subject: '', raw_body: '', parsed: false,
+    cantiere: null, scontrino_autore: null, scontrino_trovato: false
   };
 }
 
@@ -319,6 +331,134 @@ function valutaSospetti(record, ctx, cfg) {
   return { sospetta: motivi.length > 0, motivi: unici_(motivi), da_verificare: r.parsed !== true };
 }
 
+// ---------- INCROCIO SCONTRINI TELEGRAM ----------
+// Maiuscolo, solo caratteri alfanumerici ("gm 972-cf" -> "GM972CF").
+function normId_(s) {
+  return String(s == null ? '' : s).toUpperCase().replace(/[^A-Z0-9]/g, '');
+}
+function msValido_(v) {
+  if (v == null || v === '') return null;
+  var t = new Date(v).getTime();
+  return isNaN(t) ? null : t;
+}
+// Uguali oppure uno contiene l'altro (il "contiene" solo da 3 caratteri in su, per non agganciare sigle di 1-2 lettere).
+function simile_(a, b) {
+  if (!a || !b) return false;
+  if (a === b) return true;
+  return (a.length >= 3 && b.length >= 3) && (a.indexOf(b) >= 0 || b.indexOf(a) >= 0);
+}
+/**
+ * FUNZIONE PURA (testata): cerca lo scontrino Telegram che corrisponde a una transazione DKV.
+ * Match: mezzo dello scontrino ~ targa DKV (normalizzati; uguali o uno contiene l'altro), oppure ~ nome mezzo
+ * della flotta noto per quella targa (FLOTTA_NOMI_, parziale), con |ts_scontrino - ts_transazione| <= finestraMin.
+ * Fra più candidati vince il più vicino nel tempo. Null/ts non validi: nessun match, mai eccezioni.
+ * @param {Object} rec  record DKV ({targa, ts_transazione})
+ * @param {Object[]} scontrini  [{ts, autore, mezzo, cantiere, note}]
+ * @param {number} finestraMin
+ * @return {{trovato:boolean, cantiere:?string, autore:?string}}
+ */
+function abbinaScontrino_(rec, scontrini, finestraMin) {
+  var nessuno = { trovato: false, cantiere: null, autore: null };
+  var targa = normId_(rec && rec.targa);
+  var t0 = msValido_(rec && rec.ts_transazione);
+  var fin = Number(finestraMin);
+  if (!targa || t0 == null || !isFinite(fin) || fin < 0 || !Array.isArray(scontrini)) return nessuno;
+  var nome = normId_(FLOTTA_NOMI_[targa]);
+  var best = null, bestD = Infinity;
+  scontrini.forEach(function (s) {
+    if (!s) return;
+    var t = msValido_(s.ts);
+    var mezzo = normId_(s.mezzo);
+    if (t == null || !mezzo) return;
+    var d = Math.abs(t - t0) / 60000;
+    if (d > fin) return;
+    if (!(simile_(mezzo, targa) || (nome && simile_(mezzo, nome)))) return;
+    if (d < bestD) { bestD = d; best = s; }
+  });
+  if (!best) return nessuno;
+  return { trovato: true, cantiere: testo_(best.cantiere), autore: testo_(best.autore) };
+}
+/**
+ * FUNZIONE PURA (testata): aggiunge/rimuove il motivo "senza scontrino" da motivi_sospetto (testo separato da "; ")
+ * senza duplicati, e ricalcola `sospetta` (true se resta almeno un motivo).
+ * @param {?string} motiviStr  motivi_sospetto attuale
+ * @param {boolean} senzaScontrino  true = aggiungi il motivo, false = rimuovilo
+ * @return {{sospetta:boolean, motivi_sospetto:?string}}
+ */
+function aggiornaMotivoScontrino_(motiviStr, senzaScontrino) {
+  var l = String(motiviStr == null ? '' : motiviStr).split(';').map(function (x) { return x.trim(); })
+    .filter(function (x) { return x && x !== MOTIVO_SENZA_SCONTRINO_; });
+  if (senzaScontrino) l.push(MOTIVO_SENZA_SCONTRINO_);
+  l = unici_(l);
+  return { sospetta: l.length > 0, motivi_sospetto: l.length ? l.join('; ') : null };
+}
+// Legge da scontrini_telegram gli scontrini nella finestra +-SOGLIA_MINUTI_SCONTRINO attorno a ts_transazione.
+// Gli errori PROPAGANO (il chiamante decide): un errore di lettura NON deve mai valere "senza scontrino".
+function scontriniInFinestra_(cfg, rec) {
+  var t = msValido_(rec.ts_transazione);
+  if (t == null) return [];
+  var w = num_(cfg.SOGLIA_MINUTI_SCONTRINO) * 60000;
+  var q = '?select=ts,autore,mezzo,cantiere,note&ts=gte.' + encodeURIComponent(new Date(t - w).toISOString()) +
+    '&ts=lte.' + encodeURIComponent(new Date(t + w).toISOString()) + '&limit=500';
+  return supabaseTab_(cfg, TABELLA_SCONTRINI_, 'get', q).json || [];
+}
+// Ingest: se esiste già lo scontrino valorizza cantiere/scontrino_autore/scontrino_trovato sul record. Mai errori fatali.
+function arricchisciConScontrino_(cfg, rec) {
+  if (!rec.targa || !rec.ts_transazione) return rec;
+  try {
+    var m = abbinaScontrino_(rec, scontriniInFinestra_(cfg, rec), num_(cfg.SOGLIA_MINUTI_SCONTRINO));
+    if (m.trovato) { rec.cantiere = m.cantiere; rec.scontrino_autore = m.autore; rec.scontrino_trovato = true; }
+  } catch (err) {
+    Logger.log('Scontrini non disponibili (si riprova in riconciliaScontrini): ' + sicuro_(err));
+  }
+  return rec;
+}
+
+/**
+ * RICONCILIAZIONE (scrive, lato ingest, trigger ogni 2 ore). Per le righe DKV interpretate, senza scontrino abbinato e
+ * più vecchie di SOGLIA_ORE_GRACE_SCONTRINO ore: riprova l'abbinamento.
+ *  - trovato  -> PATCH scontrino_trovato=true, cantiere, scontrino_autore; toglie il motivo "senza scontrino" e ricalcola sospetta;
+ *  - non trovato -> sospetta=true + motivo "senza scontrino" (una sola volta); scontrino_trovato resta false.
+ * Idempotente (nessun PATCH se non cambia nulla), non cancella nulla. Le transazioni RIFIUTATE (DEC*) sono saltate:
+ * non c'è stato rifornimento, quindi non può esserci scontrino. Se la lettura degli scontrini fallisce la riga è saltata
+ * (mai "senza scontrino" per un errore di rete).
+ */
+function riconciliaScontrini(cfg) {
+  cfg = cfg || config_();
+  var tot = { esaminate: 0, trovate: 0, senza_scontrino: 0, saltate: 0, errori: 0 };
+  var limite = new Date(Date.now() - num_(cfg.SOGLIA_ORE_GRACE_SCONTRINO) * 3600000).toISOString();
+  var righe = supabase_(cfg, 'get',
+    '?select=authorization_id,targa,ts_transazione,esito,sospetta,motivi_sospetto&scontrino_trovato=eq.false&parsed=eq.true' +
+    '&ts_transazione=lte.' + encodeURIComponent(limite) + '&order=ts_transazione.asc&limit=500').json || [];
+  righe.forEach(function (r) {
+    if (!r || !r.authorization_id) return;
+    if (esitoDKV_(r.esito) === 'rifiutata') { tot.saltate++; return; }
+    tot.esaminate++;
+    try {
+      var m = abbinaScontrino_(r, scontriniInFinestra_(cfg, r), num_(cfg.SOGLIA_MINUTI_SCONTRINO));
+      var upd = aggiornaMotivoScontrino_(r.motivi_sospetto, !m.trovato);
+      var patch = null;
+      if (m.trovato) {
+        patch = { scontrino_trovato: true, cantiere: m.cantiere, scontrino_autore: m.autore, sospetta: upd.sospetta, motivi_sospetto: upd.motivi_sospetto };
+        tot.trovate++;
+      } else {
+        tot.senza_scontrino++;
+        if (upd.motivi_sospetto !== (r.motivi_sospetto == null ? null : r.motivi_sospetto) || r.sospetta !== true) {
+          patch = { sospetta: true, motivi_sospetto: upd.motivi_sospetto };
+        }
+      }
+      if (patch) {
+        supabase_(cfg, 'patch', '?authorization_id=eq.' + encodeURIComponent(String(r.authorization_id)), patch, { Prefer: 'return=minimal' });
+      }
+    } catch (err) {
+      tot.errori++;
+      Logger.log('Errore riconciliazione ' + r.authorization_id + ': ' + sicuro_(err));
+    }
+  });
+  Logger.log('Riconciliazione scontrini: ' + JSON.stringify(tot));
+  return tot;
+}
+
 // ---------- INGEST (scrittura) ----------
 function processaGiornata() {
   var cfg = config_();
@@ -336,6 +476,7 @@ function processaGiornata() {
         parseEmailDKV(m).forEach(function (rec, idx) {
           // Senza authorization_id: id sintetico stabile (messaggio + indice riga) per restare idempotenti
           if (!rec.authorization_id) rec.authorization_id = 'GMAIL-' + rec.gmail_message_id + '-' + idx;
+          arricchisciConScontrino_(cfg, rec);   // solo arricchimento: NIENTE "senza scontrino" qui (vedi riconciliaScontrini)
           var v = valutaSospetti(rec, contesto_(cfg, rec), cfg);
           rec.sospetta = v.sospetta;
           rec.motivi_sospetto = v.motivi.length ? v.motivi.join('; ') : null;
@@ -402,8 +543,8 @@ function aggiornaStato_(cfg, ids, stato) {
   supabase_(cfg, 'patch', '?authorization_id=in.(' + encodeURIComponent(lista) + ')', { stato: stato }, { Prefer: 'return=minimal' });
 }
 
-// Chiamata REST a Supabase con service-role key. Gli errori non contengono mai la chiave.
-function supabase_(cfg, metodo, query, payload, extra) {
+// Chiamata REST a Supabase con service-role key su una tabella qualsiasi. Gli errori non contengono mai la chiave.
+function supabaseTab_(cfg, tabella, metodo, query, payload, extra) {
   var key = cfg.SUPABASE_SERVICE_KEY;
   if (!key) throw new Error('SUPABASE_SERVICE_KEY mancante nelle Script Properties');
   var headers = { apikey: key, Authorization: 'Bearer ' + key };
@@ -411,13 +552,17 @@ function supabase_(cfg, metodo, query, payload, extra) {
   Object.keys(extra || {}).forEach(function (k) { headers[k] = extra[k]; });
   var opt = { method: metodo, headers: headers, muteHttpExceptions: true };
   if (payload !== undefined) opt.payload = JSON.stringify(payload);
-  var res = UrlFetchApp.fetch(cfg.SUPABASE_URL + '/rest/v1/' + TABELLA_ + (query || ''), opt);
+  var res = UrlFetchApp.fetch(cfg.SUPABASE_URL + '/rest/v1/' + tabella + (query || ''), opt);
   var code = res.getResponseCode();
   var testo = res.getContentText() || '';
-  if (code < 200 || code >= 300) throw new Error('Supabase HTTP ' + code + ': ' + testo.substring(0, 200).replace(key, '***'));
+  if (code < 200 || code >= 300) throw new Error('Supabase HTTP ' + code + ': ' + testo.substring(0, 200).split(key).join('***'));
   var json = null;
   try { json = testo ? JSON.parse(testo) : null; } catch (e) { json = null; }
   return { code: code, json: json };
+}
+// Compatibilità: tabella principale dkv_autorizzazioni.
+function supabase_(cfg, metodo, query, payload, extra) {
+  return supabaseTab_(cfg, TABELLA_, metodo, query, payload, extra);
 }
 
 // ---------- REPORT (SOLA LETTURA) ----------
@@ -464,11 +609,11 @@ function htmlReport_(righe, giorno) {
   if (!righe.length) h += '<p>Nessuna transazione.</p>';
   else {
     h += '<table style="border-collapse:collapse;font-size:12px" cellpadding="4" border="1">' +
-      '<tr><th>Ora</th><th>Carta</th><th>Targa</th><th>Stazione</th><th>Prodotto</th><th>EUR</th><th>Litri</th><th>Esito</th></tr>';
+      '<tr><th>Ora</th><th>Carta</th><th>Targa</th><th>Cantiere</th><th>Stazione</th><th>Prodotto</th><th>EUR</th><th>Litri</th><th>Esito</th></tr>';
     righe.forEach(function (r) {
       var st = r.sospetta ? ' style="color:#c00"' : '';
       h += '<tr' + st + '><td>' + esc_(r.ts_transazione || r.ricevuta_il) + '</td><td>' + esc_(r.carta_last4) + '</td><td>' + esc_(r.targa) +
-        '</td><td>' + esc_(r.stazione) + '</td><td>' + esc_(r.prodotto) + '</td><td>' + esc_(r.importo) + '</td><td>' + esc_(r.litri) +
+        '</td><td>' + esc_(r.cantiere) + '</td><td>' + esc_(r.stazione) + '</td><td>' + esc_(r.prodotto) + '</td><td>' + esc_(r.importo) + '</td><td>' + esc_(r.litri) +
         '</td><td>' + esc_(r.esito) + '</td></tr>';
     });
     h += '</table>';
@@ -538,13 +683,15 @@ function provaAutorizzazioni() {
   }
 }
 
-// Installa i due trigger temporali (rimuove prima i vecchi trigger di queste due funzioni).
+// Installa i tre trigger temporali (rimuove prima i vecchi trigger di queste due funzioni).
 function creaTrigger() {
   ScriptApp.getProjectTriggers().forEach(function (t) {
     var f = t.getHandlerFunction();
-    if (f === 'processaGiornata' || f === 'reportSerale') ScriptApp.deleteTrigger(t);
+    if (f === 'processaGiornata' || f === 'reportSerale' || f === 'riconciliaScontrini') ScriptApp.deleteTrigger(t);
   });
   ScriptApp.newTrigger('processaGiornata').timeBased().everyMinutes(30).create();
   ScriptApp.newTrigger('reportSerale').timeBased().atHour(21).everyDays(1).inTimezone(DEFAULTS_.TIMEZONE).create();
-  Logger.log('Trigger creati: processaGiornata ogni 30 min; reportSerale ogni giorno alle 21:00 (Europe/Rome, finestra fino alle 22).');
+  // Ogni 2 ore: con grace 24h basta; così "senza scontrino" è già scritto quando parte il report delle 21:00.
+  ScriptApp.newTrigger('riconciliaScontrini').timeBased().everyHours(2).create();
+  Logger.log('Trigger creati: processaGiornata ogni 30 min; riconciliaScontrini ogni 2 ore; reportSerale ogni giorno alle 21:00 (Europe/Rome, finestra fino alle 22).');
 }
