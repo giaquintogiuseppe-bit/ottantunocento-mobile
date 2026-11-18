@@ -54,9 +54,21 @@ var STATI_ = { NUOVA: 'nuova', ARCHIVIATA: 'archiviata_gmail' };
 var TABELLA_ = 'dkv_autorizzazioni';
 var TABELLA_SCONTRINI_ = 'scontrini_telegram';   // scritta dal bot Telegram; qui SOLO lettura
 var MOTIVO_SENZA_SCONTRINO_ = 'rifornimento senza scontrino Telegram (non associato a cantiere)';
-// Mappa flotta TARGA -> NOME MEZZO, per quando nello scontrino `mezzo` è un nome e non la targa.
-// PARZIALE (best-effort): va completata con le altre targhe/nomi della flotta.
-var FLOTTA_NOMI_ = { GM972CF: 'PRAMAC 2', FX943SG: 'Clio' };
+// Flotta Ottantunocento: per ogni mezzo gli ALIAS con cui può comparire nello scontrino Telegram.
+// `dkv` = come il mezzo appare nell'email DKV (campo "Licence plate"): NON sempre è la targa reale
+// (es. Clio: DKV F9341PT ma targa reale FX943SG). `alias` = targa reale, id GPS e nome con cui il bot
+// può indicare il mezzo. NB: "PRAMAC 1" è condiviso da due macchine (Generatore pramac e Ragno): una
+// transazione DKV "Pramac 1" NON è distinguibile tra le due (stessa carta/PIN).
+var FLOTTA_ = [
+  { nome: 'Iveco con sponda',   dkv: 'GM972CF',  alias: ['GM972CF'] },
+  { nome: 'Iveco aperto',       dkv: 'CT068NE',  alias: ['CT068NE'] },
+  { nome: 'Doblò',              dkv: 'FS504WE',  alias: ['FS504WE'] },
+  { nome: 'Clio',               dkv: 'F9341PT',  alias: ['FX943SG', 'CLIO'] },
+  { nome: 'Skoda',              dkv: 'GB649YN',  alias: ['SKODA'] },
+  { nome: 'Generatore pramac',  dkv: 'PRAMAC 1', alias: ['PRAMAC 3', 'PRAMAC 1', 'GENERATORE PRAMAC'] },
+  { nome: 'Ragno',              dkv: 'PRAMAC 1', alias: ['ATOM', 'PRAMAC 1', 'RAGNO'] },
+  { nome: 'Generatore piccolo', dkv: 'PRAMAC 2', alias: ['AIR TAG', 'PRAMAC 2', 'GENERATORE PICCOLO'] }
+];
 
 function config_() {
   var p = PropertiesService.getScriptProperties();
@@ -347,10 +359,21 @@ function simile_(a, b) {
   if (a === b) return true;
   return (a.length >= 3 && b.length >= 3) && (a.indexOf(b) >= 0 || b.indexOf(a) >= 0);
 }
+// Tutti gli alias (normalizzati) con cui può comparire il mezzo la cui identità DKV è `dkvId`.
+// Include sempre dkvId stesso, così un mezzo non ancora in FLOTTA_ si abbina almeno sulla sua sigla DKV.
+function aliasFlotta_(dkvId) {
+  var d = normId_(dkvId);
+  var out = d ? [d] : [];
+  FLOTTA_.forEach(function (m) {
+    if (normId_(m.dkv) !== d) return;
+    (m.alias || []).forEach(function (a) { var n = normId_(a); if (n) out.push(n); });
+  });
+  return unici_(out);
+}
 /**
  * FUNZIONE PURA (testata): cerca lo scontrino Telegram che corrisponde a una transazione DKV.
- * Match: mezzo dello scontrino ~ targa DKV (normalizzati; uguali o uno contiene l'altro), oppure ~ nome mezzo
- * della flotta noto per quella targa (FLOTTA_NOMI_, parziale), con |ts_scontrino - ts_transazione| <= finestraMin.
+ * Match: mezzo dello scontrino ~ uno qualsiasi degli alias del mezzo la cui identità DKV è `rec.targa`
+ * (aliasFlotta_: DKV, targa reale, id GPS, nome; normalizzati; uguali o uno contiene l'altro), con |ts_scontrino - ts_transazione| <= finestraMin.
  * Fra più candidati vince il più vicino nel tempo. Null/ts non validi: nessun match, mai eccezioni.
  * @param {Object} rec  record DKV ({targa, ts_transazione})
  * @param {Object[]} scontrini  [{ts, autore, mezzo, cantiere, note}]
@@ -363,7 +386,7 @@ function abbinaScontrino_(rec, scontrini, finestraMin) {
   var t0 = msValido_(rec && rec.ts_transazione);
   var fin = Number(finestraMin);
   if (!targa || t0 == null || !isFinite(fin) || fin < 0 || !Array.isArray(scontrini)) return nessuno;
-  var nome = normId_(FLOTTA_NOMI_[targa]);
+  var aliases = aliasFlotta_(targa);   // DKV, targa reale, id GPS, nome: tutti i modi in cui lo scontrino può nominare il mezzo
   var best = null, bestD = Infinity;
   scontrini.forEach(function (s) {
     if (!s) return;
@@ -372,7 +395,7 @@ function abbinaScontrino_(rec, scontrini, finestraMin) {
     if (t == null || !mezzo) return;
     var d = Math.abs(t - t0) / 60000;
     if (d > fin) return;
-    if (!(simile_(mezzo, targa) || (nome && simile_(mezzo, nome)))) return;
+    if (!aliases.some(function (al) { return simile_(mezzo, al); })) return;
     if (d < bestD) { bestD = d; best = s; }
   });
   if (!best) return nessuno;

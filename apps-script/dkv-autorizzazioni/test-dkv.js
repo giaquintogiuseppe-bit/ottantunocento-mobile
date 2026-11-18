@@ -133,11 +133,14 @@ assert.strictEqual(tot2.errori, 1); assert.strictEqual(tot2.threads, 0); assert.
   a = ctx.abbinaScontrino_(r0, [sc('2026-11-18T07:50:00Z', 'FS504WE', 'X', 'Y')], 45); assert.strictEqual(a.trovato, false); assert.strictEqual(a.cantiere, null); // 60 min: fuori finestra
   a = ctx.abbinaScontrino_(r0, [sc('2026-11-18T08:50:00Z', 'GM972CF', 'X', 'Y')], 45); assert.strictEqual(a.trovato, false);  // altro mezzo
   a = ctx.abbinaScontrino_(r0, [sc('2026-11-18T08:50:00Z', 'furgone FS504WE', 'Bianchi', 'Lia')], 45); assert.strictEqual(a.trovato, true); // contiene
-  const r1 = { targa: 'GM972CF', ts_transazione: '2026-11-18T09:50:00+01:00' };
-  a = ctx.abbinaScontrino_(r1, [sc('2026-11-18T08:45:00Z', 'Pramac 2', 'Verdi', 'Gigi')], 45); assert.strictEqual(a.trovato, true); assert.strictEqual(a.cantiere, 'Verdi'); // nome via mappa flotta
-  a = ctx.abbinaScontrino_({ targa: 'FX943SG', ts_transazione: '2026-11-18T09:50:00+01:00' }, [sc('2026-11-18T08:50:00Z', 'Clio', 'Neri', 'Pia')], 45); assert.strictEqual(a.trovato, true);
+  const r1 = { targa: 'GM972CF', ts_transazione: '2026-11-18T09:50:00+01:00' };   // Iveco con sponda
+  const rGen = { targa: 'PRAMAC 2', ts_transazione: '2026-11-18T09:50:00+01:00' }; // Generatore piccolo (DKV = "Pramac 2")
+  a = ctx.abbinaScontrino_(rGen, [sc('2026-11-18T08:45:00Z', 'Pramac 2', 'Verdi', 'Gigi')], 45); assert.strictEqual(a.trovato, true); assert.strictEqual(a.cantiere, 'Verdi'); // alias DKV del generatore
+  // Clio: nell'email DKV la targa è F9341PT; lo scontrino può dire "Clio" o la targa reale FX943SG
+  a = ctx.abbinaScontrino_({ targa: 'F9341PT', ts_transazione: '2026-11-18T09:50:00+01:00' }, [sc('2026-11-18T08:50:00Z', 'Clio', 'Neri', 'Pia')], 45); assert.strictEqual(a.trovato, true); assert.strictEqual(a.cantiere, 'Neri');
+  a = ctx.abbinaScontrino_({ targa: 'F9341PT', ts_transazione: '2026-11-18T09:50:00+01:00' }, [sc('2026-11-18T08:50:00Z', 'FX943SG', 'Blu', 'Pia')], 45); assert.strictEqual(a.trovato, true); // targa reale via alias
   a = ctx.abbinaScontrino_(r1, [sc('2026-11-18T08:20:00Z', 'GM972CF', 'Lontano', 'A'), sc('2026-11-18T08:48:00Z', 'GM972CF', 'Vicino', 'B')], 45); assert.strictEqual(a.cantiere, 'Vicino'); // il più vicino
-  a = ctx.abbinaScontrino_(r1, [sc('2026-11-18T08:50:00Z', 'Pramac 2', '  ', 'B')], 45); assert.strictEqual(a.trovato, true); assert.strictEqual(a.cantiere, null);
+  a = ctx.abbinaScontrino_(rGen, [sc('2026-11-18T08:50:00Z', 'Pramac 2', '  ', 'B')], 45); assert.strictEqual(a.trovato, true); assert.strictEqual(a.cantiere, null);
   // null-safe
   [[null, []], [{}, []], [r1, null], [r1, undefined], [r1, [null, {}, { ts: 'boh', mezzo: 'GM972CF' }, { ts: '2026-11-18T08:50:00Z' }]],
     [{ targa: 'GM972CF', ts_transazione: 'boh' }, [sc('2026-11-18T08:50:00Z', 'GM972CF', 'X', 'Y')]], [{ ts_transazione: '2026-11-18T08:50:00Z' }, [sc('2026-11-18T08:50:00Z', '', 'X', 'Y')]]]

@@ -34,12 +34,15 @@ La tabella è **solo antifrode**: non scrive in `DB.carburante`, non tocca `inde
 `autore`, `mezzo` (targa **o nome** del mezzo), `cantiere`, `note`. Una transazione DKV senza scontrino corrispondente è un
 rifornimento non registrato / non associato a cantiere.
 
-- **Abbinamento** (`abbinaScontrino_`, funzione pura): `mezzo` ~ `targa` DKV, entrambi normalizzati (maiuscolo, solo
-  alfanumerici); match se uguali **o uno contiene l'altro** (il "contiene" solo da 3 caratteri in su). In più, se `mezzo` è un
-  nome, si usa la mappa flotta `FLOTTA_NOMI_`. Finestra temporale: `|ts_scontrino - ts_transazione| <= SOGLIA_MINUTI_SCONTRINO`
-  (45 min); fra più candidati vince il più vicino. Ritorna `{trovato, cantiere, autore}`.
-- **Mappa flotta nomi: PARZIALE**, oggi solo `GM972CF = PRAMAC 2`, `FX943SG = Clio`. Va completata nel `.gs` (`FLOTTA_NOMI_`):
-  finché manca una targa, gli scontrini che indicano il mezzo per nome non verranno abbinati (falsi "senza scontrino").
+- **Abbinamento** (`abbinaScontrino_`, funzione pura): confronta `mezzo` dello scontrino con **tutti gli alias** del mezzo la
+  cui identità DKV (campo "Licence plate") è la `targa` della transazione; alias e `mezzo` normalizzati (maiuscolo, solo
+  alfanumerici), match se uguali **o uno contiene l'altro** (il "contiene" solo da 3 caratteri in su). Finestra temporale:
+  `|ts_scontrino - ts_transazione| <= SOGLIA_MINUTI_SCONTRINO` (45 min); fra più candidati vince il più vicino.
+  Ritorna `{trovato, cantiere, autore}`.
+- **Mappa flotta `FLOTTA_`** (nel `.gs`): per ogni mezzo l'identità DKV (`dkv`) e gli alias (targa reale, id GPS, nome) con cui
+  lo scontrino può indicarlo. ⚠️ Importante: il `dkv` **non è sempre la targa reale** (es. Clio: DKV `F9341PT`, targa `FX943SG`),
+  e `PRAMAC 1` è condiviso da due macchine (Generatore pramac e Ragno), quindi una transazione "Pramac 1" non è distinguibile tra
+  le due. Aggiungere nuovi mezzi qui; un mezzo non in `FLOTTA_` si abbina comunque sulla sua sola sigla DKV.
 - **Ingest** (`processaGiornata`): per ogni transazione con targa e data cerca gli scontrini nella finestra e, se trova,
   valorizza `cantiere`, `scontrino_autore`, `scontrino_trovato=true`. **Non** segnala mai "senza scontrino" qui: lo scontrino
   arriva dopo l'email DKV (anche il giorno seguente).
