@@ -64,7 +64,7 @@ var FLOTTA_ = [
   { nome: 'Iveco aperto',       dkv: 'CT068NE',  alias: ['CT068NE'] },
   { nome: 'Doblò',              dkv: 'FS504WE',  alias: ['FS504WE'] },
   { nome: 'Clio',               dkv: 'F9341PT',  alias: ['FX943SG', 'CLIO'] },
-  { nome: 'Skoda',              dkv: 'GB649YN',  alias: ['SKODA'] },
+  { nome: 'Skoda',              dkv: 'G86499N',  alias: ['GB649YN', 'SKODA'] },   // DKV: G86499N (email); GB649YN = id GPS
   { nome: 'Generatore pramac',  dkv: 'PRAMAC 1', alias: ['PRAMAC 3', 'PRAMAC 1', 'GENERATORE PRAMAC'] },
   { nome: 'Ragno',              dkv: 'PRAMAC 1', alias: ['ATOM', 'PRAMAC 1', 'RAGNO'] },
   { nome: 'Generatore piccolo', dkv: 'PRAMAC 2', alias: ['AIR TAG', 'PRAMAC 2', 'GENERATORE PICCOLO'] }
