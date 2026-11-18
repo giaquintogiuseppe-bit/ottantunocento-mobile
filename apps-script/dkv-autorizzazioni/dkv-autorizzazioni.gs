@@ -3,9 +3,9 @@
  *
  * Contesto: carte carburante DKV (cliente 4301665111). Su DKV Cockpit la notifica "Autorizzazioni LIVE"
  * manda un'email immediata a ogni rifornimento. Questo script:
- *   1. INGEST  (processaGiornata, trigger ogni 30 min): legge i thread con label LABEL_IN, li trasforma in
- *      righe (parseEmailDKV), valuta i sospetti, fa upsert su Supabase (tabella dkv_autorizzazioni, idempotente
- *      su gmail_message_id), poi etichetta LABEL_DONE e ARCHIVIA il thread. Non cancella e non cestina mai.
+ *   1. INGEST  (processaGiornata, trigger ogni 30 min): legge i thread con label LABEL_IN, legge l'ALLEGATO xlsx
+ *      di ogni email (parseEmailDKV, conversione via Drive) -> una riga per transazione, valuta i sospetti, fa upsert
+ *      su Supabase (tabella dkv_autorizzazioni, idempotente su authorization_id), poi etichetta LABEL_DONE e ARCHIVIA il thread. Non cancella e non cestina mai.
  *   2. REPORT  (reportSerale, trigger giornaliero ~21:00 Europe/Rome): SOLA LETTURA su Supabase; invia a REPORT_TO
  *      un'email HTML con le transazioni del giorno e, in cima in rosso, quelle sospette.
  *
@@ -15,6 +15,7 @@
  * La tabella dkv_autorizzazioni è SOLO antifrode: questo script NON scrive in DB.carburante e non tocca
  * il gestionale; la fonte costi autorevole resta l'import xlsx.
  *
+ * Servizi: Gmail + Drive Advanced Service (appsscript.json) per convertire l'xlsx allegato in Google Sheet temporaneo.
  * Script Properties (vedi impostaProprieta()): SUPABASE_URL, SUPABASE_SERVICE_KEY, REPORT_TO, LABEL_IN, LABEL_DONE
  * + soglie (SOGLIA_*), tutte con default documentati in DEFAULTS_ qui sotto.
  * La service-role key NON viene mai loggata né inviata via email.
@@ -61,52 +62,211 @@ function num_(s) {
   return isFinite(n) ? n : 0;
 }
 
-// ---------- RIFERIMENTI FLOTTA (solo promemoria per il futuro parser: NON usati per estrarre nulla ora) ----------
-//  GM972CF = PRAMAC 2, carta DKV ...0322, diesel
-//  FX943SG = Clio,     carta DKV ...2153
-//  CT068NE = (Renato), diesel
-//  FS504WE = (Pietro)
-// Quando arriverà un'email campione: mappare carta_last4 -> targa con questa tabella e completare parseEmailDKV.
+// ---------- PARSER (REALE: allegato xlsx) ----------
+// Email DKV Analytics (mittente no-reply@my-mail.dkv-mobility.com, oggetto 'DKV Analytics notification: New data
+// available for your rule "rifornimento"'): i DATI sono nell'ALLEGATO xlsx, non nel corpo.
+// Foglio: riga 0 = titolo, riga 1 = intestazioni (inglese), riga 2+ = una transazione per riga.
+// La targa arriva già dall'email: la vecchia mappa carta->targa della flotta non serve più.
 
-// ---------- PARSER (PLACEHOLDER) ----------
-/**
- * Trasforma una email di notifica DKV in un record per la tabella dkv_autorizzazioni.
- * @param {string} subject  oggetto dell'email
- * @param {string} body     corpo (testo semplice, fallback HTML)
- * @param {Object} headers  { gmail_message_id, ricevuta_il (ISO), from, ... }
- * @return {Object} record con le colonne della tabella; parsed=false se l'estrazione non è riuscita
- */
-function parseEmailDKV(subject, body, headers) {
-  headers = headers || {};
-  // Record con i soli campi grezzi: i campi interpretati restano null.
-  var rec = {
-    gmail_message_id: headers.gmail_message_id || null,
-    ricevuta_il: headers.ricevuta_il || null,
-    ts_transazione: null,
-    carta_last4: null,
-    targa: null,
-    stazione: null,
-    prodotto: null,
-    importo: null,
-    litri: null,
-    esito: null,
-    raw_subject: String(subject == null ? '' : subject),
-    raw_body: String(body == null ? '' : body).substring(0, 100000),
-    parsed: false
+// Colonna del record -> testo (minuscolo) da cercare nelle intestazioni del foglio.
+var COLONNE_DKV_ = {
+  authorization_id: 'authorization id',
+  targa: 'licence plate',
+  ts: 'authorization time',
+  litri: 'sales',                          // convenzione gestionale: Sales = LITRI (colonna "Unit" = L)
+  importo: 'authorization amount gross',   // importo lordo AUTORIZZATO, es. "70.00 EUR"
+  prodotto: 'product',
+  prodotto_gruppo: 'product group',
+  product_code: 'product code',
+  carta: 'number of card or box',
+  stazione: 'station name',
+  station_number: 'station number',
+  citta: 'town',
+  esito: 'response',
+  km: 'mileage',
+  customer_number: 'customer number'
+};
+
+// Cerca il valore per intestazione: prima match esatto, poi "contiene" (case-insensitive).
+function colonna_(obj, nome) {
+  var chiavi = Object.keys(obj || {});
+  var n = String(nome).toLowerCase();
+  var norm = function (k) { return String(k).trim().toLowerCase(); };
+  for (var i = 0; i < chiavi.length; i++) if (norm(chiavi[i]) === n) return obj[chiavi[i]];
+  for (var j = 0; j < chiavi.length; j++) if (norm(chiavi[j]).indexOf(n) >= 0) return obj[chiavi[j]];
+  return undefined;
+}
+function testo_(v) {
+  if (v == null) return null;
+  var t = String(v).trim();
+  return t === '' ? null : t;
+}
+// "33.51", "33,51", 33.51, "70.00 EUR" -> numero (null se assente/non numerico)
+function numeroDKV_(v) {
+  if (v == null || v === '') return null;
+  if (typeof v === 'number') return isFinite(v) ? v : null;
+  var m = String(v).match(/-?[\d.,]+/);
+  if (!m) return null;
+  var t = m[0];
+  if (t.indexOf(',') >= 0 && t.indexOf('.') >= 0) t = t.replace(/,/g, '');   // 1,234.50
+  else t = t.replace(',', '.');
+  var n = Number(t);
+  return isFinite(n) ? n : null;
+}
+function offsetMs_(off) {
+  var m = /^([+-])(\d{2}):?(\d{2})$/.exec(off);
+  if (!m) return 0;
+  return (m[1] === '-' ? -1 : 1) * (Number(m[2]) * 60 + Number(m[3])) * 60000;
+}
+function p2_(n) { return (n < 10 ? '0' : '') + n; }
+// "18.11.2026 - 09:50" (ora locale Europe/Rome) -> "2026-11-18T09:50:00+01:00" (gestisce ora legale). null se non valido.
+function parseDataOraDKV_(v, tz) {
+  if (v == null || v === '') return null;
+  if (Object.prototype.toString.call(v) === '[object Date]') return isNaN(v.getTime()) ? null : v.toISOString();
+  var m = String(v).match(/^\s*(\d{1,2})\.(\d{1,2})\.(\d{4})\s*-?\s*(\d{1,2}):(\d{2})(?::(\d{2}))?\s*$/);
+  if (!m) return null;
+  var d = Number(m[1]), mo = Number(m[2]), y = Number(m[3]), h = Number(m[4]), mi = Number(m[5]), sec = Number(m[6] || 0);
+  var guess = Date.UTC(y, mo - 1, d, h, mi, sec);
+  var chk = new Date(guess);
+  if (chk.getUTCDate() !== d || chk.getUTCMonth() !== mo - 1 || h > 23 || mi > 59 || sec > 59) return null;
+  tz = tz || DEFAULTS_.TIMEZONE;
+  var off1 = Utilities.formatDate(new Date(guess), tz, 'XXX');
+  var off = Utilities.formatDate(new Date(guess - offsetMs_(off1)), tz, 'XXX');
+  return y + '-' + p2_(mo) + '-' + p2_(d) + 'T' + p2_(h) + ':' + p2_(mi) + ':' + p2_(sec) + off;
+}
+// Benzina/RON->Verde, GPL/Gas auto/LPG->GPL, Diesel->Diesel, AdBlue->AdBlue, altrimenti testo grezzo.
+function prodottoDKV_(prodotto, gruppo) {
+  var t = (String(prodotto == null ? '' : prodotto) + ' ' + String(gruppo == null ? '' : gruppo)).toLowerCase();
+  if (/adblue/.test(t)) return 'AdBlue';
+  if (/\bgpl\b|\blpg\b|gas\s*auto/.test(t)) return 'GPL';
+  if (/diesel|gasolio/.test(t)) return 'Diesel';
+  if (/benzina|\bron\b/.test(t)) return 'Verde';
+  return testo_(prodotto) || testo_(gruppo);
+}
+// Esito grezzo (es. APP_LIM20_APPR) -> 'approvata' (inizia con APP) / 'rifiutata' (inizia con DEC) / 'altro' / null
+function esitoDKV_(esito) {
+  var e = String(esito == null ? '' : esito).trim().toUpperCase();
+  if (!e) return null;
+  if (e.indexOf('APP') === 0) return 'approvata';
+  if (e.indexOf('DEC') === 0) return 'rifiutata';
+  return 'altro';
+}
+// Record con TUTTE le colonne (stesse chiavi per ogni riga: serve all'upsert bulk di PostgREST)
+function recordVuoto_() {
+  return {
+    authorization_id: null, gmail_message_id: null, ricevuta_il: null, ts_transazione: null, carta_last4: null, targa: null,
+    stazione: null, prodotto: null, importo: null, litri: null, esito: null, product_code: null, km: null, citta: null,
+    station_number: null, customer_number: null, raw_subject: '', raw_body: '', parsed: false
   };
-  // TODO: completare estrazione con email campione
-  // Non conosciamo ancora il formato: l'email contiene un link a DKV Analytics, i dati potrebbero essere nel
-  // corpo oppure solo dietro il link. NON inventare regex: attendere un campione reale, poi valorizzare
-  // ts_transazione, carta_last4 (+ targa dalla mappa flotta), stazione, prodotto, importo, litri, esito
-  // e impostare parsed=true SOLO se i campi minimi (ts, carta, importo) sono stati estratti.
-  return rec;
+}
+
+/**
+ * FUNZIONE PURA (testata): mappa una riga {intestazione -> valore} dell'xlsx DKV in un record della tabella.
+ * parsed=true solo se ci sono almeno authorization_id e ts_transazione.
+ * @param {Object} obj  es. {'Licence plate':'G86499N','Authorization Time':'18.11.2026 - 09:50',...}
+ * @param {string=} tz  default Europe/Rome
+ */
+function mappaRigaDKV_(obj, tz) {
+  var C = COLONNE_DKV_, r = recordVuoto_();
+  r.authorization_id = testo_(colonna_(obj, C.authorization_id));
+  r.targa = testo_(colonna_(obj, C.targa));
+  r.ts_transazione = parseDataOraDKV_(colonna_(obj, C.ts), tz);
+  r.litri = numeroDKV_(colonna_(obj, C.litri));
+  // NB: importo = importo lordo AUTORIZZATO ("Authorization Amount Gross"): può essere un massimale
+  // pre-autorizzato e non il consumato reale. Il consumato reale resta nell'import xlsx del gestionale.
+  r.importo = numeroDKV_(colonna_(obj, C.importo));
+  r.prodotto = prodottoDKV_(colonna_(obj, C.prodotto), colonna_(obj, C.prodotto_gruppo));
+  var carta = String(colonna_(obj, C.carta) == null ? '' : colonna_(obj, C.carta)).replace(/\D/g, '');
+  r.carta_last4 = carta ? carta.slice(-4) : null;
+  r.stazione = testo_(colonna_(obj, C.stazione));
+  r.esito = testo_(colonna_(obj, C.esito));          // grezzo; vedi esitoDKV_()
+  r.product_code = testo_(colonna_(obj, C.product_code));
+  r.km = numeroDKV_(colonna_(obj, C.km));
+  r.citta = testo_(colonna_(obj, C.citta));
+  r.station_number = testo_(colonna_(obj, C.station_number));
+  r.customer_number = testo_(colonna_(obj, C.customer_number));
+  r.parsed = !!(r.authorization_id && r.ts_transazione);
+  return r;
+}
+
+// Helper Drive/SpreadsheetApp (NON unit-testato). Converte ogni allegato xlsx in un Google Sheet temporaneo
+// (Drive Advanced Service, scope Drive), legge i valori e ELIMINA sempre il file temporaneo.
+// Ritorna [{file: nomeAllegato, righe: [ {intestazione: valore}, ... ]}]
+function leggiAllegatiXlsx_(msg) {
+  var out = [];
+  msg.getAttachments({ includeInlineImages: false, includeAttachments: true }).forEach(function (blob) {
+    var nome = String(blob.getName() || '');
+    var tipo = String(blob.getContentType() || '');
+    if (!/\.xlsx$/i.test(nome) && tipo.indexOf('spreadsheetml') < 0) return;
+    var id = null;
+    try {
+      var f = Drive.Files.insert({ title: 'tmp-dkv-' + Date.now(), mimeType: 'application/vnd.google-apps.spreadsheet' }, blob, { convert: true });
+      id = f.id;
+      var v = SpreadsheetApp.openById(id).getSheets()[0].getDataRange().getValues();
+      var righe = [];
+      if (v.length >= 2) {                       // riga 0 = titolo (saltata), riga 1 = intestazioni
+        var h = v[1].map(function (x) { return String(x == null ? '' : x).trim(); });
+        for (var i = 2; i < v.length; i++) {
+          var o = {}, vuota = true;
+          for (var c = 0; c < h.length; c++) {
+            if (!h[c]) continue;
+            o[h[c]] = v[i][c];
+            if (v[i][c] !== '' && v[i][c] != null) vuota = false;
+          }
+          if (!vuota) righe.push(o);
+        }
+      }
+      out.push({ file: nome, righe: righe });
+    } finally {
+      if (id) {
+        try { Drive.Files.remove(id); }
+        catch (e) { try { DriveApp.getFileById(id).setTrashed(true); } catch (e2) { Logger.log('File temporaneo non eliminato: ' + sicuro_(e2)); } }
+      }
+    }
+  });
+  return out;
+}
+
+/**
+ * Trasforma un messaggio Gmail DKV in un ARRAY di record (uno per riga dati dell'xlsx allegato).
+ * Se non ci sono allegati xlsx (o nessuna riga dati): un solo record parsed=false con raw_subject/raw_body (fallback).
+ * Se la lettura dell'xlsx fallisce l'errore PROPAGA: il thread resta in LABEL_IN e viene ritentato (nessuna perdita dati).
+ * @param {GmailMessage} msg
+ * @return {Object[]}
+ */
+function parseEmailDKV(msg) {
+  var base = {
+    gmail_message_id: msg.getId(),
+    ricevuta_il: msg.getDate().toISOString(),
+    raw_subject: String(msg.getSubject() == null ? '' : msg.getSubject())
+  };
+  var out = [];
+  leggiAllegatiXlsx_(msg).forEach(function (a) {
+    a.righe.forEach(function (obj, i) {
+      var r = mappaRigaDKV_(obj);
+      r.gmail_message_id = base.gmail_message_id;
+      r.ricevuta_il = base.ricevuta_il;
+      r.raw_subject = base.raw_subject;
+      r.raw_body = 'allegato: ' + a.file + ' (riga dati ' + (i + 1) + ')';
+      out.push(r);
+    });
+  });
+  if (!out.length) {
+    var f = recordVuoto_();
+    f.gmail_message_id = base.gmail_message_id;
+    f.ricevuta_il = base.ricevuta_il;
+    f.raw_subject = base.raw_subject;
+    f.raw_body = corpo_(msg).substring(0, 100000);
+    out.push(f);
+  }
+  return out;
 }
 
 // ---------- ANOMALIE ----------
 /**
  * Valuta un record. Gestisce i null senza esplodere.
  * @param {Object} record
- * @param {Object=} ctx   { altre: [{gmail_message_id, ts_transazione}] stessa carta in finestra,
+ * @param {Object=} ctx   { altre: [{authorization_id, ts_transazione}] stessa carta in finestra,
  *                          stazioniNote: [string] stazioni già viste }  (letto da Supabase dall'ingest)
  * @param {Object=} cfg   config (default: config_())
  * @return {{sospetta:boolean, motivi:string[], da_verificare:boolean}}
@@ -129,6 +289,8 @@ function valutaSospetti(record, ctx, cfg) {
     motivi.push('litri ' + litri + ' oltre il massimo ' + maxLit);
   }
 
+  if (esitoDKV_(r.esito) === 'rifiutata') motivi.push('transazione rifiutata (esito ' + r.esito + ')');
+
   var ts = r.ts_transazione ? new Date(r.ts_transazione) : null;
   if (ts && !isNaN(ts.getTime())) {
     var ora = Number(Utilities.formatDate(ts, tz, 'H'));
@@ -140,7 +302,7 @@ function valutaSospetti(record, ctx, cfg) {
     var finestra = num_(cfg.SOGLIA_MINUTI_DOPPIA);
     if (finestra > 0 && r.carta_last4) {
       (ctx.altre || []).forEach(function (o) {
-        if (!o || o.gmail_message_id === r.gmail_message_id || !o.ts_transazione) return;
+        if (!o || o.authorization_id === r.authorization_id || !o.ts_transazione) return;
         var d = Math.abs(new Date(o.ts_transazione).getTime() - ts.getTime()) / 60000;
         if (d <= finestra) motivi.push('due transazioni stessa carta ...' + r.carta_last4 + ' entro ' + finestra + ' min');
       });
@@ -170,20 +332,20 @@ function processaGiornata() {
     try {
       var ids = [];
       th.getMessages().forEach(function (m) {
-        var rec = parseEmailDKV(m.getSubject(), corpo_(m), {
-          gmail_message_id: m.getId(),
-          ricevuta_il: m.getDate().toISOString(),
-          from: m.getFrom()
+        // parseEmailDKV ritorna un ARRAY (una riga dati xlsx = una transazione)
+        parseEmailDKV(m).forEach(function (rec, idx) {
+          // Senza authorization_id: id sintetico stabile (messaggio + indice riga) per restare idempotenti
+          if (!rec.authorization_id) rec.authorization_id = 'GMAIL-' + rec.gmail_message_id + '-' + idx;
+          var v = valutaSospetti(rec, contesto_(cfg, rec), cfg);
+          rec.sospetta = v.sospetta;
+          rec.motivi_sospetto = v.motivi.length ? v.motivi.join('; ') : null;
+          rec.stato = STATI_.NUOVA;
+          upsert_(cfg, [rec]);
+          ids.push(rec.authorization_id);
+          tot.record++;
         });
-        var v = valutaSospetti(rec, contesto_(cfg, rec), cfg);
-        rec.sospetta = v.sospetta;
-        rec.motivi_sospetto = v.motivi.length ? v.motivi.join('; ') : null;
-        rec.stato = STATI_.NUOVA;
-        upsert_(cfg, [rec]);
-        ids.push(rec.gmail_message_id);
-        tot.record++;
       });
-      // Solo dopo che TUTTI i messaggi sono salvati: etichetta + archivia (mai cancellare/cestinare)
+      // Solo dopo che TUTTE le righe del thread sono salvate: etichetta + archivia (mai cancellare/cestinare)
       th.addLabel(done);
       th.removeLabel(lab);
       th.moveToArchive();
@@ -212,7 +374,7 @@ function contesto_(cfg, rec) {
     if (rec.carta_last4 && rec.ts_transazione && num_(cfg.SOGLIA_MINUTI_DOPPIA) > 0) {
       var t = new Date(rec.ts_transazione).getTime(), w = num_(cfg.SOGLIA_MINUTI_DOPPIA) * 60000;
       if (!isNaN(t)) {
-        q = '?select=gmail_message_id,ts_transazione&carta_last4=eq.' + encodeURIComponent(rec.carta_last4) +
+        q = '?select=authorization_id,ts_transazione&carta_last4=eq.' + encodeURIComponent(rec.carta_last4) +
           '&ts_transazione=gte.' + encodeURIComponent(new Date(t - w).toISOString()) +
           '&ts_transazione=lte.' + encodeURIComponent(new Date(t + w).toISOString());
         ctx.altre = supabase_(cfg, 'get', q).json || [];
@@ -228,16 +390,16 @@ function contesto_(cfg, rec) {
   return ctx;
 }
 
-// Upsert idempotente: una riga per gmail_message_id (merge-duplicates)
+// Upsert idempotente: una riga per authorization_id (merge-duplicates). gmail_message_id è solo un riferimento.
 function upsert_(cfg, records) {
-  records.forEach(function (r) { if (!r.gmail_message_id) throw new Error('gmail_message_id mancante'); });
-  return supabase_(cfg, 'post', '?on_conflict=gmail_message_id', records, { Prefer: 'resolution=merge-duplicates,return=minimal' });
+  records.forEach(function (r) { if (!r.authorization_id) throw new Error('authorization_id mancante'); });
+  return supabase_(cfg, 'post', '?on_conflict=authorization_id', records, { Prefer: 'resolution=merge-duplicates,return=minimal' });
 }
 function aggiornaStato_(cfg, ids, stato) {
   ids = ids.filter(String);
   if (!ids.length) return;
   var lista = ids.map(function (i) { return '"' + String(i).replace(/"/g, '') + '"'; }).join(',');
-  supabase_(cfg, 'patch', '?gmail_message_id=in.(' + encodeURIComponent(lista) + ')', { stato: stato }, { Prefer: 'return=minimal' });
+  supabase_(cfg, 'patch', '?authorization_id=in.(' + encodeURIComponent(lista) + ')', { stato: stato }, { Prefer: 'return=minimal' });
 }
 
 // Chiamata REST a Supabase con service-role key. Gli errori non contengono mai la chiave.
@@ -340,10 +502,10 @@ function setup() {
   });
   Logger.log([
     'FILTRO GMAIL da creare a mano (Impostazioni > Filtri e indirizzi bloccati > Crea un nuovo filtro):',
-    '  Da:      TODO: mittente DKV da confermare sul primo campione reale (es. @dkv-euroservice.com?)',
-    '  Oggetto: TODO: oggetto da confermare sul primo campione reale (notifica "Autorizzazioni LIVE")',
+    '  Da:      no-reply@my-mail.dkv-mobility.com',
+    '  (oggetto tipico: DKV Analytics notification: New data available for your rule "rifornimento")',
     '  Azione:  Applica l\'etichetta "' + cfg.LABEL_IN + '"  (NON "Elimina")',
-    'Finché mittente/oggetto non sono confermati, applica la label a mano a una email DKV per provare.'
+    'Per provare: applica la label a mano a una email DKV esistente con allegato xlsx.'
   ].join('\n'));
 }
 
