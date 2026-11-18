@@ -43,6 +43,16 @@ rifornimento non registrato / non associato a cantiere.
   lo scontrino può indicarlo. ⚠️ Importante: il `dkv` **non è sempre la targa reale** (es. Clio: DKV `F9341PT`, targa `FX943SG`),
   e `PRAMAC 1` è condiviso da due macchine (Generatore pramac e Ragno), quindi una transazione "Pramac 1" non è distinguibile tra
   le due. Aggiungere nuovi mezzi qui; un mezzo non in `FLOTTA_` si abbina comunque sulla sua sola sigla DKV.
+- **Flotta da Foglio Google (self-service)**: se la Script Property **`FLOTTA_SHEET_ID`** è valorizzata, la flotta si legge dal
+  **primo foglio** di quel Foglio Google (default vuoto = si usa `FLOTTA_` del codice). Colonne (intestazioni case-insensitive,
+  match "contiene", ordine libero): `nome | dkv | targa | gps | alias`. `dkv` è obbligatoria (le righe senza `dkv` sono saltate);
+  `alias` è opzionale, lista separata da virgola o `;`. Gli alias effettivi = `targa` + `gps` + alias extra (parser puro
+  `parseRigheFlotta_`). Se il foglio dà **almeno una voce valida, SOSTITUISCE** la lista del codice (non si somma); se è
+  assente, illeggibile o vuoto si torna alla costante `FLOTTA_` e si scrive un avviso nel log. La flotta è letta una volta per
+  esecuzione (`caricaFlotta_`, cache resettata a inizio `processaGiornata`/`riconciliaScontrini`).
+  Per partire: esegui **`preparaFoglioFlotta()`** dall'editor: crea il Foglio "Flotta DKV 81|00" con l'intestazione e una riga per
+  ogni voce di `FLOTTA_` (alias noti nella colonna `alias`, `targa`/`gps` vuote), non cancella nulla e logga l'id da incollare in
+  `FLOTTA_SHEET_ID`. Poi si modifica il foglio a mano (serve che l'account dello script possa leggerlo).
 - **Ingest** (`processaGiornata`): per ogni transazione con targa e data cerca gli scontrini nella finestra e, se trova,
   valorizza `cantiere`, `scontrino_autore`, `scontrino_trovato=true`. **Non** segnala mai "senza scontrino" qui: lo scontrino
   arriva dopo l'email DKV (anche il giorno seguente).
@@ -53,7 +63,9 @@ rifornimento non registrato / non associato a cantiere.
   Le transazioni **rifiutate** (`DEC_*`) sono escluse (nessun rifornimento = nessuno scontrino); se la lettura degli scontrini
   fallisce la riga è saltata e ritentata al giro dopo. Un ingest ripetuto dello stesso `authorization_id` azzera cantiere/motivo,
   che la riconciliazione ricalcola.
-- **Report**: sola lettura; ha la colonna `Cantiere` e le "senza scontrino" compaiono tra le sospette.
+- **Report**: sola lettura; ha la colonna `Cantiere` e le "senza scontrino" compaiono tra le sospette. Se nel giorno ci sono
+  transazioni **rifiutate** (`esito` che inizia per `DEC`, cioè `esitoDKV_` = rifiutata) il report ha una sezione dedicata
+  **"Transazioni rifiutate (DEC)"** con targa/ora/stazione/esito; restano comunque conteggiate (e mostrate) tra le sospette.
 - **Nuove colonne** in `dkv_autorizzazioni`: `cantiere text`, `scontrino_autore text`, `scontrino_trovato boolean not null default false`
   (nella migration `20261117_dkv_autorizzazioni.sql`; se già applicata: `alter table ... add column if not exists ...`).
 
@@ -90,6 +102,7 @@ rifornimento non registrato / non associato a cantiere.
 | `SOGLIA_MINUTI_SCONTRINO` | `45` | finestra abbinamento targa/mezzo ↔ scontrino Telegram (± minuti) |
 | `SOGLIA_ORE_GRACE_SCONTRINO` | `24` (ore) | attesa prima di dichiarare "senza scontrino" |
 | `MAX_THREAD_PER_GIRO` | `50` | thread per esecuzione dell'ingest |
+| `FLOTTA_SHEET_ID` | `` (vuoto) | id del Foglio Google della flotta (`nome\|dkv\|targa\|gps\|alias`); vuoto = `FLOTTA_` del codice. Vedi `preparaFoglioFlotta()` |
 
 Tutte le soglie vivono nei `DEFAULTS_` in cima al `.gs` e nelle Script Properties: nessun valore hardcoded altrove.
 
@@ -120,7 +133,9 @@ La targa arriva già dall'email ("Licence plate"): la mappa carta→targa non se
 ## Test
 
 `node test-dkv.js` — Gmail/UrlFetch/PropertiesService finti: `mappaRigaDKV_` (pura) sul campione reale, soglie (sopra/sotto/null), upsert idempotente,
-ingest (solo label+archivio), `abbinaScontrino_` (targa uguale, fuori finestra, "contiene"/nome via mappa, null-safe), helper motivi
+ingest (solo label+archivio), `parseRigheFlotta_` (intestazioni in ordine vario, alias multipli, righe senza dkv, null/numeri),
+`aliasFlotta_`/`abbinaScontrino_` con flotta esplicita (e default), fallback/cache di `caricaFlotta_` (SpreadsheetApp finto),
+sezione "rifiutate" di `htmlReport_`, `abbinaScontrino_` (targa uguale, fuori finestra, "contiene"/nome via mappa, null-safe), helper motivi
 "senza scontrino" (senza doppioni), `riconciliaScontrini` (grace, idempotenza, solo GET/PATCH), report in sola lettura.
 `node --check` non accetta l'estensione `.gs`: per la sintassi copia il file con estensione `.js`.
 La parte Drive/SpreadsheetApp (`leggiAllegatiXlsx_`) non è coperta da unit test: va verificata con un'email reale

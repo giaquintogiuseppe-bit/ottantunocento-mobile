@@ -48,7 +48,8 @@ var DEFAULTS_ = {
   SOGLIA_STAZIONE_NUOVA: '1',                     // 1 = segnala stazione mai vista prima (0 = disattivato)
   SOGLIA_MIN_STORICO_STAZIONI: '5',               // "stazione nuova" attiva solo dopo almeno N stazioni già note (evita falsi allarmi all'avvio)
   SOGLIA_MINUTI_SCONTRINO: '45',                  // finestra abbinamento DKV<->scontrino Telegram: |ts_scontrino - ts_transazione| <= N minuti
-  SOGLIA_ORE_GRACE_SCONTRINO: '24'                // ore da attendere prima di dichiarare "senza scontrino" (lo scontrino può arrivare il giorno dopo)
+  SOGLIA_ORE_GRACE_SCONTRINO: '24',               // ore da attendere prima di dichiarare "senza scontrino" (lo scontrino può arrivare il giorno dopo)
+  FLOTTA_SHEET_ID: ''                             // id di un Foglio Google con la flotta (colonne nome|dkv|targa|gps|alias). Vuoto = si usa FLOTTA_ del codice
 };
 var STATI_ = { NUOVA: 'nuova', ARCHIVIATA: 'archiviata_gmail' };
 var TABELLA_ = 'dkv_autorizzazioni';
@@ -59,6 +60,8 @@ var MOTIVO_SENZA_SCONTRINO_ = 'rifornimento senza scontrino Telegram (non associ
 // (es. Clio: DKV F9341PT ma targa reale FX943SG). `alias` = targa reale, id GPS e nome con cui il bot
 // può indicare il mezzo. NB: "PRAMAC 1" è condiviso da due macchine (Generatore pramac e Ragno): una
 // transazione DKV "Pramac 1" NON è distinguibile tra le due (stessa carta/PIN).
+// Se la Script Property FLOTTA_SHEET_ID è valorizzata e il foglio contiene almeno una voce valida, il foglio SOSTITUISCE
+// questa lista (vedi caricaFlotta_); questa resta il fallback. preparaFoglioFlotta() crea il foglio a partire da qui.
 var FLOTTA_ = [
   { nome: 'Iveco con sponda',   dkv: 'GM972CF',  alias: ['GM972CF'] },
   { nome: 'Iveco aperto',       dkv: 'CT068NE',  alias: ['CT068NE'] },
@@ -359,12 +362,67 @@ function simile_(a, b) {
   if (a === b) return true;
   return (a.length >= 3 && b.length >= 3) && (a.indexOf(b) >= 0 || b.indexOf(a) >= 0);
 }
+/**
+ * FUNZIONE PURA (testata): converte la matrice di un Foglio (Sheet.getValues(); riga 0 = intestazioni) in una lista flotta
+ * [{nome, dkv, alias:[...]}]. Intestazioni (case-insensitive, "contiene", in qualsiasi ordine): nome, dkv, targa, gps, alias
+ * (alias = lista separata da virgola o ;, opzionale). `alias` in uscita = targa + gps + alias extra (vuoti scartati, senza doppioni).
+ * Le righe senza `dkv` sono saltate. Celle null/numeriche tollerate; mai eccezioni.
+ * @param {Array[]} values
+ * @return {{nome:string, dkv:string, alias:string[]}[]}
+ */
+function parseRigheFlotta_(values) {
+  if (!Array.isArray(values) || values.length < 2 || !Array.isArray(values[0])) return [];
+  var idx = {};
+  ['nome', 'dkv', 'targa', 'gps', 'alias'].forEach(function (k) {
+    idx[k] = -1;
+    for (var i = 0; i < values[0].length; i++) {
+      if (String(values[0][i] == null ? '' : values[0][i]).toLowerCase().indexOf(k) >= 0) { idx[k] = i; break; }
+    }
+  });
+  if (idx.dkv < 0) return [];
+  var cella = function (row, k) {
+    if (idx[k] < 0 || idx[k] >= row.length || row[idx[k]] == null) return '';
+    return String(row[idx[k]]).trim();
+  };
+  var out = [];
+  for (var r = 1; r < values.length; r++) {
+    var row = values[r];
+    if (!Array.isArray(row)) continue;
+    var dkv = cella(row, 'dkv');
+    if (!dkv) continue;
+    var alias = [cella(row, 'targa'), cella(row, 'gps')].concat(cella(row, 'alias').split(/[,;]/))
+      .map(function (x) { return x.trim(); }).filter(function (x) { return x; });
+    out.push({ nome: cella(row, 'nome'), dkv: dkv, alias: unici_(alias) });
+  }
+  return out;
+}
+// NON testata (usa SpreadsheetApp): sorgente della flotta. Se FLOTTA_SHEET_ID è valorizzata e il foglio dà almeno una voce
+// valida, SOSTITUISCE FLOTTA_; altrimenti (assente/illeggibile/vuoto) fallback a FLOTTA_ con un avviso nel log.
+// Cache per esecuzione in _flottaCache (resettata all'inizio di processaGiornata e riconciliaScontrini).
+var _flottaCache = null;
+function caricaFlotta_(cfg) {
+  if (_flottaCache) return _flottaCache;
+  var id = cfg && cfg.FLOTTA_SHEET_ID ? String(cfg.FLOTTA_SHEET_ID).trim() : '';
+  var flotta = null;
+  if (id) {
+    try {
+      var l = parseRigheFlotta_(SpreadsheetApp.openById(id).getSheets()[0].getDataRange().getValues());
+      if (l.length) flotta = l;
+      else Logger.log('Foglio flotta vuoto o senza voci valide: uso FLOTTA_ del codice.');
+    } catch (err) {
+      Logger.log('Foglio flotta non leggibile (' + sicuro_(err) + '): uso FLOTTA_ del codice.');
+    }
+  }
+  _flottaCache = flotta || FLOTTA_;
+  return _flottaCache;
+}
 // Tutti gli alias (normalizzati) con cui può comparire il mezzo la cui identità DKV è `dkvId`.
 // Include sempre dkvId stesso, così un mezzo non ancora in FLOTTA_ si abbina almeno sulla sua sigla DKV.
-function aliasFlotta_(dkvId) {
+// `flotta` opzionale (default FLOTTA_): resta pura.
+function aliasFlotta_(dkvId, flotta) {
   var d = normId_(dkvId);
   var out = d ? [d] : [];
-  FLOTTA_.forEach(function (m) {
+  (Array.isArray(flotta) ? flotta : FLOTTA_).forEach(function (m) {
     if (normId_(m.dkv) !== d) return;
     (m.alias || []).forEach(function (a) { var n = normId_(a); if (n) out.push(n); });
   });
@@ -378,15 +436,16 @@ function aliasFlotta_(dkvId) {
  * @param {Object} rec  record DKV ({targa, ts_transazione})
  * @param {Object[]} scontrini  [{ts, autore, mezzo, cantiere, note}]
  * @param {number} finestraMin
+ * @param {Object[]=} flotta  lista {nome, dkv, alias:[]} (default FLOTTA_ del codice)
  * @return {{trovato:boolean, cantiere:?string, autore:?string}}
  */
-function abbinaScontrino_(rec, scontrini, finestraMin) {
+function abbinaScontrino_(rec, scontrini, finestraMin, flotta) {
   var nessuno = { trovato: false, cantiere: null, autore: null };
   var targa = normId_(rec && rec.targa);
   var t0 = msValido_(rec && rec.ts_transazione);
   var fin = Number(finestraMin);
   if (!targa || t0 == null || !isFinite(fin) || fin < 0 || !Array.isArray(scontrini)) return nessuno;
-  var aliases = aliasFlotta_(targa);   // DKV, targa reale, id GPS, nome: tutti i modi in cui lo scontrino può nominare il mezzo
+  var aliases = aliasFlotta_(targa, flotta);   // DKV, targa reale, id GPS, nome: tutti i modi in cui lo scontrino può nominare il mezzo
   var best = null, bestD = Infinity;
   scontrini.forEach(function (s) {
     if (!s) return;
@@ -426,10 +485,10 @@ function scontriniInFinestra_(cfg, rec) {
   return supabaseTab_(cfg, TABELLA_SCONTRINI_, 'get', q).json || [];
 }
 // Ingest: se esiste già lo scontrino valorizza cantiere/scontrino_autore/scontrino_trovato sul record. Mai errori fatali.
-function arricchisciConScontrino_(cfg, rec) {
+function arricchisciConScontrino_(cfg, rec, flotta) {
   if (!rec.targa || !rec.ts_transazione) return rec;
   try {
-    var m = abbinaScontrino_(rec, scontriniInFinestra_(cfg, rec), num_(cfg.SOGLIA_MINUTI_SCONTRINO));
+    var m = abbinaScontrino_(rec, scontriniInFinestra_(cfg, rec), num_(cfg.SOGLIA_MINUTI_SCONTRINO), flotta);
     if (m.trovato) { rec.cantiere = m.cantiere; rec.scontrino_autore = m.autore; rec.scontrino_trovato = true; }
   } catch (err) {
     Logger.log('Scontrini non disponibili (si riprova in riconciliaScontrini): ' + sicuro_(err));
@@ -448,6 +507,8 @@ function arricchisciConScontrino_(cfg, rec) {
  */
 function riconciliaScontrini(cfg) {
   cfg = cfg || config_();
+  _flottaCache = null;
+  var flotta = caricaFlotta_(cfg);
   var tot = { esaminate: 0, trovate: 0, senza_scontrino: 0, saltate: 0, errori: 0 };
   var limite = new Date(Date.now() - num_(cfg.SOGLIA_ORE_GRACE_SCONTRINO) * 3600000).toISOString();
   var righe = supabase_(cfg, 'get',
@@ -458,7 +519,7 @@ function riconciliaScontrini(cfg) {
     if (esitoDKV_(r.esito) === 'rifiutata') { tot.saltate++; return; }
     tot.esaminate++;
     try {
-      var m = abbinaScontrino_(r, scontriniInFinestra_(cfg, r), num_(cfg.SOGLIA_MINUTI_SCONTRINO));
+      var m = abbinaScontrino_(r, scontriniInFinestra_(cfg, r), num_(cfg.SOGLIA_MINUTI_SCONTRINO), flotta);
       var upd = aggiornaMotivoScontrino_(r.motivi_sospetto, !m.trovato);
       var patch = null;
       if (m.trovato) {
@@ -485,6 +546,8 @@ function riconciliaScontrini(cfg) {
 // ---------- INGEST (scrittura) ----------
 function processaGiornata() {
   var cfg = config_();
+  _flottaCache = null;
+  var flotta = caricaFlotta_(cfg);
   var lab = GmailApp.getUserLabelByName(cfg.LABEL_IN);
   if (!lab) { Logger.log('Label "' + cfg.LABEL_IN + '" non trovata: esegui setup().'); return { threads: 0, record: 0, errori: 0 }; }
   var done = GmailApp.getUserLabelByName(cfg.LABEL_DONE) || GmailApp.createLabel(cfg.LABEL_DONE);
@@ -499,7 +562,7 @@ function processaGiornata() {
         parseEmailDKV(m).forEach(function (rec, idx) {
           // Senza authorization_id: id sintetico stabile (messaggio + indice riga) per restare idempotenti
           if (!rec.authorization_id) rec.authorization_id = 'GMAIL-' + rec.gmail_message_id + '-' + idx;
-          arricchisciConScontrino_(cfg, rec);   // solo arricchimento: NIENTE "senza scontrino" qui (vedi riconciliaScontrini)
+          arricchisciConScontrino_(cfg, rec, flotta);   // solo arricchimento: NIENTE "senza scontrino" qui (vedi riconciliaScontrini)
           var v = valutaSospetti(rec, contesto_(cfg, rec), cfg);
           rec.sospetta = v.sospetta;
           rec.motivi_sospetto = v.motivi.length ? v.motivi.join('; ') : null;
@@ -613,6 +676,7 @@ function esc_(s) {
 function htmlReport_(righe, giorno) {
   var sosp = righe.filter(function (r) { return r.sospetta; });
   var dav = righe.filter(function (r) { return !r.parsed; });
+  var rif = righe.filter(function (r) { return esitoDKV_(r.esito) === 'rifiutata'; });   // restano comunque tra le sospette
   var totale = righe.reduce(function (s, r) { return s + (r.importo == null ? 0 : Number(r.importo) || 0); }, 0);
   var h = '<div style="font-family:Arial,sans-serif;font-size:14px">';
   h += '<h2>Report DKV ' + esc_(giorno) + '</h2>';
@@ -621,6 +685,14 @@ function htmlReport_(righe, giorno) {
   if (sosp.length) {
     h += '<div style="border:2px solid #c00;padding:8px;margin:8px 0"><h3 style="color:#c00;margin:0 0 6px">ANOMALIE SOSPETTE</h3><ul style="color:#c00">';
     sosp.forEach(function (r) { h += '<li>' + riga_(r) + '<br><b>Motivi:</b> ' + esc_(r.motivi_sospetto) + '</li>'; });
+    h += '</ul></div>';
+  }
+  if (rif.length) {
+    h += '<div style="border:1px solid #c60;padding:8px;margin:8px 0"><h3 style="color:#c60;margin:0 0 6px">Transazioni rifiutate (DEC)</h3><ul>';
+    rif.forEach(function (r) {
+      h += '<li>' + esc_([r.targa || ('carta ...' + (r.carta_last4 || '?')), r.ts_transazione || r.ricevuta_il, r.stazione, r.esito]
+        .filter(function (x) { return x !== '' && x != null; }).join(' | ')) + '</li>';
+    });
     h += '</ul></div>';
   }
   if (dav.length) {
@@ -675,6 +747,17 @@ function setup() {
     '  Azione:  Applica l\'etichetta "' + cfg.LABEL_IN + '"  (NON "Elimina")',
     'Per provare: applica la label a mano a una email DKV esistente con allegato xlsx.'
   ].join('\n'));
+}
+
+// Crea un nuovo Foglio Google "Flotta DKV 81|00" con intestazione nome|dkv|targa|gps|alias e una riga per ogni voce di FLOTTA_
+// (gli alias noti vanno tutti nella colonna alias; targa/gps restano vuoti). Non cancella nulla: stampa l'id da incollare in FLOTTA_SHEET_ID.
+function preparaFoglioFlotta() {
+  var ss = SpreadsheetApp.create('Flotta DKV 81|00');
+  var righe = [['nome', 'dkv', 'targa', 'gps', 'alias']];
+  FLOTTA_.forEach(function (m) { righe.push([m.nome || '', m.dkv || '', '', '', (m.alias || []).join(', ')]); });
+  ss.getSheets()[0].getRange(1, 1, righe.length, 5).setValues(righe);
+  Logger.log('Foglio creato: ' + ss.getUrl() + '\nIncolla questo id nella Script Property FLOTTA_SHEET_ID: ' + ss.getId());
+  return ss.getId();
 }
 
 // Esempio/placeholder: sostituisci i valori, esegui UNA volta, poi riporta i placeholder (la chiave non va lasciata nel codice).

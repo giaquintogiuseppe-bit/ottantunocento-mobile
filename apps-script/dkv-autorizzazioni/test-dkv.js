@@ -198,6 +198,52 @@ assert.strictEqual(tot2.errori, 1); assert.strictEqual(tot2.threads, 0); assert.
   assert.strictEqual(t.errori, 3); assert.strictEqual(log.filter((x) => x.o.method === 'patch').length, 0);
 }
 
+// (f) flotta da Foglio: parseRigheFlotta_ (pura), aliasFlotta_/abbinaScontrino_ con flotta esplicita, caricaFlotta_ fallback
+{
+  const P = (v) => JSON.parse(JSON.stringify(ctx.parseRigheFlotta_(v)));
+  // intestazioni in ordine vario, "contiene", case-insensitive; alias multipli; targa+gps+alias uniti
+  let l = P([['Alias (extra)', 'GPS id', 'DKV (email)', 'Nome mezzo', 'TARGA'],
+    ['Furgone; Van , FS504WE', 'GPS9', 'FS504WE', 'Doblò', 'FS504WE'],
+    ['', '', 'CT068NE', 'Iveco aperto', '']]);
+  assert.deepStrictEqual(l, [{ nome: 'Doblò', dkv: 'FS504WE', alias: ['FS504WE', 'GPS9', 'Furgone', 'Van'] }, { nome: 'Iveco aperto', dkv: 'CT068NE', alias: [] }]);
+  // righe senza dkv saltate; celle null/numeriche/righe corte
+  l = P([['nome', 'dkv', 'targa', 'gps', 'alias'], ['Senza dkv', '', 'AA111AA', '', ''], ['X', null, '', '', ''], ['Num', 12345, 777, null, 99], ['Corta', 'ZZ'], null, 'boh']);
+  assert.deepStrictEqual(l, [{ nome: 'Num', dkv: '12345', alias: ['777', '99'] }, { nome: 'Corta', dkv: 'ZZ', alias: [] }]);
+  // alias opzionale (colonna assente) e input degeneri
+  assert.deepStrictEqual(P([['nome', 'dkv', 'targa', 'gps'], ['A', 'B', 'C', 'D']]), [{ nome: 'A', dkv: 'B', alias: ['C', 'D'] }]);
+  [null, undefined, [], [['nome', 'dkv']], [['nome', 'targa'], ['A', 'B']], 'x', [null]].forEach((v) => { assert.doesNotThrow(() => ctx.parseRigheFlotta_(v)); assert.deepStrictEqual(P(v), []); });
+  // flotta esplicita per aliasFlotta_/abbinaScontrino_ (default invariato)
+  const fl = [{ nome: 'Nuovo', dkv: 'NN111NN', alias: ['BETA', 'furgone blu'] }];
+  assert.deepStrictEqual([...ctx.aliasFlotta_('NN111NN', fl)], ['NN111NN', 'BETA', 'FURGONEBLU']);
+  assert.deepStrictEqual([...ctx.aliasFlotta_('NN111NN')], ['NN111NN']);                          // default FLOTTA_: non lo conosce
+  assert.ok(ctx.aliasFlotta_('FS504WE').includes('FS504WE')); assert.deepStrictEqual([...ctx.aliasFlotta_('F9341PT', [])], ['F9341PT']);
+  const rN = { targa: 'NN111NN', ts_transazione: '2026-11-18T09:50:00+01:00' };
+  const scB = [{ ts: '2026-11-18T08:50:00Z', mezzo: 'Beta', cantiere: 'Gamma', autore: 'Z' }];
+  assert.strictEqual(ctx.abbinaScontrino_(rN, scB, 45).trovato, false);                          // 3 argomenti: default FLOTTA_
+  assert.strictEqual(ctx.abbinaScontrino_(rN, scB, 45, fl).cantiere, 'Gamma');                   // flotta passata
+  assert.strictEqual(ctx.abbinaScontrino_({ targa: 'F9341PT', ts_transazione: rN.ts_transazione }, [{ ts: '2026-11-18T08:50:00Z', mezzo: 'Clio', cantiere: 'N' }], 45, fl).trovato, false); // la flotta passata sostituisce il default
+  // caricaFlotta_: senza id -> FLOTTA_; con id e foglio -> foglio (cache); foglio illeggibile/vuoto -> fallback
+  ctx._flottaCache = null; assert.strictEqual(ctx.caricaFlotta_(cfg), ctx.FLOTTA_);
+  let apertureFoglio = 0, valoriFoglio = [['nome', 'dkv', 'targa', 'gps', 'alias'], ['Nuovo', 'NN111NN', '', '', 'Beta']];
+  ctx.SpreadsheetApp = { openById: (id) => { apertureFoglio++; if (id === 'KO') throw new Error('no accesso'); return { getSheets: () => [{ getDataRange: () => ({ getValues: () => valoriFoglio }) }] }; } };
+  ctx._flottaCache = null; let fc = ctx.caricaFlotta_({ ...cfg, FLOTTA_SHEET_ID: 'SHEET1' });
+  assert.strictEqual(fc.length, 1); assert.strictEqual(fc[0].dkv, 'NN111NN'); ctx.caricaFlotta_({ ...cfg, FLOTTA_SHEET_ID: 'SHEET1' }); assert.strictEqual(apertureFoglio, 1); // cache
+  ctx._flottaCache = null; assert.strictEqual(ctx.caricaFlotta_({ ...cfg, FLOTTA_SHEET_ID: 'KO' }), ctx.FLOTTA_);
+  valoriFoglio = [['nome', 'dkv']]; ctx._flottaCache = null; assert.strictEqual(ctx.caricaFlotta_({ ...cfg, FLOTTA_SHEET_ID: 'SHEET1' }), ctx.FLOTTA_);
+  ctx._flottaCache = null;
+}
+
+// (g) report: sezione "Transazioni rifiutate (DEC)" (restano anche tra le sospette)
+{
+  const h = ctx.htmlReport_([
+    { parsed: true, sospetta: true, motivi_sospetto: 'transazione rifiutata (esito DEC_PIN)', targa: 'GM972CF', ts_transazione: '2026-11-18T09:50:00+01:00', stazione: 'Eni <X>', esito: 'DEC_PIN' },
+    { parsed: true, sospetta: false, targa: 'FS504WE', ts_transazione: '2026-11-18T10:00:00+01:00', esito: 'APP_LIM20_APPR' }], '2026-11-18');
+  assert.ok(h.includes('Transazioni rifiutate (DEC)')); assert.ok(h.includes('ANOMALIE SOSPETTE'));
+  const sez = h.split('Transazioni rifiutate (DEC)')[1].split('Elenco del giorno')[0];
+  assert.ok(sez.includes('GM972CF') && sez.includes('DEC_PIN') && sez.includes('Eni &lt;X&gt;') && !sez.includes('FS504WE'));
+  assert.ok(!ctx.htmlReport_([{ parsed: true, esito: 'APP_X' }], '2026-11-18').includes('Transazioni rifiutate'));
+}
+
 // report: sola lettura (solo GET), mail senza chiave, sospette in rosso
 fetches.length = 0;
 ctx.UrlFetchApp.fetch = (url, o) => { fetches.push({ url, o }); return { getResponseCode: () => 200, getContentText: () => JSON.stringify([
