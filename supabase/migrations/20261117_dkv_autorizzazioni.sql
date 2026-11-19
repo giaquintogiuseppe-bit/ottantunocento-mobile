@@ -39,16 +39,10 @@ create index if not exists dkv_autorizzazioni_ricevuta_il_idx on public.dkv_auto
 create index if not exists dkv_autorizzazioni_sospetta_idx    on public.dkv_autorizzazioni (sospetta) where sospetta;
 create index if not exists dkv_autorizzazioni_carta_ts_idx    on public.dkv_autorizzazioni (carta_last4, ts_transazione);
 
--- RLS: abilitata. Policy per `anon` come per le altre tabelle operative (i front-end usano la anon key):
--- SELECT, INSERT, UPDATE; NESSUNA policy DELETE (le righe antifrode non si cancellano da client).
--- L'Apps Script scrive invece con la service-role key, che bypassa RLS: le policy qui sotto
--- servono solo ai front-end che leggono/marcano come "vista".
+-- RLS: abilitata. Come le altre tabelle operative (rifornimenti, scontrini_telegram): un'unica policy
+-- "operativo" per il ruolo authenticated (il gestionale/front-end interroga come utente LOGGATO, non anon).
+-- L'Apps Script scrive con la service-role key, che bypassa comunque la RLS.
 alter table public.dkv_autorizzazioni enable row level security;
 
-drop policy if exists dkv_autorizzazioni_anon_select on public.dkv_autorizzazioni;
-drop policy if exists dkv_autorizzazioni_anon_insert on public.dkv_autorizzazioni;
-drop policy if exists dkv_autorizzazioni_anon_update on public.dkv_autorizzazioni;
-
-create policy dkv_autorizzazioni_anon_select on public.dkv_autorizzazioni for select to anon using (true);
-create policy dkv_autorizzazioni_anon_insert on public.dkv_autorizzazioni for insert to anon with check (true);
-create policy dkv_autorizzazioni_anon_update on public.dkv_autorizzazioni for update to anon using (true) with check (true);
+drop policy if exists operativo on public.dkv_autorizzazioni;
+create policy operativo on public.dkv_autorizzazioni for all to authenticated using (true) with check (true);
