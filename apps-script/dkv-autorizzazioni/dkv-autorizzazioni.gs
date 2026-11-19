@@ -47,7 +47,7 @@ var DEFAULTS_ = {
   SOGLIA_MINUTI_DOPPIA: '30',                     // due transazioni stessa carta entro N minuti (0 = disattivato)
   SOGLIA_STAZIONE_NUOVA: '1',                     // 1 = segnala stazione mai vista prima (0 = disattivato)
   SOGLIA_MIN_STORICO_STAZIONI: '5',               // "stazione nuova" attiva solo dopo almeno N stazioni già note (evita falsi allarmi all'avvio)
-  SOGLIA_MINUTI_SCONTRINO: '45',                  // finestra abbinamento DKV<->scontrino Telegram: |ts_scontrino - ts_transazione| <= N minuti
+  SOGLIA_MINUTI_SCONTRINO: '1440',                // finestra abbinamento DKV<->scontrino: gli scontrini si registrano spesso la SERA, non all'istante del rifornimento -> finestra ampia (1440 = 24h)
   SOGLIA_ORE_GRACE_SCONTRINO: '24',               // ore da attendere prima di dichiarare "senza scontrino" (lo scontrino può arrivare il giorno dopo)
   FLOTTA_SHEET_ID: ''                             // id di un Foglio Google con la flotta (colonne nome|dkv|targa|gps|alias). Vuoto = si usa FLOTTA_ del codice
 };
