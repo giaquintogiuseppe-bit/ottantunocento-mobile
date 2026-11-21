@@ -789,15 +789,30 @@ function provaAutorizzazioni() {
   }
 }
 
-// Installa i tre trigger temporali (rimuove prima i vecchi trigger di queste due funzioni).
+// Chiede su Telegram il cantiere dei rifornimenti DKV ancora orfani: chiama la Edge Function telegram-bot (?dkv-ask).
+// Autenticazione con la service-role key (la funzione verifica Authorization: Bearer <service-role>). Nessun segreto nel codice.
+function chiediCantieriMancanti() {
+  var cfg = config_();
+  try {
+    var res = UrlFetchApp.fetch(cfg.SUPABASE_URL + '/functions/v1/telegram-bot?dkv-ask', {
+      method: 'post', muteHttpExceptions: true,
+      headers: { Authorization: 'Bearer ' + cfg.SUPABASE_SERVICE_KEY }
+    });
+    Logger.log('Richiesta cantieri Telegram: HTTP ' + res.getResponseCode() + ' ' + String(res.getContentText() || '').substring(0, 200));
+  } catch (err) { Logger.log('chiediCantieriMancanti KO: ' + sicuro_(err)); }
+}
+
+// Installa i trigger temporali (rimuove prima i vecchi trigger di queste funzioni).
 function creaTrigger() {
   ScriptApp.getProjectTriggers().forEach(function (t) {
     var f = t.getHandlerFunction();
-    if (f === 'processaGiornata' || f === 'reportSerale' || f === 'riconciliaScontrini') ScriptApp.deleteTrigger(t);
+    if (f === 'processaGiornata' || f === 'reportSerale' || f === 'riconciliaScontrini' || f === 'chiediCantieriMancanti') ScriptApp.deleteTrigger(t);
   });
   ScriptApp.newTrigger('processaGiornata').timeBased().everyMinutes(30).create();
   ScriptApp.newTrigger('reportSerale').timeBased().atHour(21).everyDays(1).inTimezone(DEFAULTS_.TIMEZONE).create();
   // Ogni 2 ore: con grace 24h basta; così "senza scontrino" è già scritto quando parte il report delle 21:00.
   ScriptApp.newTrigger('riconciliaScontrini').timeBased().everyHours(2).create();
-  Logger.log('Trigger creati: processaGiornata ogni 30 min; riconciliaScontrini ogni 2 ore; reportSerale ogni giorno alle 21:00 (Europe/Rome, finestra fino alle 22).');
+  // La sera (ore 20): chiede su Telegram il cantiere dei rifornimenti ancora orfani (prima del report delle 21).
+  ScriptApp.newTrigger('chiediCantieriMancanti').timeBased().atHour(20).everyDays(1).inTimezone(DEFAULTS_.TIMEZONE).create();
+  Logger.log('Trigger creati: processaGiornata ogni 30 min; riconciliaScontrini ogni 2 ore; chiediCantieriMancanti ore 20; reportSerale ore 21 (Europe/Rome).');
 }
